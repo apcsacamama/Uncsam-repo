@@ -15,6 +15,8 @@ import {
   Navigation,
   Camera,
   Utensils,
+  Maximize2,
+  Minimize2,
 } from "lucide-react";
 
 interface ItineraryItem {
@@ -57,6 +59,7 @@ export default function ItineraryChatbot({
   const [weatherWarnings, setWeatherWarnings] = useState<string[]>([]);
   const [alternatives, setAlternatives] = useState<string[]>([]);
   const [showAlternatives, setShowAlternatives] = useState(false);
+  const [isMinimized, setIsMinimized] = useState(false);
 
   // Mock weather data
   const mockWeather = {
@@ -263,209 +266,271 @@ Contact: unclesamtourservices1988@gmail.com | +81 80-5331-1738
   if (!isVisible) return null;
 
   return (
-    <Card className="fixed inset-4 md:inset-x-auto md:left-1/2 md:transform md:-translate-x-1/2 md:w-4xl max-w-4xl shadow-2xl z-50 bg-white overflow-hidden">
-      <CardHeader className="bg-red-600 text-white p-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <Bot className="w-6 h-6" />
-            <div>
-              <CardTitle className="text-xl">AI Itinerary Planner</CardTitle>
-              <p className="text-red-100">
-                Personalized tour planning for {travelers} passenger
-                {travelers > 1 ? "s" : ""}
-              </p>
-            </div>
-          </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onClose}
-            className="text-white hover:bg-red-700"
-          >
-            <X className="w-5 h-5" />
-          </Button>
-        </div>
-      </CardHeader>
-
-      <CardContent className="p-6 max-h-96 overflow-y-auto">
-        {isGenerating ? (
-          <div className="text-center py-12">
-            <Bot className="w-12 h-12 text-red-600 mx-auto mb-4 animate-pulse" />
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">
-              Generating Your Personalized Itinerary
-            </h3>
-            <p className="text-gray-600">
-              Analyzing destinations, checking weather, and optimizing your
-              schedule...
-            </p>
-            <div className="flex justify-center mt-4">
-              <div className="flex space-x-1">
-                <div className="w-2 h-2 bg-red-600 rounded-full animate-bounce"></div>
-                <div
-                  className="w-2 h-2 bg-red-600 rounded-full animate-bounce"
-                  style={{ animationDelay: "0.1s" }}
-                ></div>
-                <div
-                  className="w-2 h-2 bg-red-600 rounded-full animate-bounce"
-                  style={{ animationDelay: "0.2s" }}
-                ></div>
+    <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
+      <div
+        className={`bg-white rounded-lg shadow-2xl transition-all duration-300 ${
+          isMinimized
+            ? "w-96 h-16"
+            : "w-[95%] h-[95%] sm:w-[90%] sm:h-[90%] lg:w-[80%] lg:h-[90%]"
+        } max-w-6xl max-h-screen overflow-hidden flex flex-col`}
+      >
+        {/* Header */}
+        <div className="bg-red-600 text-white p-4 sm:p-6 flex-shrink-0">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <Bot className="w-6 h-6" />
+              <div>
+                <h2 className="text-xl sm:text-2xl font-bold">
+                  AI Itinerary Planner
+                </h2>
+                <p className="text-red-100 text-sm sm:text-base">
+                  Personalized tour planning for {travelers} passenger
+                  {travelers > 1 ? "s" : ""}
+                </p>
               </div>
             </div>
+            <div className="flex items-center space-x-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsMinimized(!isMinimized)}
+                className="text-white hover:bg-red-700"
+              >
+                {isMinimized ? (
+                  <Maximize2 className="w-5 h-5" />
+                ) : (
+                  <Minimize2 className="w-5 h-5" />
+                )}
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={onClose}
+                className="text-white hover:bg-red-700"
+              >
+                <X className="w-5 h-5" />
+              </Button>
+            </div>
           </div>
-        ) : (
-          <div className="space-y-6">
-            {/* Weather Warnings */}
-            {weatherWarnings.length > 0 && (
-              <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded">
-                <div className="flex items-start space-x-3">
-                  <AlertTriangle className="w-5 h-5 text-yellow-600 mt-0.5" />
-                  <div>
-                    <h4 className="font-semibold text-yellow-800">
-                      Weather Advisory
-                    </h4>
-                    <ul className="text-yellow-700 text-sm mt-1">
-                      {weatherWarnings.map((warning, index) => (
-                        <li key={index}>• {warning}</li>
-                      ))}
-                    </ul>
+        </div>
+
+        {/* Content */}
+        {!isMinimized && (
+          <div className="flex-1 overflow-hidden">
+            {isGenerating ? (
+              <div className="flex items-center justify-center h-full">
+                <div className="text-center py-12">
+                  <Bot className="w-16 h-16 text-red-600 mx-auto mb-4 animate-pulse" />
+                  <h3 className="text-2xl font-semibold text-gray-900 mb-2">
+                    Generating Your Personalized Itinerary
+                  </h3>
+                  <p className="text-gray-600 mb-6">
+                    Analyzing destinations, checking weather, and optimizing
+                    your schedule...
+                  </p>
+                  <div className="flex justify-center">
+                    <div className="flex space-x-1">
+                      <div className="w-3 h-3 bg-red-600 rounded-full animate-bounce"></div>
+                      <div
+                        className="w-3 h-3 bg-red-600 rounded-full animate-bounce"
+                        style={{ animationDelay: "0.1s" }}
+                      ></div>
+                      <div
+                        className="w-3 h-3 bg-red-600 rounded-full animate-bounce"
+                        style={{ animationDelay: "0.2s" }}
+                      ></div>
+                    </div>
                   </div>
                 </div>
               </div>
-            )}
-
-            {/* Alternative Suggestions */}
-            {showAlternatives && (
-              <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg">
-                <h4 className="font-semibold text-blue-900 mb-3">
-                  Suggested Alternatives (Better Weather)
-                </h4>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  {alternatives.map((alternative, index) => (
-                    <div
-                      key={alternative}
-                      className="bg-white p-3 rounded border"
-                    >
-                      <h5 className="font-medium text-gray-900">
-                        {alternative}
-                      </h5>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => acceptAlternative(alternative, index)}
-                        className="mt-2 text-xs"
-                      >
-                        Replace {selectedDestinations[index]}
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-                <Button
-                  onClick={() => setShowAlternatives(false)}
-                  variant="outline"
-                  size="sm"
-                  className="mt-3"
-                >
-                  Keep Original Destinations
-                </Button>
-              </div>
-            )}
-
-            {/* Generated Itinerary */}
-            {itinerary.length > 0 && (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-xl font-bold text-gray-900">
-                    Your Personalized Itinerary
-                  </h3>
-                  <Button
-                    onClick={exportToPDF}
-                    className="bg-red-600 hover:bg-red-700 text-white"
-                  >
-                    <Download className="w-4 h-4 mr-2" />
-                    Export PDF
-                  </Button>
-                </div>
-
-                {itinerary.map((day) => (
-                  <Card key={day.day} className="border-gray-200">
-                    <CardHeader className="bg-gray-50 py-3">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-3">
-                          <Calendar className="w-5 h-5 text-red-600" />
-                          <div>
-                            <h4 className="font-semibold">Day {day.day}</h4>
-                            <p className="text-sm text-gray-600">{day.date}</p>
-                          </div>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          {getWeatherIcon(day.weather.condition)}
-                          <span className="text-sm text-gray-600">
-                            {day.weather.condition} • {day.weather.temp}
-                          </span>
+            ) : (
+              <div className="h-full overflow-y-auto">
+                <div className="p-4 sm:p-6 space-y-6">
+                  {/* Weather Warnings */}
+                  {weatherWarnings.length > 0 && (
+                    <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded">
+                      <div className="flex items-start space-x-3">
+                        <AlertTriangle className="w-6 h-6 text-yellow-600 mt-0.5 flex-shrink-0" />
+                        <div>
+                          <h4 className="font-semibold text-yellow-800 text-lg">
+                            Weather Advisory
+                          </h4>
+                          <ul className="text-yellow-700 mt-2 space-y-1">
+                            {weatherWarnings.map((warning, index) => (
+                              <li key={index} className="text-base">
+                                • {warning}
+                              </li>
+                            ))}
+                          </ul>
                         </div>
                       </div>
-                    </CardHeader>
-                    <CardContent className="p-4">
-                      <div className="space-y-4">
-                        {day.items.map((item, index) => (
+                    </div>
+                  )}
+
+                  {/* Alternative Suggestions */}
+                  {showAlternatives && (
+                    <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg">
+                      <h4 className="font-semibold text-blue-900 mb-4 text-lg">
+                        Suggested Alternatives (Better Weather)
+                      </h4>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        {alternatives.map((alternative, index) => (
                           <div
-                            key={index}
-                            className="flex items-start space-x-4 pb-4 border-b border-gray-100 last:border-b-0"
+                            key={alternative}
+                            className="bg-white p-4 rounded border shadow-sm"
                           >
-                            <div className="flex-shrink-0">
-                              {getActivityIcon(item.type)}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center space-x-2 mb-1">
-                                <span className="font-medium text-gray-900">
-                                  {item.time}
-                                </span>
-                                <Badge variant="outline" className="text-xs">
-                                  {item.duration}
-                                </Badge>
-                              </div>
-                              <h5 className="font-semibold text-gray-900">
-                                {item.activity}
-                              </h5>
-                              <p className="text-sm text-gray-600 flex items-center">
-                                <MapPin className="w-3 h-3 mr-1" />
-                                {item.location}
-                              </p>
-                              {item.notes && (
-                                <p className="text-xs text-gray-500 mt-1 italic">
-                                  {item.notes}
-                                </p>
-                              )}
-                            </div>
+                            <h5 className="font-medium text-gray-900 text-base">
+                              {alternative}
+                            </h5>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() =>
+                                acceptAlternative(alternative, index)
+                              }
+                              className="mt-3 w-full"
+                            >
+                              Replace {selectedDestinations[index]}
+                            </Button>
                           </div>
                         ))}
                       </div>
-                    </CardContent>
-                  </Card>
-                ))}
+                      <Button
+                        onClick={() => setShowAlternatives(false)}
+                        variant="outline"
+                        size="sm"
+                        className="mt-4"
+                      >
+                        Keep Original Destinations
+                      </Button>
+                    </div>
+                  )}
 
-                {/* Package Inclusions Reminder */}
-                <Card className="bg-green-50 border-green-200">
-                  <CardContent className="p-4">
-                    <h4 className="font-semibold text-green-900 mb-2">
-                      Included in Your Tour Package
-                    </h4>
-                    <ul className="text-sm text-green-800 space-y-1">
-                      <li>
-                        • 12-hour private tour with dedicated tour assistant
-                      </li>
-                      <li>• Private van transportation</li>
-                      <li>• Gas and toll fees included</li>
-                      <li>• Hotel pick-up and drop-off service</li>
-                      <li>• Driver fluent in English, Japanese, and Tagalog</li>
-                    </ul>
-                  </CardContent>
-                </Card>
+                  {/* Generated Itinerary */}
+                  {itinerary.length > 0 && (
+                    <div className="space-y-6">
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                        <h3 className="text-2xl font-bold text-gray-900">
+                          Your Personalized Itinerary
+                        </h3>
+                        <Button
+                          onClick={exportToPDF}
+                          className="bg-red-600 hover:bg-red-700 text-white px-6 py-3 text-base"
+                        >
+                          <Download className="w-5 h-5 mr-2" />
+                          Export PDF
+                        </Button>
+                      </div>
+
+                      {itinerary.map((day) => (
+                        <Card
+                          key={day.day}
+                          className="border-gray-200 shadow-sm"
+                        >
+                          <CardHeader className="bg-gray-50 py-4">
+                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                              <div className="flex items-center space-x-3">
+                                <Calendar className="w-6 h-6 text-red-600" />
+                                <div>
+                                  <h4 className="font-semibold text-lg">
+                                    Day {day.day}
+                                  </h4>
+                                  <p className="text-gray-600">{day.date}</p>
+                                </div>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                {getWeatherIcon(day.weather.condition)}
+                                <span className="text-gray-600">
+                                  {day.weather.condition} • {day.weather.temp}
+                                </span>
+                              </div>
+                            </div>
+                          </CardHeader>
+                          <CardContent className="p-4 sm:p-6">
+                            <div className="space-y-4">
+                              {day.items.map((item, index) => (
+                                <div
+                                  key={index}
+                                  className="flex items-start space-x-4 pb-4 border-b border-gray-100 last:border-b-0"
+                                >
+                                  <div className="flex-shrink-0 mt-1">
+                                    {getActivityIcon(item.type)}
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-2">
+                                      <span className="font-medium text-gray-900 text-base">
+                                        {item.time}
+                                      </span>
+                                      <Badge
+                                        variant="outline"
+                                        className="text-xs w-fit"
+                                      >
+                                        {item.duration}
+                                      </Badge>
+                                    </div>
+                                    <h5 className="font-semibold text-gray-900 text-base mb-1">
+                                      {item.activity}
+                                    </h5>
+                                    <p className="text-gray-600 flex items-center text-base">
+                                      <MapPin className="w-4 h-4 mr-1 flex-shrink-0" />
+                                      {item.location}
+                                    </p>
+                                    {item.notes && (
+                                      <p className="text-gray-500 mt-2 text-sm italic">
+                                        {item.notes}
+                                      </p>
+                                    )}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+
+                      {/* Package Inclusions Reminder */}
+                      <Card className="bg-green-50 border-green-200">
+                        <CardContent className="p-4 sm:p-6">
+                          <h4 className="font-semibold text-green-900 mb-3 text-lg">
+                            Included in Your Tour Package
+                          </h4>
+                          <div className="grid sm:grid-cols-2 gap-3">
+                            <ul className="text-green-800 space-y-2">
+                              <li className="flex items-center">
+                                <div className="w-2 h-2 bg-green-600 rounded-full mr-3"></div>
+                                12-hour private tour with dedicated tour
+                                assistant
+                              </li>
+                              <li className="flex items-center">
+                                <div className="w-2 h-2 bg-green-600 rounded-full mr-3"></div>
+                                Private van transportation
+                              </li>
+                              <li className="flex items-center">
+                                <div className="w-2 h-2 bg-green-600 rounded-full mr-3"></div>
+                                Gas and toll fees included
+                              </li>
+                            </ul>
+                            <ul className="text-green-800 space-y-2">
+                              <li className="flex items-center">
+                                <div className="w-2 h-2 bg-green-600 rounded-full mr-3"></div>
+                                Hotel pick-up and drop-off service
+                              </li>
+                              <li className="flex items-center">
+                                <div className="w-2 h-2 bg-green-600 rounded-full mr-3"></div>
+                                Driver fluent in English, Japanese, and Tagalog
+                              </li>
+                            </ul>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
           </div>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }
