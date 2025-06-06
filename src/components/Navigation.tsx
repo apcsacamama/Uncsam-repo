@@ -22,13 +22,18 @@ export default function Navigation() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           {/* Logo */}
-          <Link to="/" className="flex items-center space-x-2">
-            <div className="bg-white text-red-600 p-2 rounded-full">
-              <span className="font-bold text-sm">UNCLE SAM</span>
+          <Link to="/" className="flex items-center space-x-3">
+            <div className="bg-white rounded-full p-1 w-12 h-12 flex items-center justify-center">
+              <div className="bg-black rounded-full w-10 h-10 flex items-center justify-center text-white text-xs font-bold">
+                <span>US</span>
+              </div>
             </div>
-            <span className="hidden sm:block font-bold text-lg">
-              TRAVEL BOOKINGS
-            </span>
+            <div className="hidden sm:block">
+              <div className="text-white font-bold text-lg leading-tight">
+                <div>UNCLE SAM</div>
+                <div className="text-sm font-normal text-red-100">TOURS</div>
+              </div>
+            </div>
           </Link>
 
           {/* Desktop Navigation */}

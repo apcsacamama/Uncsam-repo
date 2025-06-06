@@ -1,4 +1,5 @@
 import Navigation from "../components/Navigation";
+import FAQChatbot from "../components/FAQChatbot";
 import {
   Card,
   CardContent,
@@ -314,6 +315,8 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+
+      <FAQChatbot />
     </div>
   );
 }
