@@ -59,17 +59,17 @@ export default function About() {
 
   const stats = [
     {
-      number: "1988",
+      number: "2022",
       label: "Established Since",
       icon: <Award className="w-5 h-5" />,
     },
     {
-      number: "10,000+",
+      number: "5,000+",
       label: "Happy Customers",
       icon: <Users className="w-5 h-5" />,
     },
     {
-      number: "50+",
+      number: "25+",
       label: "Destinations",
       icon: <MapPin className="w-5 h-5" />,
     },

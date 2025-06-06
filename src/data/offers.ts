@@ -122,7 +122,7 @@ export const tourPackages: TourPackage[] = [
     id: "hiroshima-peace",
     title: "Hiroshima Peace Tour",
     image:
-      "https://images.unsplash.com/photo-1590736969955-71cc94901144?w=800&h=600&fit=crop",
+      "https://images.unsplash.com/photo-1528360983277-13d401cdc186?w=800&h=600&fit=crop",
     price: 45000,
     destinations: [
       "Peace Memorial Park",
@@ -140,6 +140,7 @@ export const tourPackages: TourPackage[] = [
     description:
       "Historical and cultural journey through Hiroshima with comprehensive service",
     duration: "12 Hours",
+    featured: true,
   },
 ];
 

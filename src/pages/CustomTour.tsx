@@ -39,13 +39,25 @@ export default function CustomTour() {
   );
   const [selectedTransportation, setSelectedTransportation] = useState<
     string[]
-  >([]);
+  >(["private-van"]); // Private van is selected by default
   const [travelers, setTravelers] = useState(1);
   const [showItineraryChatbot, setShowItineraryChatbot] = useState(false);
 
   const transportationOptions = [
-    { id: 'private-van', label: 'Private Van (Included)', icon: Car, price: 0, included: true },
-    { id: 'airport-transfer', label: 'Airport Transfer (Add-on)', icon: Plane, price: 8000, addon: true },
+    {
+      id: "private-van",
+      label: "Private Van (Included)",
+      icon: Car,
+      price: 0,
+      included: true,
+    },
+    {
+      id: "airport-transfer",
+      label: "Airport Transfer (Add-on)",
+      icon: Plane,
+      price: 8000,
+      addon: true,
+    },
   ];
 
   const handleDestinationChange = (destinationId: string, checked: boolean) => {
@@ -65,6 +77,9 @@ export default function CustomTour() {
     transportId: string,
     checked: boolean,
   ) => {
+    // Don't allow unchecking the included private van
+    if (transportId === "private-van") return;
+
     if (checked) {
       setSelectedTransportation([...selectedTransportation, transportId]);
     } else {
@@ -88,10 +103,7 @@ export default function CustomTour() {
     (basePrice + destinationPrice + transportationPrice) * travelers;
 
   const isFormValid =
-    location &&
-    selectedDate &&
-    selectedDestinations.length > 0 &&
-    selectedTransportation.length > 0;
+    location && selectedDate && selectedDestinations.length > 0;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -256,34 +268,55 @@ export default function CustomTour() {
             <Card>
               <CardHeader>
                 <CardTitle>Transportation Options</CardTitle>
-                <p className="text-sm text-gray-600">Private van included in all packages. Add airport transfer if needed.</p>
+                <p className="text-sm text-gray-600">
+                  Private van included in all packages. Add airport transfer if
+                  needed.
+                </p>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
                   {transportationOptions.map((transport) => (
-                    <div key={transport.id} className={`flex items-center space-x-3 p-4 border rounded-lg ${transport.included ? 'bg-green-50 border-green-200' : transport.addon ? 'bg-blue-50 border-blue-200' : ''} hover:bg-gray-50`}>
+                    <div
+                      key={transport.id}
+                      className={`flex items-center space-x-3 p-4 border rounded-lg ${transport.included ? "bg-green-50 border-green-200" : transport.addon ? "bg-blue-50 border-blue-200" : ""} hover:bg-gray-50`}
+                    >
                       <Checkbox
                         id={transport.id}
-                        checked={transport.included ? true : selectedTransportation.includes(transport.id)}
+                        checked={
+                          transport.included
+                            ? true
+                            : selectedTransportation.includes(transport.id)
+                        }
                         disabled={transport.included}
                         onCheckedChange={(checked) =>
-                          !transport.included && handleTransportationChange(transport.id, checked as boolean)
+                          !transport.included &&
+                          handleTransportationChange(
+                            transport.id,
+                            checked as boolean,
+                          )
                         }
                       />
-                      <transport.icon className={`w-6 h-6 ${transport.included ? 'text-green-600' : transport.addon ? 'text-blue-600' : 'text-gray-600'}`} />
+                      <transport.icon
+                        className={`w-6 h-6 ${transport.included ? "text-green-600" : transport.addon ? "text-blue-600" : "text-gray-600"}`}
+                      />
                       <div className="flex-1">
                         <Label
                           htmlFor={transport.id}
-                          className={`font-medium ${transport.included ? '' : 'cursor-pointer'}`}
+                          className={`font-medium ${transport.included ? "" : "cursor-pointer"}`}
                         >
                           {transport.label}
                         </Label>
-                        <p className={`text-sm font-medium ${transport.included ? 'text-green-600' : transport.addon ? 'text-blue-600' : 'text-red-600'}`}>
-                          {transport.price === 0 ? 'Included in package' : `¥${transport.price.toLocaleString()} per pax`}
+                        <p
+                          className={`text-sm font-medium ${transport.included ? "text-green-600" : transport.addon ? "text-blue-600" : "text-red-600"}`}
+                        >
+                          {transport.price === 0
+                            ? "Included in package"
+                            : `¥${transport.price.toLocaleString()} per pax`}
                         </p>
                         {transport.addon && (
                           <p className="text-xs text-gray-500 mt-1">
-                            Optional add-on service not included in standard package
+                            Optional add-on service not included in standard
+                            package
                           </p>
                         )}
                       </div>
@@ -291,7 +324,6 @@ export default function CustomTour() {
                   ))}
                 </div>
               </CardContent>
-            </Card>
             </Card>
           </div>
 
@@ -315,9 +347,9 @@ export default function CustomTour() {
                     </div>
                   )}
 
-                  {selectedTransportation.length > 0 && (
+                  {transportationPrice > 0 && (
                     <div className="flex justify-between text-sm">
-                      <span>Transportation:</span>
+                      <span>Airport Transfer:</span>
                       <span>¥{transportationPrice.toLocaleString()}</span>
                     </div>
                   )}
@@ -338,44 +370,35 @@ export default function CustomTour() {
                 </div>
 
                 {/* Selected Items Summary */}
-                {(selectedDestinations.length > 0 ||
-                  selectedTransportation.length > 0) && (
+                {selectedDestinations.length > 0 && (
                   <div className="space-y-3 pt-4 border-t">
-                    {selectedDestinations.length > 0 && (
-                      <div>
-                        <h4 className="font-medium text-sm text-gray-700 mb-2">
-                          Selected Destinations:
-                        </h4>
-                        <ul className="text-xs text-gray-600 space-y-1">
-                          {selectedDestinations.map((id) => {
-                            const destination = destinations.find(
-                              (d) => d.id === id,
-                            );
-                            return destination ? (
-                              <li key={id}>• {destination.name}</li>
-                            ) : null;
-                          })}
-                        </ul>
-                      </div>
-                    )}
+                    <div>
+                      <h4 className="font-medium text-sm text-gray-700 mb-2">
+                        Selected Destinations:
+                      </h4>
+                      <ul className="text-xs text-gray-600 space-y-1">
+                        {selectedDestinations.map((id) => {
+                          const destination = destinations.find(
+                            (d) => d.id === id,
+                          );
+                          return destination ? (
+                            <li key={id}>• {destination.name}</li>
+                          ) : null;
+                        })}
+                      </ul>
+                    </div>
 
-                    {selectedTransportation.length > 0 && (
-                      <div>
-                        <h4 className="font-medium text-sm text-gray-700 mb-2">
-                          Transportation:
-                        </h4>
-                        <ul className="text-xs text-gray-600 space-y-1">
-                          {selectedTransportation.map((id) => {
-                            const transport = transportationOptions.find(
-                              (t) => t.id === id,
-                            );
-                            return transport ? (
-                              <li key={id}>• {transport.label}</li>
-                            ) : null;
-                          })}
-                        </ul>
-                      </div>
-                    )}
+                    <div>
+                      <h4 className="font-medium text-sm text-gray-700 mb-2">
+                        Transportation:
+                      </h4>
+                      <ul className="text-xs text-gray-600 space-y-1">
+                        <li>• Private Van (Included)</li>
+                        {selectedTransportation.includes(
+                          "airport-transfer",
+                        ) && <li>• Airport Transfer (Add-on)</li>}
+                      </ul>
+                    </div>
                   </div>
                 )}
 

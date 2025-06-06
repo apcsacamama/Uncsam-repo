@@ -1,5 +1,6 @@
 import Navigation from "../components/Navigation";
 import FAQChatbot from "../components/FAQChatbot";
+import AIIntegrationStatus from "../components/AIIntegrationStatus";
 import {
   Card,
   CardContent,
@@ -162,11 +163,9 @@ export default function Dashboard() {
           </Card>
         </div>
 
-        <div className="grid lg:grid-cols-3 gap-8 mb-8">
-          {/* AI Integration Status - Full Width */}
-          <div className="lg:col-span-3">
-            <AIIntegrationStatus />
-          </div>
+        {/* AI Integration Status - Full Width */}
+        <div className="mb-8">
+          <AIIntegrationStatus />
         </div>
 
         <div className="grid lg:grid-cols-3 gap-8">
@@ -312,7 +311,7 @@ export default function Dashboard() {
                   <div className="flex justify-between items-center">
                     <div className="flex items-center">
                       <MapPin className="w-4 h-4 text-red-600 mr-2" />
-                      <span className="text-sm">Kyoto</span>
+                      <span className="text-sm">Hiroshima</span>
                     </div>
                     <span className="text-sm font-medium">28 bookings</span>
                   </div>
