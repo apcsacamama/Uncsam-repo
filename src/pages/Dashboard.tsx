@@ -162,6 +162,13 @@ export default function Dashboard() {
           </Card>
         </div>
 
+        <div className="grid lg:grid-cols-3 gap-8 mb-8">
+          {/* AI Integration Status - Full Width */}
+          <div className="lg:col-span-3">
+            <AIIntegrationStatus />
+          </div>
+        </div>
+
         <div className="grid lg:grid-cols-3 gap-8">
           {/* Recent Bookings */}
           <div className="lg:col-span-2">

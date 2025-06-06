@@ -108,7 +108,7 @@ export default function About() {
           </h1>
           <p className="text-xl md:text-2xl font-light max-w-3xl mx-auto">
             Your trusted partner in creating unforgettable travel experiences
-            since 1988
+            since 2022
           </p>
         </div>
       </div>
@@ -171,8 +171,8 @@ export default function About() {
               <div className="flex items-center space-x-3">
                 <Heart className="w-8 h-8 text-red-600" />
                 <div>
-                  <p className="font-bold text-2xl text-gray-900">35+</p>
-                  <p className="text-gray-600 text-sm">Years of Experience</p>
+                  <p className="font-bold text-2xl text-gray-900">2+</p>
+                  <p className="text-gray-600 text-sm">Years of Excellence</p>
                 </div>
               </div>
             </div>

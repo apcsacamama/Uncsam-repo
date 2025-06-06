@@ -44,9 +44,8 @@ export default function CustomTour() {
   const [showItineraryChatbot, setShowItineraryChatbot] = useState(false);
 
   const transportationOptions = [
-    { id: "bus", label: "Bus", icon: Car, price: 5000 },
-    { id: "train", label: "Train", icon: Train, price: 8000 },
-    { id: "flight", label: "Flight", icon: Plane, price: 15000 },
+    { id: 'private-van', label: 'Private Van (Included)', icon: Car, price: 0, included: true },
+    { id: 'airport-transfer', label: 'Airport Transfer (Add-on)', icon: Plane, price: 8000, addon: true },
   ];
 
   const handleDestinationChange = (destinationId: string, checked: boolean) => {
@@ -256,44 +255,43 @@ export default function CustomTour() {
             {/* Transportation */}
             <Card>
               <CardHeader>
-                <CardTitle>Available Transportation</CardTitle>
-                <p className="text-sm text-gray-600">
-                  Choose your preferred transportation method
-                </p>
+                <CardTitle>Transportation Options</CardTitle>
+                <p className="text-sm text-gray-600">Private van included in all packages. Add airport transfer if needed.</p>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
                   {transportationOptions.map((transport) => (
-                    <div
-                      key={transport.id}
-                      className="flex items-center space-x-3 p-4 border rounded-lg hover:bg-gray-50"
-                    >
+                    <div key={transport.id} className={`flex items-center space-x-3 p-4 border rounded-lg ${transport.included ? 'bg-green-50 border-green-200' : transport.addon ? 'bg-blue-50 border-blue-200' : ''} hover:bg-gray-50`}>
                       <Checkbox
                         id={transport.id}
-                        checked={selectedTransportation.includes(transport.id)}
+                        checked={transport.included ? true : selectedTransportation.includes(transport.id)}
+                        disabled={transport.included}
                         onCheckedChange={(checked) =>
-                          handleTransportationChange(
-                            transport.id,
-                            checked as boolean,
-                          )
+                          !transport.included && handleTransportationChange(transport.id, checked as boolean)
                         }
                       />
-                      <transport.icon className="w-6 h-6 text-gray-600" />
+                      <transport.icon className={`w-6 h-6 ${transport.included ? 'text-green-600' : transport.addon ? 'text-blue-600' : 'text-gray-600'}`} />
                       <div className="flex-1">
                         <Label
                           htmlFor={transport.id}
-                          className="font-medium cursor-pointer"
+                          className={`font-medium ${transport.included ? '' : 'cursor-pointer'}`}
                         >
                           {transport.label}
                         </Label>
-                        <p className="text-sm font-medium text-red-600">
-                          ¥{transport.price.toLocaleString()} per pax
+                        <p className={`text-sm font-medium ${transport.included ? 'text-green-600' : transport.addon ? 'text-blue-600' : 'text-red-600'}`}>
+                          {transport.price === 0 ? 'Included in package' : `¥${transport.price.toLocaleString()} per pax`}
                         </p>
+                        {transport.addon && (
+                          <p className="text-xs text-gray-500 mt-1">
+                            Optional add-on service not included in standard package
+                          </p>
+                        )}
                       </div>
                     </div>
                   ))}
                 </div>
               </CardContent>
+            </Card>
             </Card>
           </div>
 

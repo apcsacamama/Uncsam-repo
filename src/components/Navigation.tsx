@@ -2,6 +2,7 @@ import { Link, useLocation } from "react-router-dom";
 import { Button } from "./ui/button";
 import { User, Menu, X } from "lucide-react";
 import { useState } from "react";
+import UncleSamLogo from "./UncleSamLogo";
 
 export default function Navigation() {
   const location = useLocation();
@@ -22,18 +23,9 @@ export default function Navigation() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           {/* Logo */}
-          <Link to="/" className="flex items-center space-x-3">
-            <div className="bg-white rounded-full p-1 w-12 h-12 flex items-center justify-center">
-              <div className="bg-black rounded-full w-10 h-10 flex items-center justify-center text-white text-xs font-bold">
-                <span>US</span>
-              </div>
-            </div>
-            <div className="hidden sm:block">
-              <div className="text-white font-bold text-lg leading-tight">
-                <div>UNCLE SAM</div>
-                <div className="text-sm font-normal text-red-100">TOURS</div>
-              </div>
-            </div>
+          <Link to="/" className="flex items-center">
+            <UncleSamLogo size="md" className="hidden sm:flex" />
+            <UncleSamLogo size="sm" className="sm:hidden" />
           </Link>
 
           {/* Desktop Navigation */}
