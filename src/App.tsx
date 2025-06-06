@@ -11,6 +11,8 @@ import Dashboard from "./pages/Dashboard";
 import BookingConfirmation from "./pages/BookingConfirmation";
 import Profile from "./pages/Profile";
 import FAQ from "./pages/FAQ";
+import About from "./pages/About";
+import Contact from "./pages/Contact";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -33,36 +35,8 @@ const App = () => (
           />
           <Route path="/profile" element={<Profile />} />
           <Route path="/faq" element={<FAQ />} />
-          <Route
-            path="/about"
-            element={
-              <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-                <div className="text-center">
-                  <h1 className="text-4xl font-bold text-gray-900 mb-4">
-                    About Us
-                  </h1>
-                  <p className="text-xl text-gray-600">
-                    Learn more about Uncle Sam Travel Bookings
-                  </p>
-                </div>
-              </div>
-            }
-          />
-          <Route
-            path="/contact"
-            element={
-              <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-                <div className="text-center">
-                  <h1 className="text-4xl font-bold text-gray-900 mb-4">
-                    Contact Us
-                  </h1>
-                  <p className="text-xl text-gray-600">
-                    Get in touch with our team
-                  </p>
-                </div>
-              </div>
-            }
-          />
+          <Route path="/about" element={<About />} />
+          <Route path="/contact" element={<Contact />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
