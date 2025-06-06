@@ -58,10 +58,17 @@ export const tourPackages: TourPackage[] = [
       "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800&h=600&fit=crop",
     price: 15000,
     destinations: ["Tokyo Disneyland", "Tokyo DisneySea"],
-    inclusions: ["Round-trip transportation", "Park tickets", "Lunch voucher"],
+    inclusions: [
+      "12-hour tour duration",
+      "Private tour with dedicated tour assistant",
+      "Private van transportation",
+      "Gas and toll fees included",
+      "Hotel pick-up and drop-off service",
+      "Driver fluent in English, Japanese, and Tagalog",
+    ],
     description:
-      "Experience the magic of Disney with convenient transportation",
-    duration: "1 Day",
+      "Experience the magic of Disney with our comprehensive private tour service",
+    duration: "12 Hours",
     featured: true,
   },
   {
@@ -69,8 +76,8 @@ export const tourPackages: TourPackage[] = [
     title: "Nagoya Tour Package",
     image:
       "https://images.unsplash.com/photo-1545569341-9eb8b30979d9?w=800&h=600&fit=crop",
-    price: 79000,
-    originalPrice: 85000,
+    price: 85000,
+    originalPrice: 95000,
     destinations: [
       "Nagoya Castle",
       "Legoland",
@@ -80,14 +87,16 @@ export const tourPackages: TourPackage[] = [
       "Public Aquarium",
     ],
     inclusions: [
-      "12-Hour Tour",
-      "Private Tour",
-      "Hotel Pick-up",
-      "Hotel Drop-off",
-      "Driver",
+      "12-hour tour duration",
+      "Private tour with dedicated tour assistant",
+      "Private van transportation",
+      "Gas and toll fees included",
+      "Hotel pick-up and drop-off service",
+      "Driver fluent in English, Japanese, and Tagalog",
     ],
-    description: "Complete Nagoya experience with all major attractions",
-    duration: "2 Days",
+    description:
+      "Complete Nagoya experience with all major attractions in one comprehensive tour",
+    duration: "12 Hours",
     featured: true,
   },
   {
@@ -97,9 +106,17 @@ export const tourPackages: TourPackage[] = [
       "https://images.unsplash.com/photo-1542640244-7e672d6cef4e?w=800&h=600&fit=crop",
     price: 65000,
     destinations: ["Fukuoka Tower", "Ohori Park", "Dazaifu", "Canal City"],
-    inclusions: ["Transportation", "Guide", "Meals"],
-    description: "Discover the beauty of Fukuoka",
-    duration: "3 Days",
+    inclusions: [
+      "12-hour tour duration",
+      "Private tour with dedicated tour assistant",
+      "Private van transportation",
+      "Gas and toll fees included",
+      "Hotel pick-up and drop-off service",
+      "Driver fluent in English, Japanese, and Tagalog",
+    ],
+    description:
+      "Discover the beauty and culture of Fukuoka with our personalized service",
+    duration: "12 Hours",
   },
   {
     id: "hiroshima-peace",
@@ -112,9 +129,17 @@ export const tourPackages: TourPackage[] = [
       "Miyajima Island",
       "Hiroshima Castle",
     ],
-    inclusions: ["Guide", "Ferry tickets", "Lunch"],
-    description: "Historical and cultural journey through Hiroshima",
-    duration: "1 Day",
+    inclusions: [
+      "12-hour tour duration",
+      "Private tour with dedicated tour assistant",
+      "Private van transportation",
+      "Gas and toll fees included",
+      "Hotel pick-up and drop-off service",
+      "Driver fluent in English, Japanese, and Tagalog",
+    ],
+    description:
+      "Historical and cultural journey through Hiroshima with comprehensive service",
+    duration: "12 Hours",
   },
 ];
 
@@ -128,7 +153,7 @@ export const mockBookings: Booking[] = [
     phone: "+81-90-1234-5678",
     travelDate: "2024-02-15",
     travelers: 2,
-    totalPrice: 158000,
+    totalPrice: 170000,
     status: "confirmed",
     createdAt: "2024-01-15",
   },

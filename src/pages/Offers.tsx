@@ -1,6 +1,7 @@
 import Navigation from "../components/Navigation";
 import OfferCard from "../components/OfferCard";
 import OfferModal from "../components/OfferModal";
+import FAQChatbot from "../components/FAQChatbot";
 import { Input } from "../components/ui/input";
 import { Button } from "../components/ui/button";
 import { tourPackages } from "../data/offers";
@@ -140,6 +141,8 @@ export default function Offers() {
         isOpen={isModalOpen}
         onClose={closeModal}
       />
+
+      <FAQChatbot />
     </div>
   );
 }

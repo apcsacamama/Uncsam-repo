@@ -1,4 +1,5 @@
 import Navigation from "../components/Navigation";
+import ItineraryChatbot from "../components/ItineraryChatbot";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
@@ -17,16 +18,28 @@ import {
 } from "../components/ui/popover";
 import { destinations } from "../data/offers";
 import { useState } from "react";
-import { CalendarIcon, MapPin, Users, Plane, Train, Car } from "lucide-react";
+import {
+  CalendarIcon,
+  MapPin,
+  Users,
+  Plane,
+  Train,
+  Car,
+  Sparkles,
+} from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "../lib/utils";
 import { Link } from "react-router-dom";
 
 export default function CustomTour() {
   const [selectedDate, setSelectedDate] = useState<Date>();
-  const [location, setLocation] = useState('');
-  const [selectedDestinations, setSelectedDestinations] = useState<string[]>([]);
-  const [selectedTransportation, setSelectedTransportation] = useState<string[]>([]);
+  const [location, setLocation] = useState("");
+  const [selectedDestinations, setSelectedDestinations] = useState<string[]>(
+    [],
+  );
+  const [selectedTransportation, setSelectedTransportation] = useState<
+    string[]
+  >([]);
   const [travelers, setTravelers] = useState(1);
   const [showItineraryChatbot, setShowItineraryChatbot] = useState(false);
 
@@ -39,7 +52,7 @@ export default function CustomTour() {
   const handleDestinationChange = (destinationId: string, checked: boolean) => {
     const newDestinations = checked
       ? [...selectedDestinations, destinationId]
-      : selectedDestinations.filter(id => id !== destinationId);
+      : selectedDestinations.filter((id) => id !== destinationId);
 
     setSelectedDestinations(newDestinations);
 
@@ -368,22 +381,28 @@ export default function CustomTour() {
                   </div>
                 )}
 
-                {selectedDestinations.length >= 2 && selectedDate && location && (
-                  <Button
-                    onClick={() => setShowItineraryChatbot(true)}
-                    variant="outline"
-                    className="w-full border-blue-600 text-blue-600 hover:bg-blue-50 font-medium py-3 rounded-lg mb-3"
-                  >
-                    <Sparkles className="w-4 h-4 mr-2" />
-                    Generate AI Itinerary
-                  </Button>
-                )}
+                {selectedDestinations.length >= 2 &&
+                  selectedDate &&
+                  location && (
+                    <Button
+                      onClick={() => setShowItineraryChatbot(true)}
+                      variant="outline"
+                      className="w-full border-blue-600 text-blue-600 hover:bg-blue-50 font-medium py-3 rounded-lg mb-3"
+                    >
+                      <Sparkles className="w-4 h-4 mr-2" />
+                      Generate AI Itinerary
+                    </Button>
+                  )}
 
                 <Link
-                  to={isFormValid ? `/booking-confirmation?custom=true&price=${totalPrice}&travelers=${travelers}` : '#'}
+                  to={
+                    isFormValid
+                      ? `/booking-confirmation?custom=true&price=${totalPrice}&travelers=${travelers}`
+                      : "#"
+                  }
                   className={cn(
                     "block w-full",
-                    !isFormValid && "pointer-events-none"
+                    !isFormValid && "pointer-events-none",
                   )}
                 >
                   <Button
@@ -393,6 +412,11 @@ export default function CustomTour() {
                     Get Tickets for ¥{totalPrice.toLocaleString()}
                   </Button>
                 </Link>
+
+                {!isFormValid && (
+                  <p className="text-xs text-gray-500 text-center">
+                    Please complete all required fields to proceed
+                  </p>
                 )}
               </CardContent>
             </Card>
@@ -401,13 +425,15 @@ export default function CustomTour() {
       </div>
 
       <ItineraryChatbot
-        selectedDestinations={selectedDestinations.map(id => {
-          const destination = destinations.find(d => d.id === id);
-          return destination ? destination.name : '';
-        }).filter(Boolean)}
+        selectedDestinations={selectedDestinations
+          .map((id) => {
+            const destination = destinations.find((d) => d.id === id);
+            return destination ? destination.name : "";
+          })
+          .filter(Boolean)}
         isVisible={showItineraryChatbot}
         onClose={() => setShowItineraryChatbot(false)}
-        travelDate={selectedDate ? format(selectedDate, 'yyyy-MM-dd') : ''}
+        travelDate={selectedDate ? format(selectedDate, "yyyy-MM-dd") : ""}
         travelers={travelers}
       />
     </div>
