@@ -4,11 +4,11 @@ import OfferModal from "../components/OfferModal";
 import FAQChatbot from "../components/FAQChatbot";
 import { Input } from "../components/ui/input";
 import { Button } from "../components/ui/button";
-// Import both tourPackages AND destinations from the data file
-import { tourPackages, destinations } from "../data/offers"; 
+// FIX: Removed 'destinations' from the import since it no longer exists
+import { tourPackages } from "../data/offers"; 
 import { TourPackage } from "../types/travel";
 import { useState } from "react";
-import { Search, Filter, SlidersHorizontal, MapPin } from "lucide-react";
+import { Search, SlidersHorizontal } from "lucide-react"; // Removed MapPin since it was used in the deleted section
 
 export default function Offers() {
   const [selectedOffer, setSelectedOffer] = useState<TourPackage | null>(null);
@@ -66,7 +66,7 @@ export default function Offers() {
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
               <Input
                 type="text"
-                placeholder="Search by destination (e.g. 'Legoland', 'Fukuoka') or package name..."
+                placeholder="Search by destination (e.g. 'Fukuoka') or package name..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10 pr-4 py-2 w-full"
@@ -97,39 +97,6 @@ export default function Offers() {
 
       <div className="max-w-7xl mx-auto px-4 py-8">
         
-        {/* POPULAR DESTINATIONS GRID */}
-        {/* Only show this if not searching, or if searching matches destinations */}
-        {!searchTerm && (
-          <section className="mb-12">
-            <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2">
-              <MapPin className="text-red-600" /> 
-              Popular Destinations
-            </h2>
-            <div className="grid md:grid-cols-3 lg:grid-cols-3 gap-6">
-              {destinations.map((dest) => (
-                <div
-                  key={dest.id}
-                  className="group relative overflow-hidden rounded-xl h-48 cursor-pointer shadow-md hover:shadow-xl transition-all"
-                  onClick={() => setSearchTerm(dest.name)} // Click to search this dest
-                >
-                  <img
-                    src={dest.image}
-                    alt={dest.name}
-                    className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
-                  <div className="absolute bottom-0 left-0 p-4 text-white">
-                    <h3 className="text-lg font-bold mb-1">{dest.name}</h3>
-                    <p className="text-xs text-gray-200 line-clamp-1">
-                      {dest.description}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
-        )}
-
         {/* Results Summary */}
         <div className="py-4">
           <p className="text-gray-600">
