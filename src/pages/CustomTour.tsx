@@ -163,17 +163,20 @@ export default function CustomTour() {
 
   const basePrice = getPackagePrice();
 
-  // Add-ons (Airport transfer only)
+  // FIX: Transportation total logic (Removed * travelers multiplier)
   const transportationPriceTotal = selectedTransportation.reduce((total, transportId) => {
       const transport = transportationOptions.find((t) => t.id === transportId);
       return total + (transport ? transport.price : 0); 
-    }, 0) * travelers;
+    }, 0);
 
   const totalPrice = basePrice + transportationPriceTotal;
 
   // Validation: Must have Location, Date, and 4-5 Destinations
   const isDestinationCountValid = selectedDestinations.length >= MIN_DESTINATIONS && selectedDestinations.length <= MAX_DESTINATIONS;
   const isFormValid = location && selectedDate && isDestinationCountValid;
+
+  // Helper to generate Addon string for URL
+  const addonsString = selectedTransportation.filter(t => t !== 'private-van').join(',');
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -224,9 +227,9 @@ export default function CustomTour() {
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
                   >
                     <option value="">Choose a region...</option>
-                    <option value="nagoya">Nagoya</option>
-                    <option value="hakone">Hakone</option>
-                    <option value="nara">Nara</option>
+                    <option value="nagoya">Nagoya (Max 9 Travelers)</option>
+                    <option value="hakone">Hakone (Max 9 Travelers)</option>
+                    <option value="nara">Nara (Max 9 Travelers)</option>
                   </select>
                 </div>
 
@@ -420,7 +423,7 @@ export default function CustomTour() {
                         >
                           {transport.price === 0
                             ? "Included in package"
-                            : `¥${transport.price.toLocaleString()} per pax`}
+                            : `¥${transport.price.toLocaleString()} per group`} {/* Fixed Label */}
                         </p>
                         {transport.addon && (
                           <p className="text-xs text-gray-500 mt-1">
@@ -463,7 +466,7 @@ export default function CustomTour() {
                     <div className="flex justify-between text-sm items-center">
                         <div className="flex flex-col">
                             <span>Add-on Transport:</span>
-                            <span className="text-xs text-gray-400">(Airport Transfer × {travelers})</span>
+                            <span className="text-xs text-gray-400">(Airport Transfer - Flat Rate)</span>
                         </div>
                       <span>¥{transportationPriceTotal.toLocaleString()}</span>
                     </div>
@@ -505,11 +508,11 @@ export default function CustomTour() {
                   </div>
                 )}
 
-                {/* UPDATED LINK: Now includes 'custom=true' and 'package=custom-...' */}
+                {/* UPDATED LINK: Now includes 'addons' parameter */}
                 <Link
                   to={
                     isFormValid
-                      ? `/payment?package=custom-${location}&location=${location}&custom=true&date=${selectedDate ? format(selectedDate, "yyyy-MM-dd") : ""}&travelers=${travelers}&price=${totalPrice}&name=Valued+Customer`
+                      ? `/payment?package=custom-${location}&location=${location}&custom=true&date=${selectedDate ? format(selectedDate, "yyyy-MM-dd") : ""}&travelers=${travelers}&price=${totalPrice}&addons=${addonsString}&name=Valued+Customer`
                       : "#"
                   }
                   className={cn(
