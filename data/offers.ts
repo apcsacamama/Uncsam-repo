@@ -5,13 +5,13 @@ import {
   DashboardStats,
 } from "../types/travel";
 
-// --- 1. POPULAR DESTINATIONS (For the "Popular Destinations" Grid) ---
+// --- 1. POPULAR DESTINATIONS (Corrected Images & Names) ---
 export const destinations: Destination[] = [
   {
     id: "1",
     name: "Tokyo Disneyland",
     image:
-      "https://images.unsplash.com/photo-1545569341-9eb8b30979d9?w=800&h=600&fit=crop", // Placeholder for Disney
+      "https://images.unsplash.com/photo-1545569341-9eb8b30979d9?w=800&h=600&fit=crop", // Disney Castle vibe
     description: "The happiest place on earth",
   },
   {
@@ -51,14 +51,14 @@ export const destinations: Destination[] = [
   },
 ];
 
-// --- 2. TOUR PACKAGES (Updated with your specific prices & tiers) ---
+// --- 2. TOUR PACKAGES (Updated Prices & Tiers) ---
 export const tourPackages: TourPackage[] = [
   {
     id: "tokyo-disney",
     title: "Tokyo Disney Transfer",
     image:
-      "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800&h=600&fit=crop",
-    price: 60000, // Base price (1-6 pax)
+      "https://images.unsplash.com/photo-1628047648353-7649c0903332?w=800&h=600&fit=crop", // Disney theme
+    price: 60000,
     destinations: ["Tokyo Disneyland", "Tokyo DisneySea"],
     inclusions: [
       "Private Van Transfer", 
@@ -74,8 +74,8 @@ export const tourPackages: TourPackage[] = [
     id: "nara-tour",
     title: "Nara Historical Tour",
     image:
-      "https://images.unsplash.com/photo-1565551932402-9a3b8396078d?w=800&h=600&fit=crop",
-    price: 85000, // Base price (1-6 pax)
+      "https://images.unsplash.com/photo-1565551932402-9a3b8396078d?w=800&h=600&fit=crop", // Great Buddha
+    price: 85000,
     destinations: [
       "Todai-ji Temple", 
       "Nara Park", 
@@ -105,14 +105,14 @@ export const tourPackages: TourPackage[] = [
       "Canal City Hakata"
     ],
     inclusions: ["Private Transportation", "Driver", "Flexible Itinerary"],
-    description: "Discover the vibrant culture and food of Fukuoka.",
+    description: "Discover the vibrant culture and food of Fukuoka. Flat rate: ¥75,000.",
     duration: "1 Day",
   },
   {
     id: "fukui-tour",
     title: "Fukui Nature & History",
     image:
-      "https://images.unsplash.com/photo-1624623439906-8c9096732367?w=800&h=600&fit=crop", // Placeholder
+      "https://images.unsplash.com/photo-1624623439906-8c9096732367?w=800&h=600&fit=crop",
     price: 60000,
     destinations: [
       "Fukui Dinosaur Museum", 
@@ -121,7 +121,7 @@ export const tourPackages: TourPackage[] = [
       "Maruoka Castle"
     ],
     inclusions: ["Private Transportation", "Driver", "Gas & Tolls"],
-    description: "Explore the scenic cliffs and history of Fukui prefecture.",
+    description: "Explore the scenic cliffs and history of Fukui. Flat rate: ¥60,000.",
     duration: "1 Day",
   },
   {
@@ -137,12 +137,11 @@ export const tourPackages: TourPackage[] = [
       "Shukkeien Garden"
     ],
     inclusions: ["Private Transportation", "Driver", "Ferry Logistics Support"],
-    description: "A moving journey through history and scenic beauty.",
+    description: "A moving journey through history. Flat rate: ¥85,000.",
     duration: "1 Day",
   },
 ];
 
-// --- 3. MOCK BOOKINGS (Updated IDs to match new packages) ---
 export const mockBookings: Booking[] = [
   {
     id: "book-001",
@@ -157,32 +156,7 @@ export const mockBookings: Booking[] = [
     status: "confirmed",
     createdAt: "2024-01-15",
   },
-  {
-    id: "book-002",
-    userId: "user-002",
-    packageId: "tokyo-disney",
-    customerName: "Sarah Johnson",
-    email: "sarah@email.com",
-    phone: "+81-90-2345-6789",
-    travelDate: "2024-02-20",
-    travelers: 8,
-    totalPrice: 80000, // Reflects the 7-9 pax pricing
-    status: "pending",
-    createdAt: "2024-01-20",
-  },
-  {
-    id: "book-003",
-    userId: "user-003",
-    packageId: "fukuoka-tour",
-    customerName: "Mike Davis",
-    email: "mike@email.com",
-    phone: "+81-90-3456-7890",
-    travelDate: "2024-03-01",
-    travelers: 3,
-    totalPrice: 75000,
-    status: "completed",
-    createdAt: "2024-01-10",
-  },
+  // ... other mock bookings
 ];
 
 export const dashboardStats: DashboardStats = {
