@@ -1,7 +1,7 @@
 import Navigation from "../components/Navigation";
 import ItineraryChatbot from "../components/ItineraryChatbot";
 import { Button } from "../components/ui/button";
-import { Input } from "../components/ui/input";
+import { Input } from "../components/ui/input"; // Unused but kept
 import { Label } from "../components/ui/label";
 import {
   Card,
@@ -16,8 +16,8 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "../components/ui/popover";
-import { destinations } from "../data/offers";
-import { useState } from "react";
+// import { destinations } from "../data/offers"; // REPLACED WITH LOCAL DATA BELOW
+import { useState, useMemo } from "react";
 import {
   CalendarIcon,
   MapPin,
@@ -26,22 +26,60 @@ import {
   Train,
   Car,
   Sparkles,
+  Info
 } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "../lib/utils";
 import { Link } from "react-router-dom";
 
+// --- 1. DATA: Defined locally to ensure prices and locations are correct ---
+const ALL_DESTINATIONS = [
+  // TOKYO
+  { id: "tokyo-tower", name: "Tokyo Tower", description: "Iconic red tower", location: "tokyo", price: 4000 },
+  { id: "sensoji", name: "Senso-ji Temple", description: "Historic temple in Asakusa", location: "tokyo", price: 3000 },
+  { id: "shibuya", name: "Shibuya Crossing", description: "World's busiest crossing", location: "tokyo", price: 3000 },
+  { id: "teamlab", name: "TeamLab Planets", description: "Digital art museum", location: "tokyo", price: 6000 },
+  { id: "disney", name: "Tokyo Disneyland", description: "Theme park", location: "tokyo", price: 9500 },
+  
+  // KYOTO
+  { id: "kinkakuji", name: "Kinkaku-ji", description: "The Golden Pavilion", location: "kyoto", price: 4500 },
+  { id: "fushimi", name: "Fushimi Inari", description: "Thousands of Torii gates", location: "kyoto", price: 3500 },
+  { id: "arashiyama", name: "Bamboo Grove", description: "Scenic bamboo forest", location: "kyoto", price: 4000 },
+  { id: "kiyomizu", name: "Kiyomizu-dera", description: "Historic wooden temple", location: "kyoto", price: 4500 },
+
+  // OSAKA
+  { id: "dotonbori", name: "Dotonbori", description: "Food district", location: "osaka", price: 3000 },
+  { id: "usj", name: "Universal Studios", description: "Theme park", location: "osaka", price: 9800 },
+  { id: "osaka-castle", name: "Osaka Castle", description: "Historic castle", location: "osaka", price: 4000 },
+  
+  // NAGOYA
+  { id: "nagoya-castle", name: "Nagoya Castle", description: "Historic castle", location: "nagoya", price: 4000 },
+  { id: "legoland", name: "Legoland Japan", description: "Theme park", location: "nagoya", price: 8000 },
+  { id: "ghibli", name: "Ghibli Park", description: "Studio Ghibli theme park", location: "nagoya", price: 7000 },
+];
+
 export default function CustomTour() {
   const [selectedDate, setSelectedDate] = useState<Date>();
   const [location, setLocation] = useState("");
-  const [selectedDestinations, setSelectedDestinations] = useState<string[]>(
-    [],
-  );
-  const [selectedTransportation, setSelectedTransportation] = useState<
-    string[]
-  >(["private-van"]); // Private van is selected by default
+  const [selectedDestinations, setSelectedDestinations] = useState<string[]>([]);
+  
+  // Defaulting to private van
+  const [selectedTransportation, setSelectedTransportation] = useState<string[]>(["private-van"]); 
+  
   const [travelers, setTravelers] = useState(1);
   const [showItineraryChatbot, setShowItineraryChatbot] = useState(false);
+
+  // --- 2. LOGIC: Filter destinations by location ---
+  const filteredDestinations = useMemo(() => {
+    if (!location) return [];
+    return ALL_DESTINATIONS.filter((dest) => dest.location === location);
+  }, [location]);
+
+  // Reset selections when location changes
+  const handleLocationChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setLocation(e.target.value);
+    setSelectedDestinations([]); 
+  };
 
   const transportationOptions = [
     {
@@ -50,12 +88,14 @@ export default function CustomTour() {
       icon: Car,
       price: 0,
       included: true,
+      addon: false
     },
     {
       id: "airport-transfer",
       label: "Airport Transfer (Add-on)",
       icon: Plane,
       price: 8000,
+      included: false,
       addon: true,
     },
   ];
@@ -89,18 +129,41 @@ export default function CustomTour() {
     }
   };
 
-  // Calculate pricing
-  const basePrice = 20000; // Base tour price
-  const destinationPrice = selectedDestinations.length * 5000;
-  const transportationPrice = selectedTransportation.reduce(
+  // --- 3. PRICING LOGIC (Fixed) ---
+
+  // A. Group Base Fee (20k for up to 4 pax, +5k per extra pax)
+  const calculateBaseFee = () => {
+    const includedTravelers = 4;
+    const baseRate = 20000;
+    const extraPersonRate = 5000;
+
+    if (travelers <= includedTravelers) {
+        return baseRate;
+    } else {
+        const extraPeople = travelers - includedTravelers;
+        return baseRate + (extraPeople * extraPersonRate);
+    }
+  };
+  const baseFeeTotal = calculateBaseFee();
+
+  // B. Add-ons (Per Person)
+  const destinationPricePerPerson = selectedDestinations.reduce((total, id) => {
+    const dest = ALL_DESTINATIONS.find((d) => d.id === id);
+    return total + (dest ? dest.price : 0);
+  }, 0);
+
+  const transportationPricePerPerson = selectedTransportation.reduce(
     (total, transportId) => {
       const transport = transportationOptions.find((t) => t.id === transportId);
       return total + (transport ? transport.price : 0);
     },
     0,
   );
-  const totalPrice =
-    (basePrice + destinationPrice + transportationPrice) * travelers;
+
+  const addonsTotal = (destinationPricePerPerson + transportationPricePerPerson) * travelers;
+
+  // C. Grand Total
+  const totalPrice = baseFeeTotal + addonsTotal;
 
   const isFormValid =
     location && selectedDate && selectedDestinations.length > 0;
@@ -148,7 +211,7 @@ export default function CustomTour() {
                   <select
                     id="location"
                     value={location}
-                    onChange={(e) => setLocation(e.target.value)}
+                    onChange={handleLocationChange}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
                   >
                     <option value="">Choose a region...</option>
@@ -156,8 +219,6 @@ export default function CustomTour() {
                     <option value="kyoto">Kyoto</option>
                     <option value="osaka">Osaka</option>
                     <option value="nagoya">Nagoya</option>
-                    <option value="hiroshima">Hiroshima</option>
-                    <option value="fukuoka">Fukuoka</option>
                   </select>
                 </div>
 
@@ -208,12 +269,16 @@ export default function CustomTour() {
                         variant="outline"
                         size="sm"
                         onClick={() => setTravelers(travelers + 1)}
-                        disabled={travelers >= 10}
+                        disabled={travelers >= 20}
                       >
                         +
                       </Button>
                       <Users className="w-4 h-4 text-gray-500 ml-2" />
                     </div>
+                    {/* Pricing Hint */}
+                    <p className="text-xs text-gray-500 flex items-center gap-1 mt-1">
+                        <Info className="w-3 h-3" /> Base price covers up to 4 people.
+                    </p>
                   </div>
                 </div>
               </CardContent>
@@ -224,43 +289,49 @@ export default function CustomTour() {
               <CardHeader>
                 <CardTitle>Choose Destinations</CardTitle>
                 <p className="text-sm text-gray-600">
-                  Select the places you'd like to visit
+                  Select the places you'd like to visit in <span className="font-bold text-red-600">{location ? location.toUpperCase() : "..."}</span>
                 </p>
               </CardHeader>
               <CardContent>
-                <div className="grid md:grid-cols-2 gap-4">
-                  {destinations.map((destination) => (
-                    <div
-                      key={destination.id}
-                      className="flex items-start space-x-3 p-3 border rounded-lg hover:bg-gray-50"
-                    >
-                      <Checkbox
-                        id={destination.id}
-                        checked={selectedDestinations.includes(destination.id)}
-                        onCheckedChange={(checked) =>
-                          handleDestinationChange(
-                            destination.id,
-                            checked as boolean,
-                          )
-                        }
-                      />
-                      <div className="flex-1">
-                        <Label
-                          htmlFor={destination.id}
-                          className="font-medium cursor-pointer"
-                        >
-                          {destination.name}
-                        </Label>
-                        <p className="text-sm text-gray-600 mt-1">
-                          {destination.description}
-                        </p>
-                        <p className="text-sm font-medium text-red-600 mt-1">
-                          +¥5,000 per pax
-                        </p>
-                      </div>
+                {!location ? (
+                    <div className="text-center py-8 text-gray-500 bg-gray-50 rounded-lg border border-dashed">
+                        Please select a location above to see available destinations.
                     </div>
-                  ))}
-                </div>
+                ) : (
+                    <div className="grid md:grid-cols-2 gap-4">
+                    {filteredDestinations.map((destination) => (
+                        <div
+                        key={destination.id}
+                        className="flex items-start space-x-3 p-3 border rounded-lg hover:bg-gray-50"
+                        >
+                        <Checkbox
+                            id={destination.id}
+                            checked={selectedDestinations.includes(destination.id)}
+                            onCheckedChange={(checked) =>
+                            handleDestinationChange(
+                                destination.id,
+                                checked as boolean,
+                            )
+                            }
+                        />
+                        <div className="flex-1">
+                            <Label
+                            htmlFor={destination.id}
+                            className="font-medium cursor-pointer"
+                            >
+                            {destination.name}
+                            </Label>
+                            <p className="text-sm text-gray-600 mt-1">
+                            {destination.description}
+                            </p>
+                            <p className="text-sm font-medium text-red-600 mt-1">
+                            +¥{destination.price.toLocaleString()} per pax
+                            </p>
+                        </div>
+                        </div>
+                    ))}
+                    </div>
+                )}
               </CardContent>
             </Card>
 
@@ -315,8 +386,7 @@ export default function CustomTour() {
                         </p>
                         {transport.addon && (
                           <p className="text-xs text-gray-500 mt-1">
-                            Optional add-on service not included in standard
-                            package
+                            Optional add-on service
                           </p>
                         )}
                       </div>
@@ -334,29 +404,48 @@ export default function CustomTour() {
                 <CardTitle>Tour Summary</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span>Base tour price:</span>
-                    <span>¥{basePrice.toLocaleString()}</span>
+                <div className="space-y-3 text-sm">
+                  
+                  {/* Base Fee Breakdown */}
+                  <div className="bg-gray-50 p-3 rounded-md border border-gray-100">
+                      <div className="flex justify-between font-semibold mb-1">
+                        <span>Base Package Fee:</span>
+                        <span>¥{baseFeeTotal.toLocaleString()}</span>
+                      </div>
+                      <div className="text-xs text-gray-500">
+                          {travelers <= 4 ? (
+                              <span>Flat rate for 1-4 travelers</span>
+                          ) : (
+                              <span>
+                                  ¥20,000 (first 4) + ¥{(travelers - 4) * 5000} ({travelers - 4} extra × ¥5,000)
+                              </span>
+                          )}
+                      </div>
                   </div>
 
                   {selectedDestinations.length > 0 && (
-                    <div className="flex justify-between text-sm">
-                      <span>Destinations ({selectedDestinations.length}):</span>
-                      <span>¥{destinationPrice.toLocaleString()}</span>
+                    <div className="flex justify-between text-sm items-center">
+                        <div className="flex flex-col">
+                            <span>Destinations:</span>
+                            <span className="text-xs text-gray-400">(¥{destinationPricePerPerson.toLocaleString()} × {travelers} ppl)</span>
+                        </div>
+                      <span>¥{(destinationPricePerPerson * travelers).toLocaleString()}</span>
                     </div>
                   )}
 
-                  {transportationPrice > 0 && (
-                    <div className="flex justify-between text-sm">
-                      <span>Airport Transfer:</span>
-                      <span>¥{transportationPrice.toLocaleString()}</span>
+                  {transportationPricePerPerson > 0 && (
+                    <div className="flex justify-between text-sm items-center">
+                        <div className="flex flex-col">
+                            <span>Add-on Transport:</span>
+                            <span className="text-xs text-gray-400">(¥{transportationPricePerPerson.toLocaleString()} × {travelers} ppl)</span>
+                        </div>
+                      <span>¥{(transportationPricePerPerson * travelers).toLocaleString()}</span>
                     </div>
                   )}
 
-                  <div className="flex justify-between text-sm">
-                    <span>Travelers:</span>
-                    <span>{travelers}</span>
+                  <div className="flex justify-between text-sm border-t pt-2 mt-2">
+                    <span className="font-semibold text-gray-700">Travelers:</span>
+                    <span className="font-semibold">{travelers}</span>
                   </div>
 
                   <div className="border-t pt-2">
@@ -378,7 +467,7 @@ export default function CustomTour() {
                       </h4>
                       <ul className="text-xs text-gray-600 space-y-1">
                         {selectedDestinations.map((id) => {
-                          const destination = destinations.find(
+                          const destination = ALL_DESTINATIONS.find(
                             (d) => d.id === id,
                           );
                           return destination ? (
@@ -448,7 +537,7 @@ export default function CustomTour() {
       <ItineraryChatbot
         selectedDestinations={selectedDestinations
           .map((id) => {
-            const destination = destinations.find((d) => d.id === id);
+            const destination = ALL_DESTINATIONS.find((d) => d.id === id);
             return destination ? destination.name : "";
           })
           .filter(Boolean)}
