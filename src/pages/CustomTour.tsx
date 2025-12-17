@@ -30,8 +30,8 @@ import { Link } from "react-router-dom";
 
 // --- CONFIGURATION: Pricing Tiers ---
 const PRICING_CONFIG: Record<string, { tier1: number; tier2: number }> = {
-  kamakura: { tier1: 70000, tier2: 90000 },
-  hakone: { tier1: 70000, tier2: 90000 },
+  nara: { tier1: 85000, tier2: 105000 },
+  hakone: { tier1: 75000, tier2: 95000 },
   nagoya: { tier1: 85000, tier2: 105000 },
 };
 
@@ -41,15 +41,15 @@ const MAX_DESTINATIONS = 5;
 
 // --- DATA: Destinations List ---
 const ALL_DESTINATIONS = [
-  // KAMAKURA
-  { id: "hasedera", name: "Hasedera Temple", description: "Temple with a massive wooden statue", location: "kamakura" },
-  { id: "kotoku-in", name: "Kotoku-in", description: "The Great Buddha", location: "kamakura" },
-  { id: "hokokuji", name: "Hokokuji Temple", description: "Famous bamboo garden temple", location: "kamakura" },
-  { id: "kenchoji", name: "Kenchoji Temple", description: "Oldest Zen training monastery", location: "kamakura" },
-  { id: "tsurugaoka", name: "Tsurugaoka Hachimangu", description: "Iconic Shinto shrine", location: "kamakura" },
-  { id: "enraku-ji", name: "Enraku-ji Temple", description: "Historic temple grounds", location: "kamakura" },
-  { id: "komachi", name: "Komachi Dori Street", description: "Bustling shopping street", location: "kamakura" },
-  { id: "kokomae", name: "Kokomae Station", description: "Famous scenic station", location: "kamakura" },
+  // NARA
+  { id: "hasedera", name: "Hasedera Temple", description: "Temple with a massive wooden statue", location: "nara" },
+  { id: "kotoku-in", name: "Kotoku-in", description: "The Great Buddha", location: "nara" },
+  { id: "hokokuji", name: "Hokokuji Temple", description: "Famous bamboo garden temple", location: "nara" },
+  { id: "kenchoji", name: "Kenchoji Temple", description: "Oldest Zen training monastery", location: "nara" },
+  { id: "tsurugaoka", name: "Tsurugaoka Hachimangu", description: "Iconic Shinto shrine", location: "nara" },
+  { id: "enraku-ji", name: "Enraku-ji Temple", description: "Historic temple grounds", location: "nara" },
+  { id: "komachi", name: "Komachi Dori Street", description: "Bustling shopping street", location: "nara" },
+  { id: "kokomae", name: "Kokomae Station", description: "Famous scenic station", location: "nara" },
 
   // HAKONE
   { id: "open-air", name: "The Hakone Open Air Museum", description: "Outdoor sculptures and art", location: "hakone" },
@@ -73,8 +73,8 @@ const ALL_DESTINATIONS = [
 
 // --- OWNER SECTION: BLOCK DATES HERE ---
 const FULLY_BOOKED_DATES = [
-    new Date(2025, 12, 25), // June 20, 2025
-    new Date(2025, 12, 31),  // July 4, 2025
+    new Date(2025, 12, 25), // December 25, 2025
+    new Date(2025, 12, 31),  // December 31, 2025
 ];
 
 export default function CustomTour() {
@@ -224,9 +224,9 @@ export default function CustomTour() {
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
                   >
                     <option value="">Choose a region...</option>
-                    <option value="nagoya">Nagoya</option>
-                    <option value="hakone">Hakone</option>
-                    <option value="kamakura">kamakura</option>
+                    <option value="nagoya">Nagoya (Max 9 Travelers)</option>
+                    <option value="hakone">Hakone (Max 9 Travelers)</option>
+                    <option value="nara">Nara (Max 9 Travelers)</option>
                   </select>
                 </div>
 
@@ -505,10 +505,11 @@ export default function CustomTour() {
                   </div>
                 )}
 
+                {/* UPDATED LINK: Now includes 'custom=true' and 'package=custom-...' */}
                 <Link
                   to={
                     isFormValid
-                      ? `/payment?location=${location}&date=${selectedDate ? format(selectedDate, "yyyy-MM-dd") : ""}&travelers=${travelers}&price=${totalPrice}`
+                      ? `/payment?package=custom-${location}&location=${location}&custom=true&date=${selectedDate ? format(selectedDate, "yyyy-MM-dd") : ""}&travelers=${travelers}&price=${totalPrice}&name=Valued+Customer`
                       : "#"
                   }
                   className={cn(
