@@ -11,12 +11,15 @@ interface OfferModalProps {
   onClose: () => void;
 }
 
-// Pricing Configuration (Matches Custom Tour Logic)
-const PRICING_CONFIG: Record<string, { tier1: number; tier2: number }> = {
-  nara: { tier1: 85000, tier2: 105000 },
-  hakone: { tier1: 75000, tier2: 95000 },
-  nagoya: { tier1: 85000, tier2: 105000 },
+// PRICING CONFIGURATION
+// If an ID is missing here, it defaults to the fixed `offer.price` in the data file.
+const TIERED_PRICING: Record<string, { tier1: number; tier2: number }> = {
+  "nara-tour": { tier1: 85000, tier2: 105000 },
+  "tokyo-disney": { tier1: 60000, tier2: 80000 },
 };
+
+// Fixed price packages (Flat rate regardless of travelers up to max)
+const FIXED_PRICE_IDS = ["fukuoka-tour", "fukui-tour", "hiroshima-tour"];
 
 export default function OfferModal({
   offer,
@@ -28,25 +31,26 @@ export default function OfferModal({
   if (!offer) return null;
 
   // --- PRICING LOGIC ---
-  // Detect location based on title
-  const locationKey = Object.keys(PRICING_CONFIG).find((key) =>
-    offer.title.toLowerCase().includes(key)
-  );
-
   let totalPrice = 0;
-  let isPackagePrice = false;
+  let pricingType: "tiered" | "fixed" | "per-person" = "per-person";
 
-  if (locationKey) {
-    // Apply Tiered Package Pricing
-    const config = PRICING_CONFIG[locationKey];
-    isPackagePrice = true;
+  // Check 1: Is it a Tiered Package?
+  if (TIERED_PRICING[offer.id]) {
+    pricingType = "tiered";
+    const config = TIERED_PRICING[offer.id];
     if (travelers <= 6) {
-      totalPrice = config.tier1;
+        totalPrice = config.tier1;
     } else {
-      totalPrice = config.tier2;
+        totalPrice = config.tier2;
     }
-  } else {
-    // Fallback for other packages (Standard multiplication)
+  } 
+  // Check 2: Is it a Fixed Price Package?
+  else if (FIXED_PRICE_IDS.includes(offer.id)) {
+    pricingType = "fixed";
+    totalPrice = offer.price; // Flat rate from data file
+  } 
+  // Default: Per Person Calculation (Fallback)
+  else {
     totalPrice = offer.price * travelers;
   }
 
@@ -154,25 +158,34 @@ export default function OfferModal({
                   </Button>
                   <Users className="w-4 h-4 text-gray-500 ml-2" />
                 </div>
-                {isPackagePrice && (
+                
+                {/* Dynamic Pricing Info Text */}
+                {pricingType === "tiered" && (
                   <p className="text-xs text-blue-600 flex items-center gap-1">
                     <Info className="w-3 h-3" />
                     Tier: {travelers <= 6 ? "1-6 Travelers" : "7-9 Travelers"}
                   </p>
                 )}
+                {pricingType === "fixed" && (
+                  <p className="text-xs text-green-600 flex items-center gap-1">
+                    <Info className="w-3 h-3" />
+                    Flat rate for the whole group (up to 9 max).
+                  </p>
+                )}
               </div>
             </div>
 
-            {/* Pricing */}
+            {/* Pricing Summary */}
             <div className="bg-gray-50 p-4 rounded-lg">
               <div className="flex justify-between items-center mb-2">
                 <span className="text-gray-600">
-                  {isPackagePrice ? "Package Price:" : "Price per person:"}
+                  {pricingType === "per-person" ? "Price per person:" : "Package Price:"}
                 </span>
                 <span className="font-medium">
-                  {isPackagePrice
-                    ? `¥${totalPrice.toLocaleString()}`
-                    : `¥${offer.price.toLocaleString()}`}
+                  {/* If tiered or fixed, total IS the unit price effectively */}
+                  {pricingType === "per-person" 
+                    ? `¥${offer.price.toLocaleString()}` 
+                    : `¥${totalPrice.toLocaleString()}`}
                 </span>
               </div>
               <div className="flex justify-between items-center mb-3">
