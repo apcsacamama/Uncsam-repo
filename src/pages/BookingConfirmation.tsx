@@ -17,7 +17,8 @@ import {
   Mail,
   Download,
   Share,
-  Sparkles 
+  Sparkles,
+  Plane // Added Plane icon for the Add-on
 } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
 import { tourPackages } from "../data/offers";
@@ -49,7 +50,11 @@ export default function BookingConfirmation() {
   const isCustom = searchParams.get("custom") === "true";
   const urlPrice = searchParams.get("price");
   const travelDateParam = searchParams.get("date");
-  const locationParam = searchParams.get("location"); // Get location (nara, hakone, etc.)
+  const locationParam = searchParams.get("location");
+  
+  // Read Add-ons from URL
+  const addonsParam = searchParams.get("addons"); 
+  const hasAirportTransfer = addonsParam && addonsParam.includes("airport-transfer");
 
   // Customer Data
   const customerName = searchParams.get("name") || "Valued Customer";
@@ -59,27 +64,24 @@ export default function BookingConfirmation() {
   const [showItineraryChatbot, setShowItineraryChatbot] = useState(false);
   const [bookingId] = useState(`BK${Date.now()}`);
 
-  // Find package if it exists (Standard tours)
   const selectedPackage = packageId
     ? tourPackages.find((p) => p.id === packageId)
     : null;
 
   // --- DETERMINE DISPLAY DATA ---
-  // If custom, use Standard Inclusions. If package, use package inclusions.
+  // 1. Inclusions Logic (Standard Package Inclusions ONLY)
   const displayInclusions = selectedPackage 
     ? selectedPackage.inclusions 
     : STANDARD_INCLUSIONS;
 
-  // If custom, generate generic destinations based on location param.
+  // 2. Destinations Logic
   const displayDestinations = useMemo(() => {
     if (selectedPackage) return selectedPackage.destinations;
     
-    // Fallback for Custom Tours based on location
     if (locationParam === "nara") return ["Todai-ji Temple", "Nara Park", "Kasuga Taisha", "Local Spot"];
     if (locationParam === "hakone") return ["Lake Ashi", "Hakone Shrine", "Owakudani", "Open Air Museum"];
     if (locationParam === "nagoya") return ["Nagoya Castle", "Oasis 21", "Toyota Museum", "Osu Kannon"];
     
-    // Default fallback if no location detected
     return ["Custom Itinerary Point 1", "Custom Itinerary Point 2", "Custom Itinerary Point 3"];
   }, [selectedPackage, locationParam]);
 
@@ -192,7 +194,7 @@ export default function BookingConfirmation() {
                   </div>
                 </div>
 
-                {/* DESTINATIONS SECTION - Now shows for both Custom and Standard */}
+                {/* DESTINATIONS SECTION */}
                 <div>
                   <h4 className="font-medium text-gray-900 mb-2">
                     {isCustom ? "Planned Destinations (Custom)" : "Included Destinations"}
@@ -212,7 +214,7 @@ export default function BookingConfirmation() {
                   </div>
                 </div>
 
-                {/* INCLUSIONS SECTION - Now shows for both Custom and Standard */}
+                {/* INCLUSIONS SECTION (Does NOT include Airport Transfer) */}
                 <div>
                   <h4 className="font-medium text-gray-900 mb-2">
                     Inclusions
@@ -406,13 +408,25 @@ export default function BookingConfirmation() {
                     <span>Package Price:</span>
                     <span>
                       ¥
-                      {totalPrice.toLocaleString()}
+                      {/* Calculate Base Price by subtracting known addons */}
+                      {(totalPrice - (hasAirportTransfer ? 8000 : 0)).toLocaleString()}
                     </span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span>Travelers:</span>
                     <span>{travelers}</span>
                   </div>
+
+                  {/* FIX: Add-on displayed clearly here, NOT in Inclusions */}
+                  {hasAirportTransfer && (
+                    <div className="flex justify-between text-sm text-blue-700 bg-blue-50 p-2 rounded border border-blue-100 mt-2">
+                        <div className="flex items-center">
+                            <Plane className="w-3 h-3 mr-2" />
+                            <span>Optional Airport Transfer</span>
+                        </div>
+                        <span className="font-medium">+ ¥8,000</span>
+                    </div>
+                  )}
 
                   <div className="border-t pt-2 mt-2">
                     <div className="flex justify-between font-bold text-lg">
