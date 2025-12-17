@@ -21,40 +21,69 @@ import {
 } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
 import { tourPackages } from "../data/offers";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 
-// --- PRICING CONFIGURATION (Must match OfferModal) ---
+// --- PRICING CONFIGURATION ---
 const TIERED_PRICING: Record<string, { tier1: number; tier2: number }> = {
   "nara-tour": { tier1: 85000, tier2: 105000 },
   "tokyo-disney": { tier1: 60000, tier2: 80000 },
 };
 const FIXED_PRICE_IDS = ["fukuoka-tour", "fukui-tour", "hiroshima-tour"];
 
+// --- DEFAULT INCLUSIONS FOR CUSTOM TOURS ---
+const STANDARD_INCLUSIONS = [
+  "12-Hour Private Tour",
+  "Professional Driver",
+  "Hotel Pick-up & Drop-off",
+  "Gas & Tolls Included",
+  "Private Van Transportation"
+];
+
 export default function BookingConfirmation() {
   const [searchParams] = useSearchParams();
+  
+  // URL Params
   const packageId = searchParams.get("package");
   const travelersParam = searchParams.get("travelers") || "1";
   const travelers = parseInt(travelersParam);
   const isCustom = searchParams.get("custom") === "true";
   const urlPrice = searchParams.get("price");
-  
-  // --- FIX: GET TRAVEL DATE FROM URL ---
   const travelDateParam = searchParams.get("date");
+  const locationParam = searchParams.get("location"); // Get location (nara, hakone, etc.)
 
-  // --- GET CUSTOMER DATA FROM URL ---
+  // Customer Data
   const customerName = searchParams.get("name") || "Valued Customer";
   const customerEmail = searchParams.get("email") || "email@example.com";
   const customerPhone = searchParams.get("phone") || "N/A";
 
-  // State for AI Chatbot
   const [showItineraryChatbot, setShowItineraryChatbot] = useState(false);
-
   const [bookingId] = useState(`BK${Date.now()}`);
+
+  // Find package if it exists (Standard tours)
   const selectedPackage = packageId
     ? tourPackages.find((p) => p.id === packageId)
     : null;
 
-  // --- FIXED PRICING LOGIC ---
+  // --- DETERMINE DISPLAY DATA ---
+  // If custom, use Standard Inclusions. If package, use package inclusions.
+  const displayInclusions = selectedPackage 
+    ? selectedPackage.inclusions 
+    : STANDARD_INCLUSIONS;
+
+  // If custom, generate generic destinations based on location param.
+  const displayDestinations = useMemo(() => {
+    if (selectedPackage) return selectedPackage.destinations;
+    
+    // Fallback for Custom Tours based on location
+    if (locationParam === "nara") return ["Todai-ji Temple", "Nara Park", "Kasuga Taisha", "Local Spot"];
+    if (locationParam === "hakone") return ["Lake Ashi", "Hakone Shrine", "Owakudani", "Open Air Museum"];
+    if (locationParam === "nagoya") return ["Nagoya Castle", "Oasis 21", "Toyota Museum", "Osu Kannon"];
+    
+    // Default fallback if no location detected
+    return ["Custom Itinerary Point 1", "Custom Itinerary Point 2", "Custom Itinerary Point 3"];
+  }, [selectedPackage, locationParam]);
+
+  // --- PRICING LOGIC ---
   let totalPrice = 0;
 
   if (urlPrice) {
@@ -72,13 +101,11 @@ export default function BookingConfirmation() {
 
   const bookingDetails = {
     id: bookingId,
-    customerName: customerName,
+    customerName,
     email: customerEmail,
     phone: customerPhone,
-    // FIX: Use the date from URL, fallback to placeholder if missing
     travelDate: travelDateParam || "Date not selected", 
     status: "confirmed" as const,
-    // Booking Date is TODAY
     createdAt: new Date().toISOString().split("T")[0], 
   };
 
@@ -89,10 +116,6 @@ export default function BookingConfirmation() {
     vehicleType: "Private Van",
     licenseNumber: "JP-2024-001",
   };
-
-  const itineraryDestinations = selectedPackage 
-    ? selectedPackage.destinations 
-    : ["Nagoya Castle", "Legoland", "Oasis 21", "Ghibli Park"]; 
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -141,7 +164,7 @@ export default function BookingConfirmation() {
                     <h4 className="font-medium text-gray-900 mb-1">Package</h4>
                     <p className="text-gray-600">
                       {isCustom
-                        ? "Custom Tour Package"
+                        ? `Custom Tour (${locationParam ? locationParam.toUpperCase() : "Japan"})`
                         : selectedPackage?.title || "N/A"}
                     </p>
                   </div>
@@ -169,45 +192,43 @@ export default function BookingConfirmation() {
                   </div>
                 </div>
 
-                {selectedPackage && !isCustom && (
-                  <div>
-                    <h4 className="font-medium text-gray-900 mb-2">
-                      Included Destinations
-                    </h4>
-                    <div className="grid grid-cols-2 gap-2">
-                      {selectedPackage.destinations.map(
-                        (destination, index) => (
-                          <div
-                            key={index}
-                            className="flex items-center text-sm text-gray-600"
-                          >
-                            <MapPin className="w-3 h-3 mr-2 text-red-600" />
-                            {destination}
-                          </div>
-                        ),
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {selectedPackage && !isCustom && (
-                  <div>
-                    <h4 className="font-medium text-gray-900 mb-2">
-                      Inclusions
-                    </h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-1">
-                      {selectedPackage.inclusions.map((inclusion, index) => (
+                {/* DESTINATIONS SECTION - Now shows for both Custom and Standard */}
+                <div>
+                  <h4 className="font-medium text-gray-900 mb-2">
+                    {isCustom ? "Planned Destinations (Custom)" : "Included Destinations"}
+                  </h4>
+                  <div className="grid grid-cols-2 gap-2">
+                    {displayDestinations.map(
+                      (destination, index) => (
                         <div
                           key={index}
                           className="flex items-center text-sm text-gray-600"
                         >
-                          <CheckCircle className="w-3 h-3 mr-2 text-green-600" />
-                          {inclusion}
+                          <MapPin className="w-3 h-3 mr-2 text-red-600" />
+                          {destination}
                         </div>
-                      ))}
-                    </div>
+                      ),
+                    )}
                   </div>
-                )}
+                </div>
+
+                {/* INCLUSIONS SECTION - Now shows for both Custom and Standard */}
+                <div>
+                  <h4 className="font-medium text-gray-900 mb-2">
+                    Inclusions
+                  </h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-1">
+                    {displayInclusions.map((inclusion, index) => (
+                      <div
+                        key={index}
+                        className="flex items-center text-sm text-gray-600"
+                      >
+                        <CheckCircle className="w-3 h-3 mr-2 text-green-600" />
+                        {inclusion}
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </CardContent>
             </Card>
 
@@ -483,7 +504,7 @@ export default function BookingConfirmation() {
 
       {/* AI Chatbot Component */}
       <ItineraryChatbot
-        selectedDestinations={itineraryDestinations}
+        selectedDestinations={displayDestinations}
         isVisible={showItineraryChatbot}
         onClose={() => setShowItineraryChatbot(false)}
         travelDate={bookingDetails.travelDate}
