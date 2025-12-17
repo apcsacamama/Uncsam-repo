@@ -1,5 +1,5 @@
 import Navigation from "../components/Navigation";
-import ItineraryChatbot from "../components/ItineraryChatbot"; // Imported Chatbot
+import ItineraryChatbot from "../components/ItineraryChatbot";
 import {
   Card,
   CardContent,
@@ -17,7 +17,7 @@ import {
   Mail,
   Download,
   Share,
-  Sparkles // Added Icon
+  Sparkles 
 } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
 import { tourPackages } from "../data/offers";
@@ -295,30 +295,13 @@ export default function BookingConfirmation() {
               </CardContent>
             </Card>
 
-            {/* Next Steps (AI BUTTON MOVED HERE) */}
+            {/* Next Steps */}
             <Card>
               <CardHeader>
                 <CardTitle>What's Next?</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {/* --- AI ITINERARY BUTTON --- */}
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                    <h4 className="font-semibold text-blue-900 mb-2 flex items-center gap-2">
-                        <Sparkles className="w-4 h-4 text-blue-600" />
-                        Plan Your Day
-                    </h4>
-                    <p className="text-sm text-blue-800 mb-3">
-                        Want a detailed schedule? Our AI can generate a perfect itinerary for your trip!
-                    </p>
-                    <Button 
-                        onClick={() => setShowItineraryChatbot(true)}
-                        className="w-full bg-blue-600 hover:bg-blue-700 text-white"
-                    >
-                        Generate AI Itinerary
-                    </Button>
-                  </div>
-
                   <div className="flex items-start space-x-3">
                     <div className="bg-blue-100 rounded-full p-2 mt-1">
                       <Mail className="w-4 h-4 text-blue-600" />
@@ -364,7 +347,7 @@ export default function BookingConfirmation() {
 
           {/* Payment Summary & Actions */}
           <div className="space-y-6">
-            {/* Payment Summary */}
+            {/* Payment Summary - TAX REMOVED */}
             <Card>
               <CardHeader>
                 <CardTitle>Payment Summary</CardTitle>
@@ -384,21 +367,14 @@ export default function BookingConfirmation() {
                     <span>Travelers:</span>
                     <span>{travelers}</span>
                   </div>
-                  <div className="flex justify-between text-sm">
-                    <span>Subtotal:</span>
-                    <span>¥{totalPrice.toLocaleString()}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span>Tax (10%):</span>
-                    <span>
-                      ¥{Math.floor(totalPrice * 0.1).toLocaleString()}
-                    </span>
-                  </div>
-                  <div className="border-t pt-2">
+                  
+                  {/* Tax rows removed */}
+
+                  <div className="border-t pt-2 mt-2">
                     <div className="flex justify-between font-bold text-lg">
                       <span>Total Paid:</span>
                       <span className="text-green-600">
-                        ¥{Math.floor(totalPrice * 1.1).toLocaleString()}
+                        ¥{totalPrice.toLocaleString()}
                       </span>
                     </div>
                   </div>
@@ -412,12 +388,22 @@ export default function BookingConfirmation() {
               </CardContent>
             </Card>
 
-            {/* Action Buttons */}
+            {/* Action Buttons - AI BUTTON ADDED */}
             <Card>
               <CardHeader>
                 <CardTitle>Booking Actions</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
+                
+                {/* Generate AI Itinerary Button - Moved Here */}
+                <Button 
+                    onClick={() => setShowItineraryChatbot(true)}
+                    className="w-full bg-blue-600 hover:bg-blue-700 text-white mb-2"
+                >
+                    <Sparkles className="w-4 h-4 mr-2" />
+                    Generate AI Itinerary
+                </Button>
+
                 <Button className="w-full" variant="outline">
                   <Download className="w-4 h-4 mr-2" />
                   Download Receipt
