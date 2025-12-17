@@ -1,5 +1,5 @@
 import Navigation from "../components/Navigation";
-import ItineraryChatbot from "../components/ItineraryChatbot";
+// ItineraryChatbot import removed
 import { Button } from "../components/ui/button";
 import { Label } from "../components/ui/label";
 import {
@@ -22,8 +22,8 @@ import {
   Users,
   Plane,
   Car,
-  Sparkles,
-  Info
+  Info,
+  AlertCircle // Added for limits warning
 } from "lucide-react";
 import { format, isBefore, startOfToday, isSameDay } from "date-fns";
 import { cn } from "../lib/utils";
@@ -37,6 +37,8 @@ const PRICING_CONFIG: Record<string, { tier1: number; tier2: number }> = {
 };
 
 const MAX_TRAVELERS = 9;
+const MIN_DESTINATIONS = 4;
+const MAX_DESTINATIONS = 5;
 
 // --- DATA: Destinations List ---
 const ALL_DESTINATIONS = [
@@ -82,7 +84,7 @@ export default function CustomTour() {
   const [selectedDestinations, setSelectedDestinations] = useState<string[]>([]);
   const [selectedTransportation, setSelectedTransportation] = useState<string[]>(["private-van"]); 
   const [travelers, setTravelers] = useState(1);
-  const [showItineraryChatbot, setShowItineraryChatbot] = useState(false);
+  // Removed showItineraryChatbot state
 
   // --- LOGIC: Filter destinations ---
   const filteredDestinations = useMemo(() => {
@@ -128,14 +130,11 @@ export default function CustomTour() {
   ];
 
   const handleDestinationChange = (destinationId: string, checked: boolean) => {
-    const newDestinations = checked
-      ? [...selectedDestinations, destinationId]
-      : selectedDestinations.filter((id) => id !== destinationId);
-
-    setSelectedDestinations(newDestinations);
-
-    if (newDestinations.length >= 2 && selectedDate && location) {
-      setShowItineraryChatbot(true);
+    if (checked) {
+        if (selectedDestinations.length >= MAX_DESTINATIONS) return; // Prevent selecting more than 5
+        setSelectedDestinations([...selectedDestinations, destinationId]);
+    } else {
+        setSelectedDestinations(selectedDestinations.filter((id) => id !== destinationId));
     }
   };
 
@@ -161,7 +160,7 @@ export default function CustomTour() {
     else if (travelers <= 9) {
         return config.tier2;
     }
-    return 0; // Should not happen given max limit
+    return 0;
   };
 
   const basePrice = getPackagePrice();
@@ -174,7 +173,9 @@ export default function CustomTour() {
 
   const totalPrice = basePrice + transportationPriceTotal;
 
-  const isFormValid = location && selectedDate && selectedDestinations.length > 0;
+  // Validation: Must have Location, Date, and 4-5 Destinations
+  const isDestinationCountValid = selectedDestinations.length >= MIN_DESTINATIONS && selectedDestinations.length <= MAX_DESTINATIONS;
+  const isFormValid = location && selectedDate && isDestinationCountValid;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -303,9 +304,17 @@ export default function CustomTour() {
             {/* 2. Choose Destinations */}
             <Card>
               <CardHeader>
-                <CardTitle>Choose Destinations</CardTitle>
+                <div className="flex justify-between items-center">
+                    <CardTitle>Choose Destinations</CardTitle>
+                    <span className={cn(
+                        "text-sm font-medium",
+                        selectedDestinations.length >= MIN_DESTINATIONS && selectedDestinations.length <= MAX_DESTINATIONS ? "text-green-600" : "text-gray-500"
+                    )}>
+                        {selectedDestinations.length} / {MAX_DESTINATIONS} selected
+                    </span>
+                </div>
                 <p className="text-sm text-gray-600">
-                  Select 4-5 places you'd like to visit in <span className="font-bold text-red-600">{location ? location.toUpperCase() : "..."}</span>
+                  Select {MIN_DESTINATIONS}-{MAX_DESTINATIONS} places in <span className="font-bold text-red-600">{location ? location.toUpperCase() : "..."}</span>
                 </p>
               </CardHeader>
               <CardContent>
@@ -315,37 +324,54 @@ export default function CustomTour() {
                     </div>
                 ) : (
                     <div className="grid md:grid-cols-2 gap-4">
-                    {filteredDestinations.map((destination) => (
-                        <div
-                        key={destination.id}
-                        className="flex items-start space-x-3 p-3 border rounded-lg hover:bg-gray-50"
-                        >
-                        <Checkbox
-                            id={destination.id}
-                            checked={selectedDestinations.includes(destination.id)}
-                            onCheckedChange={(checked) =>
-                            handleDestinationChange(
-                                destination.id,
-                                checked as boolean,
-                            )
-                            }
-                        />
-                        <div className="flex-1">
-                            <Label
-                            htmlFor={destination.id}
-                            className="font-medium cursor-pointer"
+                    {filteredDestinations.map((destination) => {
+                        const isSelected = selectedDestinations.includes(destination.id);
+                        // Disable Logic: Disable unchecked boxes if we reached Max (5)
+                        const isDisabled = !isSelected && selectedDestinations.length >= MAX_DESTINATIONS;
+
+                        return (
+                            <div
+                            key={destination.id}
+                            className={cn(
+                                "flex items-start space-x-3 p-3 border rounded-lg transition-colors",
+                                isSelected ? "border-red-500 bg-red-50" : "hover:bg-gray-50",
+                                isDisabled && "opacity-50 cursor-not-allowed bg-gray-100"
+                            )}
                             >
-                            {destination.name}
-                            </Label>
-                            <p className="text-sm text-gray-600 mt-1">
-                            {destination.description}
-                            </p>
-                            <p className="text-sm font-medium text-green-600 mt-1">
-                                Included in Package
-                            </p>
-                        </div>
-                        </div>
-                    ))}
+                            <Checkbox
+                                id={destination.id}
+                                checked={isSelected}
+                                disabled={isDisabled}
+                                onCheckedChange={(checked) =>
+                                handleDestinationChange(
+                                    destination.id,
+                                    checked as boolean,
+                                )
+                                }
+                            />
+                            <div className="flex-1">
+                                <Label
+                                htmlFor={destination.id}
+                                className={cn("font-medium", isDisabled ? "cursor-not-allowed" : "cursor-pointer")}
+                                >
+                                {destination.name}
+                                </Label>
+                                <p className="text-sm text-gray-600 mt-1">
+                                {destination.description}
+                                </p>
+                                <p className="text-sm font-medium text-green-600 mt-1">
+                                    Included in Package
+                                </p>
+                            </div>
+                            </div>
+                        );
+                    })}
+                    </div>
+                )}
+                {selectedDestinations.length === MAX_DESTINATIONS && (
+                    <div className="mt-4 flex items-center gap-2 text-sm text-amber-600 bg-amber-50 p-3 rounded-md border border-amber-200">
+                        <AlertCircle className="w-4 h-4" />
+                        <span>Maximum of {MAX_DESTINATIONS} destinations reached. Uncheck one to select another.</span>
                     </div>
                 )}
               </CardContent>
@@ -482,18 +508,7 @@ export default function CustomTour() {
                   </div>
                 )}
 
-                {selectedDestinations.length >= 2 &&
-                  selectedDate &&
-                  location && (
-                    <Button
-                      onClick={() => setShowItineraryChatbot(true)}
-                      variant="outline"
-                      className="w-full border-blue-600 text-blue-600 hover:bg-blue-50 font-medium py-3 rounded-lg mb-3"
-                    >
-                      <Sparkles className="w-4 h-4 mr-2" />
-                      Generate AI Itinerary
-                    </Button>
-                  )}
+                {/* AI Itinerary Button Removed */}
 
                 <Link
                   to={
@@ -515,28 +530,23 @@ export default function CustomTour() {
                 </Link>
 
                 {!isFormValid && (
-                  <p className="text-xs text-gray-500 text-center">
-                    Please complete all required fields to proceed
-                  </p>
+                  <div className="text-xs text-center space-y-1 text-gray-500">
+                    <p>Please complete requirements:</p>
+                    <ul className="list-disc list-inside">
+                        {!location && <li>Select a location</li>}
+                        {!selectedDate && <li>Pick a date</li>}
+                        {selectedDestinations.length < MIN_DESTINATIONS && (
+                            <li>Select at least {MIN_DESTINATIONS} destinations</li>
+                        )}
+                    </ul>
+                  </div>
                 )}
               </CardContent>
             </Card>
           </div>
         </div>
       </div>
-
-      <ItineraryChatbot
-        selectedDestinations={selectedDestinations
-          .map((id) => {
-            const destination = ALL_DESTINATIONS.find((d) => d.id === id);
-            return destination ? destination.name : "";
-          })
-          .filter(Boolean)}
-        isVisible={showItineraryChatbot}
-        onClose={() => setShowItineraryChatbot(false)}
-        travelDate={selectedDate ? format(selectedDate, "yyyy-MM-dd") : ""}
-        travelers={travelers}
-      />
+      {/* ItineraryChatbot removed from rendering */}
     </div>
   );
 }
