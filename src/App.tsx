@@ -9,6 +9,7 @@ import Offers from "./pages/Offers";
 import CustomTour from "./pages/CustomTour";
 import Dashboard from "./pages/Dashboard";
 import BookingConfirmation from "./pages/BookingConfirmation";
+import PaymentPage from "./pages/PaymentPage"; // <--- 1. IMPORT ADDED HERE
 import Profile from "./pages/Profile";
 import FAQ from "./pages/FAQ";
 import About from "./pages/About";
@@ -29,6 +30,10 @@ const App = () => (
           <Route path="/offers" element={<Offers />} />
           <Route path="/custom" element={<CustomTour />} />
           <Route path="/dashboard" element={<Dashboard />} />
+          
+          {/* 2. ROUTE ADDED HERE */}
+          <Route path="/payment" element={<PaymentPage />} />
+
           <Route
             path="/booking-confirmation"
             element={<BookingConfirmation />}
