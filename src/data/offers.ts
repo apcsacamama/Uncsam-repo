@@ -5,142 +5,140 @@ import {
   DashboardStats,
 } from "../types/travel";
 
+// --- 1. POPULAR DESTINATIONS (Corrected Images & Names) ---
 export const destinations: Destination[] = [
   {
     id: "1",
-    name: "Nagoya Castle",
+    name: "Tokyo Disneyland",
     image:
-      "https://images.unsplash.com/photo-1545569341-9eb8b30979d9?w=800&h=600&fit=crop",
-    description: "Historic castle in the heart of Nagoya",
+      "https://images.unsplash.com/photo-1545569341-9eb8b30979d9?w=800&h=600&fit=crop", // Disney Castle vibe
+    description: "The happiest place on earth",
   },
   {
     id: "2",
-    name: "Legoland",
+    name: "Todai-ji Temple",
     image:
-      "https://images.unsplash.com/photo-1544985361-b420d7a77043?w=800&h=600&fit=crop",
-    description: "Family fun at Legoland Japan",
+      "https://images.unsplash.com/photo-1594614269894-37f0003cb06c?w=800&h=600&fit=crop",
+    description: "Home of the Great Buddha in Nara",
   },
   {
     id: "3",
-    name: "Science Museum",
+    name: "Fukuoka Tower",
     image:
-      "https://images.unsplash.com/photo-1581833971358-2c8b550f87b3?w=800&h=600&fit=crop",
-    description: "Interactive science exhibits",
+      "https://images.unsplash.com/photo-1542640244-7e672d6cef4e?w=800&h=600&fit=crop",
+    description: "Iconic landmark of Fukuoka",
   },
   {
     id: "4",
-    name: "Oasis 21",
+    name: "Tojinbo Cliffs",
     image:
-      "https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?w=800&h=600&fit=crop",
-    description: "Modern shopping and entertainment complex",
+      "https://images.unsplash.com/photo-1490806843957-31f4c9a91c65?w=800&h=600&fit=crop",
+    description: "Rugged scenic cliffs in Fukui",
   },
   {
     id: "5",
-    name: "Noritake Garden",
+    name: "Miyajima Island",
     image:
-      "https://images.unsplash.com/photo-1511739001486-6bfe10ce785f?w=800&h=600&fit=crop",
-    description: "Beautiful gardens and pottery museum",
+      "https://images.unsplash.com/photo-1590736969955-71cc94901144?w=800&h=600&fit=crop",
+    description: "Famous floating shrine in Hiroshima",
   },
   {
     id: "6",
-    name: "Public Aquarium",
+    name: "Nara Park",
     image:
-      "https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=800&h=600&fit=crop",
-    description: "Marine life and underwater adventures",
+      "https://images.unsplash.com/photo-1559317076-2395a123eb4f?w=800&h=600&fit=crop",
+    description: "Famous for its friendly bowing deer",
   },
 ];
 
+// --- 2. TOUR PACKAGES (Updated Prices & Tiers) ---
 export const tourPackages: TourPackage[] = [
   {
     id: "tokyo-disney",
-    title: "Tokyo Disney Transportation",
+    title: "Tokyo Disney Transfer",
     image:
-      "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800&h=600&fit=crop",
-    price: 15000,
+      "https://images.unsplash.com/photo-1628047648353-7649c0903332?w=800&h=600&fit=crop", // Disney theme
+    price: 60000,
     destinations: ["Tokyo Disneyland", "Tokyo DisneySea"],
     inclusions: [
-      "12-hour tour duration",
-      "Private tour with dedicated tour assistant",
-      "Private van transportation",
-      "Gas and toll fees included",
-      "Hotel pick-up and drop-off service",
-      "Driver fluent in English, Japanese, and Tagalog",
+      "Private Van Transfer", 
+      "Hotel Pick-up & Drop-off", 
+      "Gas & Tolls"
     ],
     description:
-      "Experience the magic of Disney with our comprehensive private tour service",
-    duration: "12 Hours",
+      "Convenient transfer to the parks. Price: ¥60,000 (1-6 travelers), ¥80,000 (7-9 travelers).",
+    duration: "1 Day",
     featured: true,
   },
   {
-    id: "nagoya-tour",
-    title: "Nagoya Tour Package",
+    id: "nara-tour",
+    title: "Nara Historical Tour",
     image:
-      "https://images.unsplash.com/photo-1545569341-9eb8b30979d9?w=800&h=600&fit=crop",
+      "https://images.unsplash.com/photo-1565551932402-9a3b8396078d?w=800&h=600&fit=crop", // Great Buddha
     price: 85000,
-    originalPrice: 95000,
     destinations: [
-      "Nagoya Castle",
-      "Legoland",
-      "Science Museum",
-      "Oasis 21",
-      "Noritake Garden",
-      "Public Aquarium",
+      "Todai-ji Temple", 
+      "Nara Park", 
+      "Kasuga Taisha Shrine", 
+      "Nigatsu-do Hall", 
+      "Yoshikien Garden"
     ],
     inclusions: [
-      "12-hour tour duration",
-      "Private tour with dedicated tour assistant",
-      "Private van transportation",
-      "Gas and toll fees included",
-      "Hotel pick-up and drop-off service",
-      "Driver fluent in English, Japanese, and Tagalog",
+      "10-Hour Private Tour",
+      "Professional Driver",
+      "Hotel Pick-up & Drop-off",
     ],
-    description:
-      "Complete Nagoya experience with all major attractions in one comprehensive tour",
-    duration: "12 Hours",
+    description: "Walk among ancient temples and deer. Price: ¥85,000 (1-6 travelers), ¥105,000 (7-9 travelers).",
+    duration: "1 Day",
     featured: true,
   },
   {
-    id: "fukuoka-adventure",
-    title: "Fukuoka Adventure",
+    id: "fukuoka-tour",
+    title: "Fukuoka City Tour",
     image:
-      "https://images.unsplash.com/photo-1542640244-7e672d6cef4e?w=800&h=600&fit=crop",
-    price: 65000,
-    destinations: ["Fukuoka Tower", "Ohori Park", "Dazaifu", "Canal City"],
-    inclusions: [
-      "12-hour tour duration",
-      "Private tour with dedicated tour assistant",
-      "Private van transportation",
-      "Gas and toll fees included",
-      "Hotel pick-up and drop-off service",
-      "Driver fluent in English, Japanese, and Tagalog",
+      "https://images.unsplash.com/photo-1558223933-911cb7df4101?w=800&h=600&fit=crop",
+    price: 75000,
+    destinations: [
+      "Fukuoka Tower", 
+      "Ohori Park", 
+      "Dazaifu Tenmangu", 
+      "Canal City Hakata"
     ],
-    description:
-      "Discover the beauty and culture of Fukuoka with our personalized service",
-    duration: "12 Hours",
+    inclusions: ["Private Transportation", "Driver", "Flexible Itinerary"],
+    description: "Discover the vibrant culture and food of Fukuoka. Flat rate: ¥75,000.",
+    duration: "1 Day",
   },
   {
-    id: "hiroshima-peace",
+    id: "fukui-tour",
+    title: "Fukui Nature & History",
+    image:
+      "https://images.unsplash.com/photo-1624623439906-8c9096732367?w=800&h=600&fit=crop",
+    price: 60000,
+    destinations: [
+      "Fukui Dinosaur Museum", 
+      "Tojinbo Cliffs", 
+      "Eiheiji Temple", 
+      "Maruoka Castle"
+    ],
+    inclusions: ["Private Transportation", "Driver", "Gas & Tolls"],
+    description: "Explore the scenic cliffs and history of Fukui. Flat rate: ¥60,000.",
+    duration: "1 Day",
+  },
+  {
+    id: "hiroshima-tour",
     title: "Hiroshima Peace Tour",
     image:
-      "https://images.unsplash.com/photo-1528360983277-13d401cdc186?w=800&h=600&fit=crop",
-    price: 45000,
+      "https://images.unsplash.com/photo-1542051841857-5f90071e7989?w=800&h=600&fit=crop",
+    price: 85000,
     destinations: [
-      "Peace Memorial Park",
-      "Miyajima Island",
-      "Hiroshima Castle",
+      "Peace Memorial Park", 
+      "Miyajima Island", 
+      "Hiroshima Castle", 
+      "Shukkeien Garden"
     ],
-    inclusions: [
-      "12-hour tour duration",
-      "Private tour with dedicated tour assistant",
-      "Private van transportation",
-      "Gas and toll fees included",
-      "Hotel pick-up and drop-off service",
-      "Driver fluent in English, Japanese, and Tagalog",
-    ],
-    description:
-      "Historical and cultural journey through Hiroshima with comprehensive service",
-    duration: "12 Hours",
-    featured: true,
+    inclusions: ["Private Transportation", "Driver", "Ferry Logistics Support"],
+    description: "A moving journey through history. Flat rate: ¥85,000.",
+    duration: "1 Day",
   },
 ];
 
@@ -148,42 +146,17 @@ export const mockBookings: Booking[] = [
   {
     id: "book-001",
     userId: "user-001",
-    packageId: "nagoya-tour",
+    packageId: "nara-tour",
     customerName: "John Smith",
     email: "john@email.com",
     phone: "+81-90-1234-5678",
     travelDate: "2024-02-15",
-    travelers: 2,
-    totalPrice: 170000,
+    travelers: 4,
+    totalPrice: 85000,
     status: "confirmed",
     createdAt: "2024-01-15",
   },
-  {
-    id: "book-002",
-    userId: "user-002",
-    packageId: "tokyo-disney",
-    customerName: "Sarah Johnson",
-    email: "sarah@email.com",
-    phone: "+81-90-2345-6789",
-    travelDate: "2024-02-20",
-    travelers: 4,
-    totalPrice: 60000,
-    status: "pending",
-    createdAt: "2024-01-20",
-  },
-  {
-    id: "book-003",
-    userId: "user-003",
-    packageId: "fukuoka-adventure",
-    customerName: "Mike Davis",
-    email: "mike@email.com",
-    phone: "+81-90-3456-7890",
-    travelDate: "2024-03-01",
-    travelers: 1,
-    totalPrice: 65000,
-    status: "completed",
-    createdAt: "2024-01-10",
-  },
+  // ... other mock bookings
 ];
 
 export const dashboardStats: DashboardStats = {
