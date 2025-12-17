@@ -30,7 +30,7 @@ import { Link } from "react-router-dom";
 
 // --- CONFIGURATION: Pricing Tiers ---
 const PRICING_CONFIG: Record<string, { tier1: number; tier2: number }> = {
-  nara: { tier1: 85000, tier2: 105000 },
+  kamakura: { tier1: 85000, tier2: 105000 },
   hakone: { tier1: 75000, tier2: 95000 },
   nagoya: { tier1: 85000, tier2: 105000 },
 };
@@ -41,15 +41,15 @@ const MAX_DESTINATIONS = 5;
 
 // --- DATA: Destinations List ---
 const ALL_DESTINATIONS = [
-  // NARA
-  { id: "hasedera", name: "Hasedera Temple", description: "Temple with a massive wooden statue", location: "nara" },
-  { id: "kotoku-in", name: "Kotoku-in", description: "The Great Buddha", location: "nara" },
-  { id: "hokokuji", name: "Hokokuji Temple", description: "Famous bamboo garden temple", location: "nara" },
-  { id: "kenchoji", name: "Kenchoji Temple", description: "Oldest Zen training monastery", location: "nara" },
-  { id: "tsurugaoka", name: "Tsurugaoka Hachimangu", description: "Iconic Shinto shrine", location: "nara" },
-  { id: "enraku-ji", name: "Enraku-ji Temple", description: "Historic temple grounds", location: "nara" },
-  { id: "komachi", name: "Komachi Dori Street", description: "Bustling shopping street", location: "nara" },
-  { id: "kokomae", name: "Kokomae Station", description: "Famous scenic station", location: "nara" },
+  // KAMAKURA
+  { id: "hasedera", name: "Hasedera Temple", description: "Temple with a massive wooden statue", location: "kamakura" },
+  { id: "kotoku-in", name: "Kotoku-in", description: "The Great Buddha", location: "kamakura" },
+  { id: "hokokuji", name: "Hokokuji Temple", description: "Famous bamboo garden temple", location: "kamakura" },
+  { id: "kenchoji", name: "Kenchoji Temple", description: "Oldest Zen training monastery", location: "kamakura" },
+  { id: "tsurugaoka", name: "Tsurugaoka Hachimangu", description: "Iconic Shinto shrine", location: "kamakura" },
+  { id: "enraku-ji", name: "Enraku-ji Temple", description: "Historic temple grounds", location: "kamakura" },
+  { id: "komachi", name: "Komachi Dori Street", description: "Bustling shopping street", location: "kamakura" },
+  { id: "kokomae", name: "Kokomae Station", description: "Famous scenic station", location: "kamakura" },
 
   // HAKONE
   { id: "open-air", name: "The Hakone Open Air Museum", description: "Outdoor sculptures and art", location: "hakone" },
@@ -226,7 +226,7 @@ export default function CustomTour() {
                     <option value="">Choose a region...</option>
                     <option value="nagoya">Nagoya</option>
                     <option value="hakone">Hakone</option>
-                    <option value="nara">Nara</option>
+                    <option value="kamakura">kamakura</option>
                   </select>
                 </div>
 
