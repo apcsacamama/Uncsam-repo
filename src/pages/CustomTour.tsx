@@ -1,5 +1,4 @@
 import Navigation from "../components/Navigation";
-// ItineraryChatbot import removed
 import { Button } from "../components/ui/button";
 import { Label } from "../components/ui/label";
 import {
@@ -74,8 +73,8 @@ const ALL_DESTINATIONS = [
 
 // --- OWNER SECTION: BLOCK DATES HERE ---
 const FULLY_BOOKED_DATES = [
-    new Date(2025, 5, 20), // June 20, 2025
-    new Date(2025, 6, 4),  // July 4, 2025
+    new Date(2025, 12, 25), // June 20, 2025
+    new Date(2025, 12, 31),  // July 4, 2025
 ];
 
 export default function CustomTour() {
@@ -84,7 +83,6 @@ export default function CustomTour() {
   const [selectedDestinations, setSelectedDestinations] = useState<string[]>([]);
   const [selectedTransportation, setSelectedTransportation] = useState<string[]>(["private-van"]); 
   const [travelers, setTravelers] = useState(1);
-  // Removed showItineraryChatbot state
 
   // --- LOGIC: Filter destinations ---
   const filteredDestinations = useMemo(() => {
@@ -226,9 +224,9 @@ export default function CustomTour() {
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
                   >
                     <option value="">Choose a region...</option>
-                    <option value="nagoya">Nagoya (Max 9 Travelers)</option>
-                    <option value="hakone">Hakone (Max 9 Travelers)</option>
-                    <option value="nara">Nara (Max 9 Travelers)</option>
+                    <option value="nagoya">Nagoya</option>
+                    <option value="hakone">Hakone</option>
+                    <option value="nara">Nara</option>
                   </select>
                 </div>
 
@@ -508,8 +506,6 @@ export default function CustomTour() {
                   </div>
                 )}
 
-                {/* AI Itinerary Button Removed */}
-
                 <Link
                   to={
                     isFormValid
@@ -546,7 +542,6 @@ export default function CustomTour() {
           </div>
         </div>
       </div>
-      {/* ItineraryChatbot removed from rendering */}
     </div>
   );
 }
