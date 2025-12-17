@@ -5,13 +5,13 @@ import {
   DashboardStats,
 } from "../types/travel";
 
-// --- 1. POPULAR DESTINATIONS (Corrected Images & Names) ---
+// --- 1. POPULAR DESTINATIONS (Representative images for the carousel) ---
 export const destinations: Destination[] = [
   {
     id: "1",
     name: "Tokyo Disneyland",
     image:
-      "https://images.unsplash.com/photo-1545569341-9eb8b30979d9?w=800&h=600&fit=crop", // Disney Castle vibe
+      "https://images.unsplash.com/photo-1545569341-9eb8b30979d9?w=800&h=600&fit=crop",
     description: "The happiest place on earth",
   },
   {
@@ -51,47 +51,89 @@ export const destinations: Destination[] = [
   },
 ];
 
-// --- 2. TOUR PACKAGES (Updated Prices & Tiers) ---
+// --- 2. TOUR PACKAGES (Strictly matching your provided list) ---
 export const tourPackages: TourPackage[] = [
+  // --- TOKYO ---
   {
-    id: "tokyo-disney",
-    title: "Tokyo Disney Transfer",
+    id: "tokyo-disney-large",
+    title: "Tokyo Disney Transfer (Large Group)",
     image:
-      "https://images.unsplash.com/photo-1628047648353-7649c0903332?w=800&h=600&fit=crop", // Disney theme
-    price: 60000,
+      "https://images.unsplash.com/photo-1628047648353-7649c0903332?w=800&h=600&fit=crop",
+    price: 80000,
     destinations: ["Tokyo Disneyland", "Tokyo DisneySea"],
     inclusions: [
-      "Private Van Transfer", 
-      "Hotel Pick-up & Drop-off", 
-      "Gas & Tolls"
+      "Private Van Transfer",
+      "Hotel Pick-up & Drop-off",
+      "Gas & Tolls",
     ],
-    description:
-      "Convenient transfer to the parks. Price: ¥60,000 (1-6 travelers), ¥80,000 (7-9 travelers).",
+    description: "Comfortable transfer for larger groups (7-9 travelers).",
     duration: "1 Day",
     featured: true,
   },
   {
-    id: "nara-tour",
-    title: "Nara Historical Tour",
+    id: "tokyo-disney-small",
+    title: "Tokyo Disney Transfer (Small Group)",
     image:
-      "https://images.unsplash.com/photo-1565551932402-9a3b8396078d?w=800&h=600&fit=crop", // Great Buddha
-    price: 85000,
+      "https://images.unsplash.com/photo-1505928738367-1725515d4813?w=800&h=600&fit=crop", // Different angle/vibes
+    price: 60000,
+    destinations: ["Tokyo Disneyland", "Tokyo DisneySea"],
+    inclusions: [
+      "Private Van Transfer",
+      "Hotel Pick-up & Drop-off",
+      "Gas & Tolls",
+    ],
+    description: "Convenient transfer for small groups (1-6 travelers).",
+    duration: "1 Day",
+    featured: false,
+  },
+
+  // --- NARA ---
+  {
+    id: "nara-tour-large",
+    title: "Nara Historical Tour (Large Group)",
+    image:
+      "https://images.unsplash.com/photo-1565551932402-9a3b8396078d?w=800&h=600&fit=crop",
+    price: 105000,
     destinations: [
-      "Todai-ji Temple", 
-      "Nara Park", 
-      "Kasuga Taisha Shrine", 
-      "Nigatsu-do Hall", 
-      "Yoshikien Garden"
+      "Todai-ji Temple",
+      "Nara Park",
+      "Kasuga Taisha Shrine",
+      "Nigatsu-do Hall",
+      "Yoshikien Garden",
     ],
     inclusions: [
       "10-Hour Private Tour",
       "Professional Driver",
       "Hotel Pick-up & Drop-off",
     ],
-    description: "Walk among ancient temples and deer. Price: ¥85,000 (1-6 travelers), ¥105,000 (7-9 travelers).",
+    description: "Explore ancient Nara. Best for 7-9 travelers.",
     duration: "1 Day",
     featured: true,
   },
+  {
+    id: "nara-tour-small",
+    title: "Nara Historical Tour (Small Group)",
+    image:
+      "https://images.unsplash.com/photo-1579409893817-5e1610427324?w=800&h=600&fit=crop", // Deer focus
+    price: 85000,
+    destinations: [
+      "Todai-ji Temple",
+      "Nara Park",
+      "Kasuga Taisha Shrine",
+      "Nigatsu-do Hall",
+      "Yoshikien Garden",
+    ],
+    inclusions: [
+      "10-Hour Private Tour",
+      "Professional Driver",
+      "Hotel Pick-up & Drop-off",
+    ],
+    description: "Explore ancient Nara. Best for 1-6 travelers.",
+    duration: "1 Day",
+    featured: false,
+  },
+
+  // --- FUKUOKA (Added Kushida Shrine to make 5 destinations) ---
   {
     id: "fukuoka-tour",
     title: "Fukuoka City Tour",
@@ -99,15 +141,18 @@ export const tourPackages: TourPackage[] = [
       "https://images.unsplash.com/photo-1558223933-911cb7df4101?w=800&h=600&fit=crop",
     price: 75000,
     destinations: [
-      "Fukuoka Tower", 
-      "Ohori Park", 
-      "Dazaifu Tenmangu", 
-      "Canal City Hakata"
+      "Fukuoka Tower",
+      "Ohori Park",
+      "Dazaifu Tenmangu",
+      "Kushida Shrine",
+      "Canal City Hakata",
     ],
     inclusions: ["Private Transportation", "Driver", "Flexible Itinerary"],
-    description: "Discover the vibrant culture and food of Fukuoka. Flat rate: ¥75,000.",
+    description: "Discover the vibrant culture and food of Fukuoka.",
     duration: "1 Day",
   },
+
+  // --- FUKUI ---
   {
     id: "fukui-tour",
     title: "Fukui Nature & History",
@@ -115,15 +160,17 @@ export const tourPackages: TourPackage[] = [
       "https://images.unsplash.com/photo-1624623439906-8c9096732367?w=800&h=600&fit=crop",
     price: 60000,
     destinations: [
-      "Fukui Dinosaur Museum", 
-      "Tojinbo Cliffs", 
-      "Eiheiji Temple", 
-      "Maruoka Castle"
+      "Fukui Dinosaur Museum",
+      "Eiheiji Temple",
+      "Tojinbo Cliffs",
+      "Maruoka Castle",
     ],
     inclusions: ["Private Transportation", "Driver", "Gas & Tolls"],
-    description: "Explore the scenic cliffs and history of Fukui. Flat rate: ¥60,000.",
+    description: "Explore the scenic cliffs and history of Fukui.",
     duration: "1 Day",
   },
+
+  // --- HIROSHIMA ---
   {
     id: "hiroshima-tour",
     title: "Hiroshima Peace Tour",
@@ -131,13 +178,13 @@ export const tourPackages: TourPackage[] = [
       "https://images.unsplash.com/photo-1542051841857-5f90071e7989?w=800&h=600&fit=crop",
     price: 85000,
     destinations: [
-      "Peace Memorial Park", 
-      "Miyajima Island", 
-      "Hiroshima Castle", 
-      "Shukkeien Garden"
+      "Peace Memorial Park",
+      "Miyajima Island",
+      "Hiroshima Castle",
+      "Shukkeien Garden",
     ],
     inclusions: ["Private Transportation", "Driver", "Ferry Logistics Support"],
-    description: "A moving journey through history. Flat rate: ¥85,000.",
+    description: "A moving journey through history.",
     duration: "1 Day",
   },
 ];
@@ -146,7 +193,7 @@ export const mockBookings: Booking[] = [
   {
     id: "book-001",
     userId: "user-001",
-    packageId: "nara-tour",
+    packageId: "nara-tour-small", // Updated ID to match new schema
     customerName: "John Smith",
     email: "john@email.com",
     phone: "+81-90-1234-5678",
