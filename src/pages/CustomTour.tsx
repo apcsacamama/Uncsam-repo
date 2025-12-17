@@ -22,7 +22,7 @@ import {
   Plane,
   Car,
   Info,
-  AlertCircle // Added for limits warning
+  AlertCircle 
 } from "lucide-react";
 import { format, isBefore, startOfToday, isSameDay } from "date-fns";
 import { cn } from "../lib/utils";
@@ -73,8 +73,8 @@ const ALL_DESTINATIONS = [
 
 // --- OWNER SECTION: BLOCK DATES HERE ---
 const FULLY_BOOKED_DATES = [
-    new Date(2025, 12, 25), // June 20, 2025
-    new Date(2025, 12, 31),  // July 4, 2025
+    new Date(2025, 5, 20), // June 20, 2025
+    new Date(2025, 6, 4),  // July 4, 2025
 ];
 
 export default function CustomTour() {
@@ -224,9 +224,9 @@ export default function CustomTour() {
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
                   >
                     <option value="">Choose a region...</option>
-                    <option value="nagoya">Nagoya</option>
-                    <option value="hakone">Hakone</option>
-                    <option value="nara">Nara</option>
+                    <option value="nagoya">Nagoya (Max 9 Travelers)</option>
+                    <option value="hakone">Hakone (Max 9 Travelers)</option>
+                    <option value="nara">Nara (Max 9 Travelers)</option>
                   </select>
                 </div>
 
@@ -324,7 +324,6 @@ export default function CustomTour() {
                     <div className="grid md:grid-cols-2 gap-4">
                     {filteredDestinations.map((destination) => {
                         const isSelected = selectedDestinations.includes(destination.id);
-                        // Disable Logic: Disable unchecked boxes if we reached Max (5)
                         const isDisabled = !isSelected && selectedDestinations.length >= MAX_DESTINATIONS;
 
                         return (
