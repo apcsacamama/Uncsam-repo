@@ -1,5 +1,4 @@
 import Navigation from "../components/Navigation";
-// import ItineraryChatbot from "../components/ItineraryChatbot"; // Removed from here
 import { Button } from "../components/ui/button";
 import { Label } from "../components/ui/label";
 import {
@@ -23,7 +22,7 @@ import {
   Plane,
   Car,
   Info,
-  AlertCircle // Added for warning icon
+  AlertCircle 
 } from "lucide-react";
 import { format, isBefore, startOfToday, isSameDay } from "date-fns";
 import { cn } from "../lib/utils";
@@ -74,8 +73,8 @@ const ALL_DESTINATIONS = [
 
 // --- OWNER SECTION: BLOCK DATES HERE ---
 const FULLY_BOOKED_DATES = [
-    new Date(2025, 5, 20), // June 20, 2025
-    new Date(2025, 6, 4),  // July 4, 2025
+    new Date(2025, 12, 25), // December 25, 2025
+    new Date(2025, 12, 31),  // December 31, 2025
 ];
 
 export default function CustomTour() {
@@ -84,7 +83,6 @@ export default function CustomTour() {
   const [selectedDestinations, setSelectedDestinations] = useState<string[]>([]);
   const [selectedTransportation, setSelectedTransportation] = useState<string[]>(["private-van"]); 
   const [travelers, setTravelers] = useState(1);
-  // Removed showItineraryChatbot state since button is gone
 
   // --- LOGIC: Filter destinations ---
   const filteredDestinations = useMemo(() => {
@@ -131,7 +129,7 @@ export default function CustomTour() {
 
   const handleDestinationChange = (destinationId: string, checked: boolean) => {
     if (checked) {
-        if (selectedDestinations.length >= MAX_DESTINATIONS) return; // Prevent > 5
+        if (selectedDestinations.length >= MAX_DESTINATIONS) return; // Prevent selecting more than 5
         setSelectedDestinations([...selectedDestinations, destinationId]);
     } else {
         setSelectedDestinations(selectedDestinations.filter((id) => id !== destinationId));
@@ -160,7 +158,7 @@ export default function CustomTour() {
     else if (travelers <= 9) {
         return config.tier2;
     }
-    return 0; // Should not happen given max limit
+    return 0;
   };
 
   const basePrice = getPackagePrice();
@@ -173,7 +171,7 @@ export default function CustomTour() {
 
   const totalPrice = basePrice + transportationPriceTotal;
 
-  // Validation: Must select Location, Date, and between 4-5 Destinations
+  // Validation: Must have Location, Date, and 4-5 Destinations
   const isDestinationCountValid = selectedDestinations.length >= MIN_DESTINATIONS && selectedDestinations.length <= MAX_DESTINATIONS;
   const isFormValid = location && selectedDate && isDestinationCountValid;
 
@@ -314,7 +312,7 @@ export default function CustomTour() {
                     </span>
                 </div>
                 <p className="text-sm text-gray-600">
-                  Select 4-5 places in <span className="font-bold text-red-600">{location ? location.toUpperCase() : "..."}</span>
+                  Select {MIN_DESTINATIONS}-{MAX_DESTINATIONS} places in <span className="font-bold text-red-600">{location ? location.toUpperCase() : "..."}</span>
                 </p>
               </CardHeader>
               <CardContent>
@@ -326,7 +324,6 @@ export default function CustomTour() {
                     <div className="grid md:grid-cols-2 gap-4">
                     {filteredDestinations.map((destination) => {
                         const isSelected = selectedDestinations.includes(destination.id);
-                        // Disable logic: disable if NOT selected AND limit reached
                         const isDisabled = !isSelected && selectedDestinations.length >= MAX_DESTINATIONS;
 
                         return (
@@ -371,7 +368,7 @@ export default function CustomTour() {
                 {selectedDestinations.length === MAX_DESTINATIONS && (
                     <div className="mt-4 flex items-center gap-2 text-sm text-amber-600 bg-amber-50 p-3 rounded-md border border-amber-200">
                         <AlertCircle className="w-4 h-4" />
-                        <span>Maximum of 5 destinations reached. Uncheck one to select another.</span>
+                        <span>Maximum of {MAX_DESTINATIONS} destinations reached. Uncheck one to select another.</span>
                     </div>
                 )}
               </CardContent>
@@ -508,12 +505,10 @@ export default function CustomTour() {
                   </div>
                 )}
 
-                {/* Removed AI Itinerary Button here */}
-
                 <Link
                   to={
                     isFormValid
-                      ? `/booking-confirmation?custom=true&price=${totalPrice}&travelers=${travelers}`
+                      ? `/payment?location=${location}&date=${selectedDate ? format(selectedDate, "yyyy-MM-dd") : ""}&travelers=${travelers}&price=${totalPrice}`
                       : "#"
                   }
                   className={cn(
@@ -546,7 +541,6 @@ export default function CustomTour() {
           </div>
         </div>
       </div>
-      {/* Removed ItineraryChatbot component rendering */}
     </div>
   );
 }
