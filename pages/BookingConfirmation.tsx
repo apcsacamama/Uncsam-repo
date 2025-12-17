@@ -42,8 +42,8 @@ export default function BookingConfirmation() {
 
   const bookingDetails = {
     id: bookingId,
-    customerName: "John Smith", // In real app, this would come from auth
-    email: "john@email.com",
+    customerName: "Taro Yamada", // Changed to Japanese Name
+    email: "taro.yamada@email.com",
     phone: "+81-90-1234-5678",
     travelDate: "2024-03-15",
     status: "confirmed" as const,
@@ -272,21 +272,14 @@ export default function BookingConfirmation() {
                     <span>Travelers:</span>
                     <span>{travelers}</span>
                   </div>
-                  <div className="flex justify-between text-sm">
-                    <span>Subtotal:</span>
-                    <span>¥{totalPrice.toLocaleString()}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span>Tax (10%):</span>
-                    <span>
-                      ¥{Math.floor(totalPrice * 0.1).toLocaleString()}
-                    </span>
-                  </div>
-                  <div className="border-t pt-2">
+                  
+                  {/* Tax lines removed here */}
+
+                  <div className="border-t pt-2 mt-2">
                     <div className="flex justify-between font-bold text-lg">
                       <span>Total Paid:</span>
                       <span className="text-green-600">
-                        ¥{Math.floor(totalPrice * 1.1).toLocaleString()}
+                        ¥{totalPrice.toLocaleString()}
                       </span>
                     </div>
                   </div>
