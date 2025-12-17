@@ -23,14 +23,25 @@ import { Link, useSearchParams } from "react-router-dom";
 import { tourPackages } from "../data/offers";
 import { useState } from "react";
 
+// --- PRICING CONFIGURATION (Must match OfferModal) ---
+const TIERED_PRICING: Record<string, { tier1: number; tier2: number }> = {
+  "nara-tour": { tier1: 85000, tier2: 105000 },
+  "tokyo-disney": { tier1: 60000, tier2: 80000 },
+};
+const FIXED_PRICE_IDS = ["fukuoka-tour", "fukui-tour", "hiroshima-tour"];
+
 export default function BookingConfirmation() {
   const [searchParams] = useSearchParams();
   const packageId = searchParams.get("package");
-  const travelers = searchParams.get("travelers") || "1";
+  const travelersParam = searchParams.get("travelers") || "1";
+  const travelers = parseInt(travelersParam);
   const isCustom = searchParams.get("custom") === "true";
-  const customPrice = searchParams.get("price");
+  const urlPrice = searchParams.get("price");
+  
+  // --- FIX: GET TRAVEL DATE FROM URL ---
+  const travelDateParam = searchParams.get("date");
 
-  // --- NEW: GET CUSTOMER DATA FROM URL ---
+  // --- GET CUSTOMER DATA FROM URL ---
   const customerName = searchParams.get("name") || "Valued Customer";
   const customerEmail = searchParams.get("email") || "email@example.com";
   const customerPhone = searchParams.get("phone") || "N/A";
@@ -43,21 +54,32 @@ export default function BookingConfirmation() {
     ? tourPackages.find((p) => p.id === packageId)
     : null;
 
-  const totalPrice =
-    isCustom && customPrice
-      ? parseInt(customPrice)
-      : selectedPackage
-        ? selectedPackage.price * parseInt(travelers)
-        : 0;
+  // --- FIXED PRICING LOGIC ---
+  let totalPrice = 0;
+
+  if (urlPrice) {
+    totalPrice = parseInt(urlPrice);
+  } else if (selectedPackage) {
+    if (TIERED_PRICING[selectedPackage.id]) {
+      const config = TIERED_PRICING[selectedPackage.id];
+      totalPrice = travelers <= 6 ? config.tier1 : config.tier2;
+    } else if (FIXED_PRICE_IDS.includes(selectedPackage.id)) {
+      totalPrice = selectedPackage.price;
+    } else {
+      totalPrice = selectedPackage.price * travelers;
+    }
+  }
 
   const bookingDetails = {
     id: bookingId,
-    customerName: customerName, // Dynamic Name
-    email: customerEmail,       // Dynamic Email
-    phone: customerPhone,       // Dynamic Phone
-    travelDate: "2026-01-07",
+    customerName: customerName,
+    email: customerEmail,
+    phone: customerPhone,
+    // FIX: Use the date from URL, fallback to placeholder if missing
+    travelDate: travelDateParam || "Date not selected", 
     status: "confirmed" as const,
-    createdAt: new Date().toISOString().split("T")[0],
+    // Booking Date is TODAY
+    createdAt: new Date().toISOString().split("T")[0], 
   };
 
   const driverDetails = {
@@ -68,7 +90,6 @@ export default function BookingConfirmation() {
     licenseNumber: "JP-2024-001",
   };
 
-  // Destinations to pass to AI (Mock data if custom, else package data)
   const itineraryDestinations = selectedPackage 
     ? selectedPackage.destinations 
     : ["Nagoya Castle", "Legoland", "Oasis 21", "Ghibli Park"]; 
@@ -128,15 +149,16 @@ export default function BookingConfirmation() {
                     <h4 className="font-medium text-gray-900 mb-1">
                       Travel Date
                     </h4>
-                    <p className="text-gray-600">{bookingDetails.travelDate}</p>
+                    <p className="text-gray-600 font-semibold text-red-600">
+                        {bookingDetails.travelDate}
+                    </p>
                   </div>
                   <div>
                     <h4 className="font-medium text-gray-900 mb-1">
                       Travelers
                     </h4>
                     <p className="text-gray-600">
-                      {travelers}{" "}
-                      {parseInt(travelers) === 1 ? "person" : "people"}
+                      {travelers} {travelers === 1 ? "person" : "people"}
                     </p>
                   </div>
                   <div>
@@ -363,17 +385,13 @@ export default function BookingConfirmation() {
                     <span>Package Price:</span>
                     <span>
                       ¥
-                      {Math.floor(
-                        totalPrice / parseInt(travelers),
-                      ).toLocaleString()}
+                      {totalPrice.toLocaleString()}
                     </span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span>Travelers:</span>
                     <span>{travelers}</span>
                   </div>
-                  
-                  {/* Tax Lines Removed */}
 
                   <div className="border-t pt-2 mt-2">
                     <div className="flex justify-between font-bold text-lg">
@@ -399,7 +417,7 @@ export default function BookingConfirmation() {
                 <CardTitle>Booking Actions</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                
+                 
                 {/* Generate AI Itinerary Button */}
                 <Button 
                     onClick={() => setShowItineraryChatbot(true)}
@@ -469,7 +487,7 @@ export default function BookingConfirmation() {
         isVisible={showItineraryChatbot}
         onClose={() => setShowItineraryChatbot(false)}
         travelDate={bookingDetails.travelDate}
-        travelers={parseInt(travelers)}
+        travelers={travelers}
       />
     </div>
   );
