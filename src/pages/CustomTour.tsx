@@ -31,7 +31,7 @@ import { Link } from "react-router-dom";
 // --- CONFIGURATION: Pricing Tiers ---
 const PRICING_CONFIG: Record<string, { tier1: number; tier2: number }> = {
   kamakura: { tier1: 85000, tier2: 105000 },
-  hakone: { tier1: 75000, tier2: 95000 },
+  hakone: { tier1: 70000, tier2: 90000 },
   nagoya: { tier1: 85000, tier2: 105000 },
 };
 
