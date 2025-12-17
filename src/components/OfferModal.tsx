@@ -1,7 +1,7 @@
 import { TourPackage } from "../types/travel";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./ui/dialog";
 import { Button } from "./ui/button";
-import { X, MapPin, Clock, Check } from "lucide-react";
+import { X, MapPin, Clock, Check, Users, Info } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 
@@ -10,6 +10,16 @@ interface OfferModalProps {
   isOpen: boolean;
   onClose: () => void;
 }
+
+// PRICING CONFIGURATION
+// If an ID is missing here, it defaults to the fixed `offer.price` in the data file.
+const TIERED_PRICING: Record<string, { tier1: number; tier2: number }> = {
+  "nara-tour": { tier1: 85000, tier2: 105000 },
+  "tokyo-disney": { tier1: 60000, tier2: 80000 },
+};
+
+// Fixed price packages (Flat rate regardless of travelers up to max)
+const FIXED_PRICE_IDS = ["fukuoka-tour", "fukui-tour", "hiroshima-tour"];
 
 export default function OfferModal({
   offer,
@@ -20,7 +30,29 @@ export default function OfferModal({
 
   if (!offer) return null;
 
-  const totalPrice = offer.price * travelers;
+  // --- PRICING LOGIC ---
+  let totalPrice = 0;
+  let pricingType: "tiered" | "fixed" | "per-person" = "per-person";
+
+  // Check 1: Is it a Tiered Package?
+  if (TIERED_PRICING[offer.id]) {
+    pricingType = "tiered";
+    const config = TIERED_PRICING[offer.id];
+    if (travelers <= 6) {
+        totalPrice = config.tier1;
+    } else {
+        totalPrice = config.tier2;
+    }
+  } 
+  // Check 2: Is it a Fixed Price Package?
+  else if (FIXED_PRICE_IDS.includes(offer.id)) {
+    pricingType = "fixed";
+    totalPrice = offer.price; // Flat rate from data file
+  } 
+  // Default: Per Person Calculation (Fallback)
+  else {
+    totalPrice = offer.price * travelers;
+  }
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -103,35 +135,57 @@ export default function OfferModal({
               <h3 className="text-lg font-semibold text-gray-900 mb-3">
                 Number of Travelers
               </h3>
-              <div className="flex items-center space-x-3">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setTravelers(Math.max(1, travelers - 1))}
-                  disabled={travelers <= 1}
-                >
-                  -
-                </Button>
-                <span className="text-lg font-medium w-8 text-center">
-                  {travelers}
-                </span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setTravelers(travelers + 1)}
-                  disabled={travelers >= 10}
-                >
-                  +
-                </Button>
+              <div className="space-y-2">
+                <div className="flex items-center space-x-3">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setTravelers(Math.max(1, travelers - 1))}
+                    disabled={travelers <= 1}
+                  >
+                    -
+                  </Button>
+                  <span className="text-lg font-medium w-8 text-center">
+                    {travelers}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setTravelers(travelers + 1)}
+                    disabled={travelers >= 9}
+                  >
+                    +
+                  </Button>
+                  <Users className="w-4 h-4 text-gray-500 ml-2" />
+                </div>
+                
+                {/* Dynamic Pricing Info Text */}
+                {pricingType === "tiered" && (
+                  <p className="text-xs text-blue-600 flex items-center gap-1">
+                    <Info className="w-3 h-3" />
+                    Tier: {travelers <= 6 ? "1-6 Travelers" : "7-9 Travelers"}
+                  </p>
+                )}
+                {pricingType === "fixed" && (
+                  <p className="text-xs text-green-600 flex items-center gap-1">
+                    <Info className="w-3 h-3" />
+                    Flat rate for the whole group (up to 9 max).
+                  </p>
+                )}
               </div>
             </div>
 
-            {/* Pricing */}
+            {/* Pricing Summary */}
             <div className="bg-gray-50 p-4 rounded-lg">
               <div className="flex justify-between items-center mb-2">
-                <span className="text-gray-600">Price per pax:</span>
+                <span className="text-gray-600">
+                  {pricingType === "per-person" ? "Price per person:" : "Package Price:"}
+                </span>
                 <span className="font-medium">
-                  ¥{offer.price.toLocaleString()}
+                  {/* If tiered or fixed, total IS the unit price effectively */}
+                  {pricingType === "per-person" 
+                    ? `¥${offer.price.toLocaleString()}` 
+                    : `¥${totalPrice.toLocaleString()}`}
                 </span>
               </div>
               <div className="flex justify-between items-center mb-3">
@@ -148,15 +202,15 @@ export default function OfferModal({
               </div>
             </div>
 
-            {/* Book Button */}
+            {/* Book Button - Redirects to Payment Page */}
             <Link
-              to={`/booking-confirmation?package=${offer.id}&travelers=${travelers}`}
+              to={`/payment?location=${encodeURIComponent(offer.title)}&price=${totalPrice}&travelers=${travelers}&package=${offer.id}`}
             >
               <Button
                 className="w-full bg-red-600 hover:bg-red-700 text-white font-medium py-3 text-lg rounded-lg"
                 onClick={onClose}
               >
-                Get Tickets for ¥{totalPrice.toLocaleString()}
+                Book for ¥{totalPrice.toLocaleString()}
               </Button>
             </Link>
           </div>
