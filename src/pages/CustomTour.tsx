@@ -1,7 +1,7 @@
 import Navigation from "../components/Navigation";
 import ItineraryChatbot from "../components/ItineraryChatbot";
 import { Button } from "../components/ui/button";
-import { Input } from "../components/ui/input"; // Unused but kept
+import { Input } from "../components/ui/input"; 
 import { Label } from "../components/ui/label";
 import {
   Card,
@@ -16,7 +16,6 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "../components/ui/popover";
-// import { destinations } from "../data/offers"; // REPLACED WITH LOCAL DATA BELOW
 import { useState, useMemo } from "react";
 import {
   CalendarIcon,
@@ -28,11 +27,12 @@ import {
   Sparkles,
   Info
 } from "lucide-react";
-import { format } from "date-fns";
+import { format, isBefore, startOfToday, isSameDay } from "date-fns"; // Added date helpers
 import { cn } from "../lib/utils";
 import { Link } from "react-router-dom";
 
-// --- 1. DATA: Defined locally to ensure prices and locations are correct ---
+// --- OWNER SECTION: MANAGE DESTINATIONS HERE ---
+// To add a destination, just copy a line, change the ID, Name, and Details.
 const ALL_DESTINATIONS = [
   // TOKYO
   { id: "tokyo-tower", name: "Tokyo Tower", description: "Iconic red tower", location: "tokyo", price: 4000 },
@@ -58,27 +58,49 @@ const ALL_DESTINATIONS = [
   { id: "ghibli", name: "Ghibli Park", description: "Studio Ghibli theme park", location: "nagoya", price: 7000 },
 ];
 
+// --- OWNER SECTION: BLOCK DATES HERE ---
+// Add dates here in the format: new Date(Year, MonthIndex, Day)
+// Note: MonthIndex starts at 0 (January is 0, June is 5, December is 11)
+const FULLY_BOOKED_DATES = [
+    new Date(2025, 5, 20), // June 20, 2025 is blocked
+    new Date(2025, 6, 4),  // July 4, 2025 is blocked
+];
+
 export default function CustomTour() {
   const [selectedDate, setSelectedDate] = useState<Date>();
   const [location, setLocation] = useState("");
   const [selectedDestinations, setSelectedDestinations] = useState<string[]>([]);
   
-  // Defaulting to private van
   const [selectedTransportation, setSelectedTransportation] = useState<string[]>(["private-van"]); 
   
   const [travelers, setTravelers] = useState(1);
   const [showItineraryChatbot, setShowItineraryChatbot] = useState(false);
 
-  // --- 2. LOGIC: Filter destinations by location ---
+  // --- LOGIC: Filter destinations by location ---
   const filteredDestinations = useMemo(() => {
     if (!location) return [];
     return ALL_DESTINATIONS.filter((dest) => dest.location === location);
   }, [location]);
 
-  // Reset selections when location changes
   const handleLocationChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     setLocation(e.target.value);
     setSelectedDestinations([]); 
+  };
+
+  // --- LOGIC: Date Blocking ---
+  // This function returns true if a date should be disabled
+  const isDateDisabled = (date: Date) => {
+    // 1. Block Past Dates
+    if (isBefore(date, startOfToday())) {
+        return true;
+    }
+    // 2. Block Fully Booked Dates (Owner Controlled)
+    const isFullyBooked = FULLY_BOOKED_DATES.some(blockedDate => 
+        isSameDay(date, blockedDate)
+    );
+    if (isFullyBooked) return true;
+
+    return false;
   };
 
   const transportationOptions = [
@@ -107,7 +129,6 @@ export default function CustomTour() {
 
     setSelectedDestinations(newDestinations);
 
-    // Show itinerary chatbot when 2 or more destinations are selected
     if (newDestinations.length >= 2 && selectedDate && location) {
       setShowItineraryChatbot(true);
     }
@@ -117,7 +138,6 @@ export default function CustomTour() {
     transportId: string,
     checked: boolean,
   ) => {
-    // Don't allow unchecking the included private van
     if (transportId === "private-van") return;
 
     if (checked) {
@@ -129,9 +149,7 @@ export default function CustomTour() {
     }
   };
 
-  // --- 3. PRICING LOGIC (Fixed) ---
-
-  // A. Group Base Fee (20k for up to 4 pax, +5k per extra pax)
+  // --- PRICING LOGIC ---
   const calculateBaseFee = () => {
     const includedTravelers = 4;
     const baseRate = 20000;
@@ -146,7 +164,6 @@ export default function CustomTour() {
   };
   const baseFeeTotal = calculateBaseFee();
 
-  // B. Add-ons (Per Person)
   const destinationPricePerPerson = selectedDestinations.reduce((total, id) => {
     const dest = ALL_DESTINATIONS.find((d) => d.id === id);
     return total + (dest ? dest.price : 0);
@@ -161,8 +178,6 @@ export default function CustomTour() {
   );
 
   const addonsTotal = (destinationPricePerPerson + transportationPricePerPerson) * travelers;
-
-  // C. Grand Total
   const totalPrice = baseFeeTotal + addonsTotal;
 
   const isFormValid =
@@ -246,6 +261,8 @@ export default function CustomTour() {
                           selected={selectedDate}
                           onSelect={setSelectedDate}
                           initialFocus
+                          // THIS IS THE FIX: Disable past dates AND blocked dates
+                          disabled={isDateDisabled} 
                         />
                       </PopoverContent>
                     </Popover>
