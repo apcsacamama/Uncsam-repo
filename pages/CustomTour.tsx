@@ -1,7 +1,6 @@
 import Navigation from "../components/Navigation";
 import ItineraryChatbot from "../components/ItineraryChatbot";
 import { Button } from "../components/ui/button";
-import { Input } from "../components/ui/input"; 
 import { Label } from "../components/ui/label";
 import {
   Card,
@@ -22,84 +21,89 @@ import {
   MapPin,
   Users,
   Plane,
-  Train,
   Car,
   Sparkles,
   Info
 } from "lucide-react";
-import { format, isBefore, startOfToday, isSameDay } from "date-fns"; // Added date helpers
+import { format, isBefore, startOfToday, isSameDay } from "date-fns";
 import { cn } from "../lib/utils";
 import { Link } from "react-router-dom";
 
-// --- OWNER SECTION: MANAGE DESTINATIONS HERE ---
-// To add a destination, just copy a line, change the ID, Name, and Details.
-const ALL_DESTINATIONS = [
-  // TOKYO
-  { id: "tokyo-tower", name: "Tokyo Tower", description: "Iconic red tower", location: "tokyo", price: 4000 },
-  { id: "sensoji", name: "Senso-ji Temple", description: "Historic temple in Asakusa", location: "tokyo", price: 3000 },
-  { id: "shibuya", name: "Shibuya Crossing", description: "World's busiest crossing", location: "tokyo", price: 3000 },
-  { id: "teamlab", name: "TeamLab Planets", description: "Digital art museum", location: "tokyo", price: 6000 },
-  { id: "disney", name: "Tokyo Disneyland", description: "Theme park", location: "tokyo", price: 9500 },
-  
-  // KYOTO
-  { id: "kinkakuji", name: "Kinkaku-ji", description: "The Golden Pavilion", location: "kyoto", price: 4500 },
-  { id: "fushimi", name: "Fushimi Inari", description: "Thousands of Torii gates", location: "kyoto", price: 3500 },
-  { id: "arashiyama", name: "Bamboo Grove", description: "Scenic bamboo forest", location: "kyoto", price: 4000 },
-  { id: "kiyomizu", name: "Kiyomizu-dera", description: "Historic wooden temple", location: "kyoto", price: 4500 },
+// --- CONFIGURATION: Locations, Prices, and Limits ---
+// UPDATED: All locations now have maxTravelers: 6
+const LOCATION_CONFIG: Record<string, { price: number; maxTravelers: number }> = {
+  nara: { price: 85000, maxTravelers: 6 },
+  hakone: { price: 75000, maxTravelers: 6 },
+  nagoya: { price: 85000, maxTravelers: 6 },
+};
 
-  // OSAKA
-  { id: "dotonbori", name: "Dotonbori", description: "Food district", location: "osaka", price: 3000 },
-  { id: "usj", name: "Universal Studios", description: "Theme park", location: "osaka", price: 9800 },
-  { id: "osaka-castle", name: "Osaka Castle", description: "Historic castle", location: "osaka", price: 4000 },
-  
+// --- DATA: Destinations List ---
+const ALL_DESTINATIONS = [
+  // NARA
+  { id: "hasedera", name: "Hasedera Temple", description: "Temple with a massive wooden statue", location: "nara" },
+  { id: "kotoku-in", name: "Kotoku-in", description: "The Great Buddha", location: "nara" },
+  { id: "hokokuji", name: "Hokokuji Temple", description: "Famous bamboo garden temple", location: "nara" },
+  { id: "kenchoji", name: "Kenchoji Temple", description: "Oldest Zen training monastery", location: "nara" },
+  { id: "tsurugaoka", name: "Tsurugaoka Hachimangu", description: "Iconic Shinto shrine", location: "nara" },
+  { id: "enraku-ji", name: "Enraku-ji Temple", description: "Historic temple grounds", location: "nara" },
+  { id: "komachi", name: "Komachi Dori Street", description: "Bustling shopping street", location: "nara" },
+  { id: "kokomae", name: "Kokomae Station", description: "Famous scenic station", location: "nara" },
+
+  // HAKONE
+  { id: "open-air", name: "The Hakone Open Air Museum", description: "Outdoor sculptures and art", location: "hakone" },
+  { id: "pirate-ship", name: "Hakone Pirate Ship", description: "Cruise on Lake Ashi", location: "hakone" },
+  { id: "black-egg", name: "Owakudani Black Egg", description: "Volcanic valley famous for black eggs", location: "hakone" },
+  { id: "yunessun", name: "Hakone Kowakien Yunessun", description: "Hot spring theme park", location: "hakone" },
+  { id: "taikanzan", name: "Taikanzan Observatory", description: "Panoramic views of Mt. Fuji", location: "hakone" },
+  { id: "gora-park", name: "Hakone Gora Park", description: "Western-style landscape park", location: "hakone" },
+  { id: "hakone-shrine", name: "Hakone Shrine", description: "Shrine with a floating torii gate", location: "hakone" },
+
   // NAGOYA
-  { id: "nagoya-castle", name: "Nagoya Castle", description: "Historic castle", location: "nagoya", price: 4000 },
-  { id: "legoland", name: "Legoland Japan", description: "Theme park", location: "nagoya", price: 8000 },
-  { id: "ghibli", name: "Ghibli Park", description: "Studio Ghibli theme park", location: "nagoya", price: 7000 },
+  { id: "nagoya-castle", name: "Nagoya Castle", description: "Historic castle with golden shachihoko", location: "nagoya" },
+  { id: "legoland", name: "Legoland Japan", description: "Family theme park", location: "nagoya" },
+  { id: "science-museum", name: "Nagoya City Science Museum", description: "Largest planetarium in the world", location: "nagoya" },
+  { id: "oasis-21", name: "Oasis 21", description: "Spaceship-aqua roof structure", location: "nagoya" },
+  { id: "noritake", name: "Noritake Garden", description: "Pottery and craft center", location: "nagoya" },
+  { id: "aquarium", name: "Port of Nagoya Public Aquarium", description: "Marine life and dolphin shows", location: "nagoya" },
+  { id: "scmaglev", name: "SCMAGLEV and Railway Park", description: "Train museum", location: "nagoya" },
+  { id: "ghibli", name: "Ghibli Park", description: "Studio Ghibli theme park", location: "nagoya" },
 ];
 
 // --- OWNER SECTION: BLOCK DATES HERE ---
-// Add dates here in the format: new Date(Year, MonthIndex, Day)
-// Note: MonthIndex starts at 0 (January is 0, June is 5, December is 11)
 const FULLY_BOOKED_DATES = [
-    new Date(2025, 5, 20), // June 20, 2025 is blocked
-    new Date(2025, 6, 4),  // July 4, 2025 is blocked
+    new Date(2025, 5, 20), // June 20, 2025
+    new Date(2025, 6, 4),  // July 4, 2025
 ];
 
 export default function CustomTour() {
   const [selectedDate, setSelectedDate] = useState<Date>();
   const [location, setLocation] = useState("");
   const [selectedDestinations, setSelectedDestinations] = useState<string[]>([]);
-  
   const [selectedTransportation, setSelectedTransportation] = useState<string[]>(["private-van"]); 
-  
   const [travelers, setTravelers] = useState(1);
   const [showItineraryChatbot, setShowItineraryChatbot] = useState(false);
 
-  // --- LOGIC: Filter destinations by location ---
+  // --- LOGIC: Filter destinations ---
   const filteredDestinations = useMemo(() => {
     if (!location) return [];
     return ALL_DESTINATIONS.filter((dest) => dest.location === location);
   }, [location]);
 
+  // Handle Location Change (Reset everything)
   const handleLocationChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setLocation(e.target.value);
+    const newLocation = e.target.value;
+    setLocation(newLocation);
     setSelectedDestinations([]); 
+    setTravelers(1); 
   };
 
   // --- LOGIC: Date Blocking ---
-  // This function returns true if a date should be disabled
   const isDateDisabled = (date: Date) => {
-    // 1. Block Past Dates
-    if (isBefore(date, startOfToday())) {
-        return true;
-    }
-    // 2. Block Fully Booked Dates (Owner Controlled)
+    if (isBefore(date, startOfToday())) return true; // Block past
     const isFullyBooked = FULLY_BOOKED_DATES.some(blockedDate => 
         isSameDay(date, blockedDate)
     );
-    if (isFullyBooked) return true;
-
+    if (isFullyBooked) return true; // Block specific owner dates
     return false;
   };
 
@@ -134,54 +138,32 @@ export default function CustomTour() {
     }
   };
 
-  const handleTransportationChange = (
-    transportId: string,
-    checked: boolean,
-  ) => {
+  const handleTransportationChange = (transportId: string, checked: boolean) => {
     if (transportId === "private-van") return;
-
     if (checked) {
       setSelectedTransportation([...selectedTransportation, transportId]);
     } else {
-      setSelectedTransportation(
-        selectedTransportation.filter((id) => id !== transportId),
-      );
+      setSelectedTransportation(selectedTransportation.filter((id) => id !== transportId));
     }
   };
 
   // --- PRICING LOGIC ---
-  const calculateBaseFee = () => {
-    const includedTravelers = 4;
-    const baseRate = 20000;
-    const extraPersonRate = 5000;
-
-    if (travelers <= includedTravelers) {
-        return baseRate;
-    } else {
-        const extraPeople = travelers - includedTravelers;
-        return baseRate + (extraPeople * extraPersonRate);
-    }
+  const getPricingData = () => {
+    if (!location) return { basePrice: 0, maxTravelers: 1 };
+    return LOCATION_CONFIG[location];
   };
-  const baseFeeTotal = calculateBaseFee();
 
-  const destinationPricePerPerson = selectedDestinations.reduce((total, id) => {
-    const dest = ALL_DESTINATIONS.find((d) => d.id === id);
-    return total + (dest ? dest.price : 0);
-  }, 0);
+  const { basePrice, maxTravelers } = getPricingData();
 
-  const transportationPricePerPerson = selectedTransportation.reduce(
-    (total, transportId) => {
+  // Add-ons (Only Airport transfer costs extra now)
+  const transportationPriceTotal = selectedTransportation.reduce((total, transportId) => {
       const transport = transportationOptions.find((t) => t.id === transportId);
-      return total + (transport ? transport.price : 0);
-    },
-    0,
-  );
+      return total + (transport ? transport.price : 0); 
+    }, 0) * travelers;
 
-  const addonsTotal = (destinationPricePerPerson + transportationPricePerPerson) * travelers;
-  const totalPrice = baseFeeTotal + addonsTotal;
+  const totalPrice = basePrice + transportationPriceTotal;
 
-  const isFormValid =
-    location && selectedDate && selectedDestinations.length > 0;
+  const isFormValid = location && selectedDate && selectedDestinations.length > 0;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -199,7 +181,7 @@ export default function CustomTour() {
       >
         <div className="absolute inset-0 bg-black bg-opacity-40" />
         <div className="relative z-10 text-center text-white">
-          <h1 className="text-44xl md:text-5xl font-bold mb-4">
+          <h1 className="text-4xl md:text-5xl font-bold mb-4">
             Create Your Own Japanese Experience
           </h1>
           <p className="text-xl max-w-2xl mx-auto">
@@ -210,9 +192,11 @@ export default function CustomTour() {
 
       <div className="max-w-4xl mx-auto px-4 py-12">
         <div className="grid lg:grid-cols-3 gap-8">
-          {/* Form Section */}
+          
+          {/* LEFT COLUMN: FORM */}
           <div className="lg:col-span-2 space-y-8">
-            {/* Location and Date */}
+            
+            {/* 1. Location & Date */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -230,10 +214,9 @@ export default function CustomTour() {
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
                   >
                     <option value="">Choose a region...</option>
-                    <option value="tokyo">Tokyo</option>
-                    <option value="kyoto">Kyoto</option>
-                    <option value="osaka">Osaka</option>
-                    <option value="nagoya">Nagoya</option>
+                    <option value="nagoya">Nagoya (Max 6 Travelers)</option>
+                    <option value="hakone">Hakone (Max 6 Travelers)</option>
+                    <option value="nara">Nara (Max 6 Travelers)</option>
                   </select>
                 </div>
 
@@ -261,7 +244,6 @@ export default function CustomTour() {
                           selected={selectedDate}
                           onSelect={setSelectedDate}
                           initialFocus
-                          // THIS IS THE FIX: Disable past dates AND blocked dates
                           disabled={isDateDisabled} 
                         />
                       </PopoverContent>
@@ -286,27 +268,28 @@ export default function CustomTour() {
                         variant="outline"
                         size="sm"
                         onClick={() => setTravelers(travelers + 1)}
-                        disabled={travelers >= 20}
+                        disabled={!location || travelers >= maxTravelers}
                       >
                         +
                       </Button>
                       <Users className="w-4 h-4 text-gray-500 ml-2" />
                     </div>
-                    {/* Pricing Hint */}
-                    <p className="text-xs text-gray-500 flex items-center gap-1 mt-1">
-                        <Info className="w-3 h-3" /> Base price covers up to 4 people.
-                    </p>
+                    {location && (
+                        <p className="text-xs text-gray-500 flex items-center gap-1 mt-1">
+                            <Info className="w-3 h-3" /> Max {maxTravelers} travelers for {location.charAt(0).toUpperCase() + location.slice(1)}.
+                        </p>
+                    )}
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            {/* Choose Destinations */}
+            {/* 2. Choose Destinations */}
             <Card>
               <CardHeader>
                 <CardTitle>Choose Destinations</CardTitle>
                 <p className="text-sm text-gray-600">
-                  Select the places you'd like to visit in <span className="font-bold text-red-600">{location ? location.toUpperCase() : "..."}</span>
+                  Select 4-5 places you'd like to visit in <span className="font-bold text-red-600">{location ? location.toUpperCase() : "..."}</span>
                 </p>
               </CardHeader>
               <CardContent>
@@ -341,8 +324,8 @@ export default function CustomTour() {
                             <p className="text-sm text-gray-600 mt-1">
                             {destination.description}
                             </p>
-                            <p className="text-sm font-medium text-red-600 mt-1">
-                            +¥{destination.price.toLocaleString()} per pax
+                            <p className="text-sm font-medium text-green-600 mt-1">
+                                Included in Package
                             </p>
                         </div>
                         </div>
@@ -352,13 +335,12 @@ export default function CustomTour() {
               </CardContent>
             </Card>
 
-            {/* Transportation */}
+            {/* 3. Transportation */}
             <Card>
               <CardHeader>
-                <CardTitle>Transportation Options</CardTitle>
+                <CardTitle>Transportation Upgrades</CardTitle>
                 <p className="text-sm text-gray-600">
-                  Private van included in all packages. Add airport transfer if
-                  needed.
+                  Private van included. Add airport transfer if needed.
                 </p>
               </CardHeader>
               <CardContent>
@@ -414,9 +396,9 @@ export default function CustomTour() {
             </Card>
           </div>
 
-          {/* Summary Section */}
+          {/* RIGHT COLUMN: SUMMARY */}
           <div className="lg:col-span-1">
-            <Card className="sticky top-8">
+            <Card className="sticky top-8 shadow-lg border-t-4 border-t-red-600">
               <CardHeader>
                 <CardTitle>Tour Summary</CardTitle>
               </CardHeader>
@@ -426,37 +408,25 @@ export default function CustomTour() {
                   {/* Base Fee Breakdown */}
                   <div className="bg-gray-50 p-3 rounded-md border border-gray-100">
                       <div className="flex justify-between font-semibold mb-1">
-                        <span>Base Package Fee:</span>
-                        <span>¥{baseFeeTotal.toLocaleString()}</span>
+                        <span>Package Price:</span>
+                        <span>{basePrice > 0 ? `¥${basePrice.toLocaleString()}` : "---"}</span>
                       </div>
                       <div className="text-xs text-gray-500">
-                          {travelers <= 4 ? (
-                              <span>Flat rate for 1-4 travelers</span>
+                          {location ? (
+                              <span>Flat rate for {location.toUpperCase()} (Up to {maxTravelers} travelers)</span>
                           ) : (
-                              <span>
-                                  ¥20,000 (first 4) + ¥{(travelers - 4) * 5000} ({travelers - 4} extra × ¥5,000)
-                              </span>
+                              <span>Select a location to see pricing</span>
                           )}
                       </div>
                   </div>
 
-                  {selectedDestinations.length > 0 && (
-                    <div className="flex justify-between text-sm items-center">
-                        <div className="flex flex-col">
-                            <span>Destinations:</span>
-                            <span className="text-xs text-gray-400">(¥{destinationPricePerPerson.toLocaleString()} × {travelers} ppl)</span>
-                        </div>
-                      <span>¥{(destinationPricePerPerson * travelers).toLocaleString()}</span>
-                    </div>
-                  )}
-
-                  {transportationPricePerPerson > 0 && (
+                  {transportationPriceTotal > 0 && (
                     <div className="flex justify-between text-sm items-center">
                         <div className="flex flex-col">
                             <span>Add-on Transport:</span>
-                            <span className="text-xs text-gray-400">(¥{transportationPricePerPerson.toLocaleString()} × {travelers} ppl)</span>
+                            <span className="text-xs text-gray-400">(Airport Transfer × {travelers})</span>
                         </div>
-                      <span>¥{(transportationPricePerPerson * travelers).toLocaleString()}</span>
+                      <span>¥{transportationPriceTotal.toLocaleString()}</span>
                     </div>
                   )}
 
@@ -493,18 +463,6 @@ export default function CustomTour() {
                         })}
                       </ul>
                     </div>
-
-                    <div>
-                      <h4 className="font-medium text-sm text-gray-700 mb-2">
-                        Transportation:
-                      </h4>
-                      <ul className="text-xs text-gray-600 space-y-1">
-                        <li>• Private Van (Included)</li>
-                        {selectedTransportation.includes(
-                          "airport-transfer",
-                        ) && <li>• Airport Transfer (Add-on)</li>}
-                      </ul>
-                    </div>
                   </div>
                 )}
 
@@ -536,7 +494,7 @@ export default function CustomTour() {
                     disabled={!isFormValid}
                     className="w-full bg-red-600 hover:bg-red-700 text-white font-medium py-3 rounded-lg"
                   >
-                    Get Tickets for ¥{totalPrice.toLocaleString()}
+                    {basePrice > 0 ? `Book for ¥${totalPrice.toLocaleString()}` : "Select Details"}
                   </Button>
                 </Link>
 
