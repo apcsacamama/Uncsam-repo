@@ -509,7 +509,7 @@ export default function CustomTour() {
                 <Link
                   to={
                     isFormValid
-                      ? `/booking-confirmation?custom=true&price=${totalPrice}&travelers=${travelers}`
+                      ? `/payment?location=${location}&date=${selectedDate ? format(selectedDate, "yyyy-MM-dd") : ""}&travelers=${travelers}&price=${totalPrice}`
                       : "#"
                   }
                   className={cn(
