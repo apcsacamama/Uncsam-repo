@@ -227,9 +227,9 @@ export default function CustomTour() {
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
                   >
                     <option value="">Choose a region...</option>
-                    <option value="nagoya">Nagoya (Max 9 Travelers)</option>
-                    <option value="hakone">Hakone (Max 9 Travelers)</option>
-                    <option value="nara">Nara (Max 9 Travelers)</option>
+                    <option value="nagoya">Nagoya</option>
+                    <option value="hakone">Hakone</option>
+                    <option value="nara">Nara</option>
                   </select>
                 </div>
 
