@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Badge } from "./ui/badge";
@@ -40,7 +40,7 @@ interface DayItinerary {
 }
 
 interface ItineraryChatbotProps {
-  selectedDestinations: string[];
+  selectedDestinations: string[]; // Receives names like "Tokyo Tower"
   isVisible: boolean;
   onClose: () => void;
   travelDate: string;
@@ -61,27 +61,39 @@ export default function ItineraryChatbot({
   const [showAlternatives, setShowAlternatives] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
 
-  // Mock weather data
-  const mockWeather = {
+  // 1. EXPANDED MOCK DATA: Covers Tokyo, Kyoto, Osaka, Nagoya
+  const mockWeather: Record<string, { condition: string; temp: string; warning?: string }> = {
+    // Tokyo
+    "Tokyo Tower": { condition: "Sunny", temp: "24°C" },
+    "Senso-ji Temple": { condition: "Partly Cloudy", temp: "23°C" },
+    "Shibuya Crossing": { condition: "Clear", temp: "22°C" },
+    "TeamLab Planets": { condition: "Rain", temp: "19°C", warning: "Indoor activity recommended due to rain" },
+    "Tokyo Disneyland": { condition: "Sunny", temp: "25°C" },
+
+    // Kyoto
+    "Kinkaku-ji": { condition: "Sunny", temp: "21°C" },
+    "Fushimi Inari": { condition: "Cloudy", temp: "20°C" },
+    "Bamboo Grove": { condition: "Rain", temp: "18°C", warning: "Slippery paths expected" },
+    "Kiyomizu-dera": { condition: "Sunny", temp: "22°C" },
+
+    // Osaka
+    "Dotonbori": { condition: "Clear", temp: "23°C" },
+    "Universal Studios": { condition: "Sunny", temp: "26°C" },
+    "Osaka Castle": { condition: "Partly Cloudy", temp: "24°C" },
+
+    // Nagoya
     "Nagoya Castle": { condition: "Sunny", temp: "24°C" },
-    Legoland: { condition: "Partly Cloudy", temp: "22°C" },
-    "Science Museum": { condition: "Clear", temp: "25°C" },
-    "Oasis 21": {
-      condition: "Rain",
-      temp: "18°C",
-      warning: "Heavy rain expected",
-    },
-    "Noritake Garden": { condition: "Sunny", temp: "26°C" },
-    "Public Aquarium": { condition: "Overcast", temp: "20°C" },
+    "Legoland Japan": { condition: "Partly Cloudy", temp: "22°C" },
+    "Ghibli Park": { condition: "Sunny", temp: "23°C" },
   };
 
-  const alternativeDestinations = [
-    "Atsuta Shrine",
-    "Toyota Commemorative Museum",
-    "Nagoya TV Tower",
-    "Shirotori Garden",
-    "Nagoya Port Building",
-    "Tokugawa Art Museum",
+  // Generic alternatives pool
+  const allAlternatives = [
+    "Local History Museum",
+    "City Art Gallery",
+    "Botanical Garden",
+    "Traditional Tea House",
+    "Shopping District",
   ];
 
   useEffect(() => {
@@ -93,94 +105,118 @@ export default function ItineraryChatbot({
   const generateItinerary = async () => {
     setIsGenerating(true);
 
-    // Check weather warnings
+    // Check weather warnings based on name matching
     const warnings: string[] = [];
-    selectedDestinations.forEach((dest) => {
-      const weather = mockWeather[dest as keyof typeof mockWeather];
+    selectedDestinations.forEach((destName) => {
+      // Find matching key in mockWeather (partial match or exact)
+      const weatherKey = Object.keys(mockWeather).find(k => destName.includes(k) || k.includes(destName));
+      const weather = weatherKey ? mockWeather[weatherKey] : { condition: "Sunny", temp: "22°C", warning: undefined };
+      
       if (weather?.warning) {
-        warnings.push(`${dest}: ${weather.warning}`);
+        warnings.push(`${destName}: ${weather.warning}`);
       }
     });
     setWeatherWarnings(warnings);
 
     if (warnings.length > 0) {
-      setAlternatives(
-        alternativeDestinations
-          .filter((alt) => !selectedDestinations.includes(alt))
-          .slice(0, 3),
-      );
+      setAlternatives(allAlternatives.slice(0, 3));
       setShowAlternatives(true);
     }
 
     // Simulate AI generation delay
     await new Promise((resolve) => setTimeout(resolve, 2000));
 
-    // Generate mock itinerary
+    // 2. DYNAMIC ITINERARY GENERATION
+    // Map selected destinations to time slots
+    const generatedItems: ItineraryItem[] = [
+        {
+          time: "09:00",
+          activity: "Hotel Pick-up & Welcome Briefing",
+          location: "Your Hotel",
+          duration: "30 mins",
+          type: "travel",
+          notes: "Meet your multilingual driver and tour assistant",
+        }
+    ];
+
+    // Add First Destination (Morning)
+    if (selectedDestinations[0]) {
+        generatedItems.push({
+            time: "09:30",
+            activity: "Travel to Destination 1",
+            location: selectedDestinations[0],
+            duration: "45 mins",
+            type: "travel",
+        });
+        generatedItems.push({
+            time: "10:15",
+            activity: `Explore ${selectedDestinations[0]}`,
+            location: selectedDestinations[0],
+            duration: "2 hours",
+            type: "sightseeing",
+            notes: "Guided tour with historical insights and photo opportunities",
+        });
+    }
+
+    // Lunch
+    generatedItems.push({
+        time: "12:30",
+        activity: "Traditional Japanese Lunch",
+        location: "Local Restaurant",
+        duration: "1 hour",
+        type: "meal",
+        notes: "Authentic cuisine experience with dietary accommodations",
+    });
+
+    // Add Second Destination (Afternoon)
+    if (selectedDestinations[1]) {
+        generatedItems.push({
+            time: "14:00",
+            activity: `Visit ${selectedDestinations[1]}`,
+            location: selectedDestinations[1],
+            duration: "3 hours",
+            type: "activity",
+            notes: "Interactive experience and exploration",
+        });
+    }
+
+    // Add Third Destination (Evening) or Free Time
+    if (selectedDestinations[2]) {
+        generatedItems.push({
+            time: "17:30",
+            activity: `Evening at ${selectedDestinations[2]}`,
+            location: selectedDestinations[2],
+            duration: "1.5 hours",
+            type: "sightseeing",
+            notes: "Sunset views and evening atmosphere",
+        });
+    } else {
+        generatedItems.push({
+            time: "17:30",
+            activity: "Evening Shopping & Leisure",
+            location: "City Center",
+            duration: "1.5 hours",
+            type: "sightseeing",
+            notes: "Free time for souvenirs",
+        });
+    }
+
+    // Return
+    generatedItems.push({
+        time: "19:30",
+        activity: "Return to Hotel",
+        location: "Your Hotel",
+        duration: "45 mins",
+        type: "travel",
+        notes: "Safe drop-off with tour summary",
+    });
+
     const mockItinerary: DayItinerary[] = [
       {
         day: 1,
         date: travelDate,
-        items: [
-          {
-            time: "09:00",
-            activity: "Hotel Pick-up & Welcome Briefing",
-            location: "Your Hotel",
-            duration: "30 mins",
-            type: "travel",
-            notes: "Meet your multilingual driver and tour assistant",
-          },
-          {
-            time: "09:30",
-            activity: "Travel to First Destination",
-            location: selectedDestinations[0] || "Nagoya Castle",
-            duration: "45 mins",
-            type: "travel",
-          },
-          {
-            time: "10:15",
-            activity: `Explore ${selectedDestinations[0] || "Nagoya Castle"}`,
-            location: selectedDestinations[0] || "Nagoya Castle",
-            duration: "2 hours",
-            type: "sightseeing",
-            notes:
-              "Guided tour with historical insights and photo opportunities",
-          },
-          {
-            time: "12:30",
-            activity: "Traditional Japanese Lunch",
-            location: "Local Restaurant",
-            duration: "1 hour",
-            type: "meal",
-            notes: "Authentic cuisine experience with dietary accommodations",
-          },
-          {
-            time: "14:00",
-            activity: `Visit ${selectedDestinations[1] || "Legoland"}`,
-            location: selectedDestinations[1] || "Legoland",
-            duration: "3 hours",
-            type: "activity",
-            notes: "Interactive experience and family-friendly activities",
-          },
-          {
-            time: "17:30",
-            activity: `Evening at ${selectedDestinations[2] || "Oasis 21"}`,
-            location: selectedDestinations[2] || "Oasis 21",
-            duration: "1.5 hours",
-            type: "sightseeing",
-            notes: "Shopping and modern architecture exploration",
-          },
-          {
-            time: "19:30",
-            activity: "Return to Hotel",
-            location: "Your Hotel",
-            duration: "45 mins",
-            type: "travel",
-            notes: "Safe drop-off with tour summary and recommendations",
-          },
-        ],
-        weather: mockWeather[
-          selectedDestinations[0] as keyof typeof mockWeather
-        ] || { condition: "Clear", temp: "24°C" },
+        items: generatedItems,
+        weather: { condition: "Clear", temp: "24°C" }, // General day weather
       },
     ];
 
@@ -189,10 +225,15 @@ export default function ItineraryChatbot({
   };
 
   const acceptAlternative = (alternative: string, replaceIndex: number) => {
-    const newDestinations = [...selectedDestinations];
-    newDestinations[replaceIndex] = alternative;
+    // In a real app, this would update the parent state. 
+    // Here we just update the local view for the demo.
+    const newItems = [...itinerary];
+    if(newItems[0] && newItems[0].items) {
+        // Find the item corresponding to the destination to replace
+        // This is a simplified mock logic
+        alert(`Ideally this updates your main selection. For now, imagine ${alternative} is added!`);
+    }
     setShowAlternatives(false);
-    generateItinerary();
   };
 
   const exportToPDF = () => {
@@ -213,9 +254,9 @@ ${itinerary
       day.items
         .map(
           (item) =>
-            `${item.time} - ${item.activity} at ${item.location} (${item.duration})`,
+            `${item.time} - ${item.activity} at ${item.location} (${item.duration})`
         )
-        .join("\n"),
+        .join("\n")
   )
   .join("\n\n")}
 
@@ -390,7 +431,7 @@ Contact: unclesamtourservices1988@gmail.com | +81 80-5331-1738
                               }
                               className="mt-3 w-full"
                             >
-                              Replace {selectedDestinations[index]}
+                              Consider Alternative
                             </Button>
                           </div>
                         ))}
