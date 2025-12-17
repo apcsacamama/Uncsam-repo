@@ -15,7 +15,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "../components/ui/popover";
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import {
   CalendarIcon,
   MapPin,
@@ -29,16 +29,18 @@ import { format, isBefore, startOfToday, isSameDay } from "date-fns";
 import { cn } from "../lib/utils";
 import { Link } from "react-router-dom";
 
-// --- CONFIGURATION: Locations, Prices, and Limits ---
-const LOCATION_CONFIG: Record<string, { price: number; maxTravelers: number }> = {
-  nara: { price: 85000, maxTravelers: 6 },
-  hakone: { price: 75000, maxTravelers: 6 },
-  nagoya: { price: 85000, maxTravelers: 6 },
+// --- CONFIGURATION: Pricing Tiers ---
+const PRICING_CONFIG: Record<string, { tier1: number; tier2: number }> = {
+  nara: { tier1: 85000, tier2: 105000 },
+  hakone: { tier1: 75000, tier2: 95000 },
+  nagoya: { tier1: 85000, tier2: 105000 },
 };
+
+const MAX_TRAVELERS = 9;
 
 // --- DATA: Destinations List ---
 const ALL_DESTINATIONS = [
-  // NARA (Note: User requested Kamakura-style destinations under the "Nara" label)
+  // NARA
   { id: "hasedera", name: "Hasedera Temple", description: "Temple with a massive wooden statue", location: "nara" },
   { id: "kotoku-in", name: "Kotoku-in", description: "The Great Buddha", location: "nara" },
   { id: "hokokuji", name: "Hokokuji Temple", description: "Famous bamboo garden temple", location: "nara" },
@@ -93,7 +95,7 @@ export default function CustomTour() {
     const newLocation = e.target.value;
     setLocation(newLocation);
     setSelectedDestinations([]); 
-    setTravelers(1); // Reset travelers to 1 when switching locations to prevent over-limit bugs
+    setTravelers(1); 
   };
 
   // --- LOGIC: Date Blocking ---
@@ -146,18 +148,28 @@ export default function CustomTour() {
     }
   };
 
-  // --- NEW PRICING LOGIC ---
-  const getPricingData = () => {
-    if (!location) return { basePrice: 0, maxTravelers: 1 };
-    return LOCATION_CONFIG[location];
+  // --- TIERED PRICING LOGIC ---
+  const getPackagePrice = () => {
+    if (!location) return 0;
+    const config = PRICING_CONFIG[location];
+    
+    // Tier 1: 1-6 Travelers
+    if (travelers <= 6) {
+        return config.tier1;
+    } 
+    // Tier 2: 7-9 Travelers
+    else if (travelers <= 9) {
+        return config.tier2;
+    }
+    return 0; // Should not happen given max limit
   };
 
-  const { basePrice, maxTravelers } = getPricingData();
+  const basePrice = getPackagePrice();
 
-  // Add-ons (Only Airport transfer costs extra now, destinations are included in package price)
+  // Add-ons (Airport transfer only)
   const transportationPriceTotal = selectedTransportation.reduce((total, transportId) => {
       const transport = transportationOptions.find((t) => t.id === transportId);
-      return total + (transport ? transport.price : 0); // Flat fee add-on, or per person? Assuming per person for transfer
+      return total + (transport ? transport.price : 0); 
     }, 0) * travelers;
 
   const totalPrice = basePrice + transportationPriceTotal;
@@ -213,9 +225,9 @@ export default function CustomTour() {
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
                   >
                     <option value="">Choose a region...</option>
-                    <option value="nagoya">Nagoya (Max 6 Travelers)</option>
-                    <option value="hakone">Hakone (Max 6 Travelers)</option>
-                    <option value="nara">Nara (Max 6 Travelers)</option>
+                    <option value="nagoya">Nagoya (Max 9 Travelers)</option>
+                    <option value="hakone">Hakone (Max 9 Travelers)</option>
+                    <option value="nara">Nara (Max 9 Travelers)</option>
                   </select>
                 </div>
 
@@ -267,16 +279,21 @@ export default function CustomTour() {
                         variant="outline"
                         size="sm"
                         onClick={() => setTravelers(travelers + 1)}
-                        disabled={!location || travelers >= maxTravelers}
+                        disabled={travelers >= MAX_TRAVELERS}
                       >
                         +
                       </Button>
                       <Users className="w-4 h-4 text-gray-500 ml-2" />
                     </div>
                     {location && (
-                        <p className="text-xs text-gray-500 flex items-center gap-1 mt-1">
-                            <Info className="w-3 h-3" /> Max {maxTravelers} travelers for {location.charAt(0).toUpperCase() + location.slice(1)}.
-                        </p>
+                        <div className="text-xs text-gray-500 mt-1 space-y-1">
+                            <p className="flex items-center gap-1">
+                                <Info className="w-3 h-3" /> Max 9 travelers allowed.
+                            </p>
+                            <p className="font-medium text-blue-600">
+                                Current Tier: {travelers <= 6 ? "1-6 Travelers" : "7-9 Travelers"}
+                            </p>
+                        </div>
                     )}
                   </div>
                 </div>
@@ -412,7 +429,7 @@ export default function CustomTour() {
                       </div>
                       <div className="text-xs text-gray-500">
                           {location ? (
-                              <span>Flat rate for {location.toUpperCase()} (Up to {maxTravelers} travelers)</span>
+                              <span>Flat rate for {location.toUpperCase()} ({travelers} travelers)</span>
                           ) : (
                               <span>Select a location to see pricing</span>
                           )}
