@@ -73,8 +73,8 @@ const ALL_DESTINATIONS = [
 
 // --- OWNER SECTION: BLOCK DATES HERE ---
 const FULLY_BOOKED_DATES = [
-    new Date(2025, 5, 20), // June 20, 2025
-    new Date(2025, 6, 4),  // July 4, 2025
+    new Date(2025, 12, 25), // June 20, 2025
+    new Date(2025, 12, 31),  // July 4, 2025
 ];
 
 export default function CustomTour() {
