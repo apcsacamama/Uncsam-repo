@@ -1,4 +1,5 @@
 import Navigation from "../components/Navigation";
+import ItineraryChatbot from "../components/ItineraryChatbot";
 import {
   Card,
   CardContent,
@@ -16,10 +17,11 @@ import {
   Mail,
   Download,
   Share,
+  Sparkles 
 } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
 import { tourPackages } from "../data/offers";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 export default function BookingConfirmation() {
   const [searchParams] = useSearchParams();
@@ -27,6 +29,14 @@ export default function BookingConfirmation() {
   const travelers = searchParams.get("travelers") || "1";
   const isCustom = searchParams.get("custom") === "true";
   const customPrice = searchParams.get("price");
+
+  // --- NEW: GET CUSTOMER DATA FROM URL ---
+  const customerName = searchParams.get("name") || "Valued Customer";
+  const customerEmail = searchParams.get("email") || "email@example.com";
+  const customerPhone = searchParams.get("phone") || "N/A";
+
+  // State for AI Chatbot
+  const [showItineraryChatbot, setShowItineraryChatbot] = useState(false);
 
   const [bookingId] = useState(`BK${Date.now()}`);
   const selectedPackage = packageId
@@ -42,13 +52,26 @@ export default function BookingConfirmation() {
 
   const bookingDetails = {
     id: bookingId,
-    customerName: "Taro Yamada", // Changed to Japanese Name
-    email: "taro.yamada@email.com",
-    phone: "+81-90-1234-5678",
-    travelDate: "2024-03-15",
+    customerName: customerName, // Dynamic Name
+    email: customerEmail,       // Dynamic Email
+    phone: customerPhone,       // Dynamic Phone
+    travelDate: "2026-01-07",
     status: "confirmed" as const,
     createdAt: new Date().toISOString().split("T")[0],
   };
+
+  const driverDetails = {
+    name: "Takeshi Yamamoto",
+    phone: "+81 80-5331-1738",
+    languages: ["English", "Japanese", "Tagalog"],
+    vehicleType: "Private Van",
+    licenseNumber: "JP-2024-001",
+  };
+
+  // Destinations to pass to AI (Mock data if custom, else package data)
+  const itineraryDestinations = selectedPackage 
+    ? selectedPackage.destinations 
+    : ["Nagoya Castle", "Legoland", "Oasis 21", "Ghibli Park"]; 
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -166,6 +189,83 @@ export default function BookingConfirmation() {
               </CardContent>
             </Card>
 
+            {/* Driver Information */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Users className="w-5 h-5 text-green-600" />
+                  Your Assigned Driver
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
+                  <div className="flex items-center space-x-3 mb-3">
+                    <div className="bg-green-600 rounded-full w-12 h-12 flex items-center justify-center text-white font-bold text-lg">
+                      {driverDetails.name
+                        .split(" ")
+                        .map((n) => n[0])
+                        .join("")}
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-green-900">
+                        {driverDetails.name}
+                      </h3>
+                      <p className="text-green-700 text-sm">
+                        Professional Tour Driver
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div>
+                      <h4 className="font-medium text-green-900 mb-1">
+                        Contact Number
+                      </h4>
+                      <p className="text-green-800 flex items-center">
+                        <Phone className="w-4 h-4 mr-2" />
+                        {driverDetails.phone}
+                      </p>
+                    </div>
+                    <div>
+                      <h4 className="font-medium text-green-900 mb-1">
+                        Vehicle
+                      </h4>
+                      <p className="text-green-800">
+                        {driverDetails.vehicleType}
+                      </p>
+                    </div>
+                    <div className="md:col-span-2">
+                      <h4 className="font-medium text-green-900 mb-2">
+                        Languages Spoken
+                      </h4>
+                      <div className="flex gap-2">
+                        {driverDetails.languages.map((lang, index) => (
+                          <Badge
+                            key={index}
+                            className="bg-green-100 text-green-800 text-xs"
+                          >
+                            {lang}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="text-sm text-gray-600">
+                  <p className="mb-2">
+                    <strong>Important:</strong> Your driver will contact you 24
+                    hours before your tour to confirm pickup details and answer
+                    any questions.
+                  </p>
+                  <p>
+                    For immediate assistance, you can contact your driver
+                    directly at the number provided above.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+
             {/* Customer Information */}
             <Card>
               <CardHeader>
@@ -273,7 +373,7 @@ export default function BookingConfirmation() {
                     <span>{travelers}</span>
                   </div>
                   
-                  {/* Tax lines removed here */}
+                  {/* Tax Lines Removed */}
 
                   <div className="border-t pt-2 mt-2">
                     <div className="flex justify-between font-bold text-lg">
@@ -299,6 +399,16 @@ export default function BookingConfirmation() {
                 <CardTitle>Booking Actions</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
+                
+                {/* Generate AI Itinerary Button */}
+                <Button 
+                    onClick={() => setShowItineraryChatbot(true)}
+                    className="w-full bg-blue-600 hover:bg-blue-700 text-white mb-2"
+                >
+                    <Sparkles className="w-4 h-4 mr-2" />
+                    Generate AI Itinerary
+                </Button>
+
                 <Button className="w-full" variant="outline">
                   <Download className="w-4 h-4 mr-2" />
                   Download Receipt
@@ -352,6 +462,15 @@ export default function BookingConfirmation() {
           </div>
         </div>
       </div>
+
+      {/* AI Chatbot Component */}
+      <ItineraryChatbot
+        selectedDestinations={itineraryDestinations}
+        isVisible={showItineraryChatbot}
+        onClose={() => setShowItineraryChatbot(false)}
+        travelDate={bookingDetails.travelDate}
+        travelers={parseInt(travelers)}
+      />
     </div>
   );
 }
