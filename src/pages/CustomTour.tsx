@@ -33,7 +33,7 @@ import { Link } from "react-router-dom";
 const LOCATION_CONFIG: Record<string, { price: number; maxTravelers: number }> = {
   nara: { price: 85000, maxTravelers: 6 },
   hakone: { price: 75000, maxTravelers: 6 },
-  nagoya: { price: 85000, maxTravelers: 5 },
+  nagoya: { price: 85000, maxTravelers: 6 },
 };
 
 // --- DATA: Destinations List ---
@@ -213,7 +213,7 @@ export default function CustomTour() {
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
                   >
                     <option value="">Choose a region...</option>
-                    <option value="nagoya">Nagoya (Max 5 Travelers)</option>
+                    <option value="nagoya">Nagoya (Max 6 Travelers)</option>
                     <option value="hakone">Hakone (Max 6 Travelers)</option>
                     <option value="nara">Nara (Max 6 Travelers)</option>
                   </select>
