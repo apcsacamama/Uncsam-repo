@@ -505,10 +505,11 @@ export default function CustomTour() {
                   </div>
                 )}
 
+                {/* UPDATED LINK: Now includes 'custom=true' and 'package=custom-...' */}
                 <Link
                   to={
                     isFormValid
-                      ? `/payment?location=${location}&date=${selectedDate ? format(selectedDate, "yyyy-MM-dd") : ""}&travelers=${travelers}&price=${totalPrice}`
+                      ? `/payment?package=custom-${location}&location=${location}&custom=true&date=${selectedDate ? format(selectedDate, "yyyy-MM-dd") : ""}&travelers=${travelers}&price=${totalPrice}&name=Valued+Customer`
                       : "#"
                   }
                   className={cn(
