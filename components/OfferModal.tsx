@@ -1,7 +1,7 @@
 import { TourPackage } from "../types/travel";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./ui/dialog";
 import { Button } from "./ui/button";
-import { X, MapPin, Clock, Check } from "lucide-react";
+import { X, MapPin, Clock, Check, Users, Info } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 
@@ -10,6 +10,13 @@ interface OfferModalProps {
   isOpen: boolean;
   onClose: () => void;
 }
+
+// Pricing Configuration (Matches Custom Tour Logic)
+const PRICING_CONFIG: Record<string, { tier1: number; tier2: number }> = {
+  nara: { tier1: 85000, tier2: 105000 },
+  hakone: { tier1: 75000, tier2: 95000 },
+  nagoya: { tier1: 85000, tier2: 105000 },
+};
 
 export default function OfferModal({
   offer,
@@ -20,7 +27,28 @@ export default function OfferModal({
 
   if (!offer) return null;
 
-  const totalPrice = offer.price * travelers;
+  // --- PRICING LOGIC ---
+  // Detect location based on title
+  const locationKey = Object.keys(PRICING_CONFIG).find((key) =>
+    offer.title.toLowerCase().includes(key)
+  );
+
+  let totalPrice = 0;
+  let isPackagePrice = false;
+
+  if (locationKey) {
+    // Apply Tiered Package Pricing
+    const config = PRICING_CONFIG[locationKey];
+    isPackagePrice = true;
+    if (travelers <= 6) {
+      totalPrice = config.tier1;
+    } else {
+      totalPrice = config.tier2;
+    }
+  } else {
+    // Fallback for other packages (Standard multiplication)
+    totalPrice = offer.price * travelers;
+  }
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -103,35 +131,48 @@ export default function OfferModal({
               <h3 className="text-lg font-semibold text-gray-900 mb-3">
                 Number of Travelers
               </h3>
-              <div className="flex items-center space-x-3">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setTravelers(Math.max(1, travelers - 1))}
-                  disabled={travelers <= 1}
-                >
-                  -
-                </Button>
-                <span className="text-lg font-medium w-8 text-center">
-                  {travelers}
-                </span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setTravelers(travelers + 1)}
-                  disabled={travelers >= 10}
-                >
-                  +
-                </Button>
+              <div className="space-y-2">
+                <div className="flex items-center space-x-3">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setTravelers(Math.max(1, travelers - 1))}
+                    disabled={travelers <= 1}
+                  >
+                    -
+                  </Button>
+                  <span className="text-lg font-medium w-8 text-center">
+                    {travelers}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setTravelers(travelers + 1)}
+                    disabled={travelers >= 9}
+                  >
+                    +
+                  </Button>
+                  <Users className="w-4 h-4 text-gray-500 ml-2" />
+                </div>
+                {isPackagePrice && (
+                  <p className="text-xs text-blue-600 flex items-center gap-1">
+                    <Info className="w-3 h-3" />
+                    Tier: {travelers <= 6 ? "1-6 Travelers" : "7-9 Travelers"}
+                  </p>
+                )}
               </div>
             </div>
 
             {/* Pricing */}
             <div className="bg-gray-50 p-4 rounded-lg">
               <div className="flex justify-between items-center mb-2">
-                <span className="text-gray-600">Price per person:</span>
+                <span className="text-gray-600">
+                  {isPackagePrice ? "Package Price:" : "Price per person:"}
+                </span>
                 <span className="font-medium">
-                  ¥{offer.price.toLocaleString()}
+                  {isPackagePrice
+                    ? `¥${totalPrice.toLocaleString()}`
+                    : `¥${offer.price.toLocaleString()}`}
                 </span>
               </div>
               <div className="flex justify-between items-center mb-3">
@@ -148,15 +189,15 @@ export default function OfferModal({
               </div>
             </div>
 
-            {/* Book Button */}
+            {/* Book Button - Redirects to Payment Page */}
             <Link
-              to={`/booking-confirmation?package=${offer.id}&travelers=${travelers}`}
+              to={`/payment?location=${encodeURIComponent(offer.title)}&price=${totalPrice}&travelers=${travelers}&package=${offer.id}`}
             >
               <Button
                 className="w-full bg-red-600 hover:bg-red-700 text-white font-medium py-3 text-lg rounded-lg"
                 onClick={onClose}
               >
-                Get Tickets for ¥{totalPrice.toLocaleString()}
+                Book for ¥{totalPrice.toLocaleString()}
               </Button>
             </Link>
           </div>
