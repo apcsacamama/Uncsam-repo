@@ -1,4 +1,5 @@
 import Navigation from "../components/Navigation";
+import ItineraryChatbot from "../components/ItineraryChatbot"; // Imported Chatbot
 import {
   Card,
   CardContent,
@@ -16,6 +17,7 @@ import {
   Mail,
   Download,
   Share,
+  Sparkles // Added Icon
 } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
 import { tourPackages } from "../data/offers";
@@ -27,6 +29,9 @@ export default function BookingConfirmation() {
   const travelers = searchParams.get("travelers") || "1";
   const isCustom = searchParams.get("custom") === "true";
   const customPrice = searchParams.get("price");
+
+  // State for AI Chatbot
+  const [showItineraryChatbot, setShowItineraryChatbot] = useState(false);
 
   const [bookingId] = useState(`BK${Date.now()}`);
   const selectedPackage = packageId
@@ -42,7 +47,7 @@ export default function BookingConfirmation() {
 
   const bookingDetails = {
     id: bookingId,
-    customerName: "John Smith", // In real app, this would come from auth
+    customerName: "John Smith", 
     email: "john@email.com",
     phone: "+81-90-1234-5678",
     travelDate: "2024-03-15",
@@ -57,6 +62,11 @@ export default function BookingConfirmation() {
     vehicleType: "Private Van",
     licenseNumber: "JP-2024-001",
   };
+
+  // Destinations to pass to AI (Mock data if custom, else package data)
+  const itineraryDestinations = selectedPackage 
+    ? selectedPackage.destinations 
+    : ["Nagoya Castle", "Legoland", "Oasis 21", "Ghibli Park"]; 
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -284,13 +294,31 @@ export default function BookingConfirmation() {
                 </div>
               </CardContent>
             </Card>
-            {/* Next Steps */}
+
+            {/* Next Steps (AI BUTTON MOVED HERE) */}
             <Card>
               <CardHeader>
                 <CardTitle>What's Next?</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
+                  {/* --- AI ITINERARY BUTTON --- */}
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <h4 className="font-semibold text-blue-900 mb-2 flex items-center gap-2">
+                        <Sparkles className="w-4 h-4 text-blue-600" />
+                        Plan Your Day
+                    </h4>
+                    <p className="text-sm text-blue-800 mb-3">
+                        Want a detailed schedule? Our AI can generate a perfect itinerary for your trip!
+                    </p>
+                    <Button 
+                        onClick={() => setShowItineraryChatbot(true)}
+                        className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                    >
+                        Generate AI Itinerary
+                    </Button>
+                  </div>
+
                   <div className="flex items-start space-x-3">
                     <div className="bg-blue-100 rounded-full p-2 mt-1">
                       <Mail className="w-4 h-4 text-blue-600" />
@@ -443,6 +471,15 @@ export default function BookingConfirmation() {
           </div>
         </div>
       </div>
+
+      {/* AI Chatbot Component */}
+      <ItineraryChatbot
+        selectedDestinations={itineraryDestinations}
+        isVisible={showItineraryChatbot}
+        onClose={() => setShowItineraryChatbot(false)}
+        travelDate={bookingDetails.travelDate}
+        travelers={parseInt(travelers)}
+      />
     </div>
   );
 }
