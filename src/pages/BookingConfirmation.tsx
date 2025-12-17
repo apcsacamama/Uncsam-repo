@@ -55,7 +55,6 @@ export default function BookingConfirmation() {
     customerName: customerName, // Dynamic Name
     email: customerEmail,       // Dynamic Email
     phone: customerPhone,       // Dynamic Phone
-    travelDate: "2024-03-15",
     status: "confirmed" as const,
     createdAt: new Date().toISOString().split("T")[0],
   };
