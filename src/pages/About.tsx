@@ -98,7 +98,7 @@ export default function About() {
         <div className="relative z-10 text-center text-white max-w-4xl mx-auto px-4">
           <div className="flex justify-center mb-6">
             <img
-              src="/api/placeholder/120/120"
+              src="https://scontent.fmnl3-2.fna.fbcdn.net/v/t39.30808-6/451379664_1018105196986792_7540591188468829376_n.jpg?_nc_cat=105&_nc_cb=99be929b-f3b7c874&ccb=1-7&_nc_sid=6ee11a&_nc_eui2=AeF9dS-ZdeqkyEUA02aQjrFf-myw5AVKl3T6bLDkBUqXdBhi0ZBA27vGfZSBHo9-MUYD71lqroea-BjDeFSXAv3n&_nc_ohc=SFQneAgnXHUQ7kNvwGPNVZ5&_nc_oc=AdlansKi8yE1pb2zDpu1EkknhwvTJpTDiKM0Oh2ha53UOxQ-2RuydlUfBPj8mk7x9RA&_nc_zt=23&_nc_ht=scontent.fmnl3-2.fna&_nc_gid=UT4JAZ0yxwAcfwydsQ_iAg&oh=00_Afn3Cz0niNCHFEiPASqvCd-Q4f0eTw2q1uG5dePjh5CEjw&oe=6948A6E8/120/120"
               alt="UncleSam Tours Logo"
               className="w-24 h-24 rounded-full bg-white p-2"
             />
