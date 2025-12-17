@@ -21,7 +21,7 @@ import {
 } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
 import { tourPackages } from "../data/offers";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 export default function BookingConfirmation() {
   const [searchParams] = useSearchParams();
@@ -29,6 +29,11 @@ export default function BookingConfirmation() {
   const travelers = searchParams.get("travelers") || "1";
   const isCustom = searchParams.get("custom") === "true";
   const customPrice = searchParams.get("price");
+
+  // --- NEW: GET CUSTOMER DATA FROM URL ---
+  const customerName = searchParams.get("name") || "Valued Customer";
+  const customerEmail = searchParams.get("email") || "email@example.com";
+  const customerPhone = searchParams.get("phone") || "N/A";
 
   // State for AI Chatbot
   const [showItineraryChatbot, setShowItineraryChatbot] = useState(false);
@@ -47,9 +52,9 @@ export default function BookingConfirmation() {
 
   const bookingDetails = {
     id: bookingId,
-    customerName: "John Smith", 
-    email: "john@email.com",
-    phone: "+81-90-1234-5678",
+    customerName: customerName, // Dynamic Name
+    email: customerEmail,       // Dynamic Email
+    phone: customerPhone,       // Dynamic Phone
     travelDate: "2024-03-15",
     status: "confirmed" as const,
     createdAt: new Date().toISOString().split("T")[0],
@@ -347,7 +352,7 @@ export default function BookingConfirmation() {
 
           {/* Payment Summary & Actions */}
           <div className="space-y-6">
-            {/* Payment Summary - TAX REMOVED */}
+            {/* Payment Summary */}
             <Card>
               <CardHeader>
                 <CardTitle>Payment Summary</CardTitle>
@@ -368,7 +373,7 @@ export default function BookingConfirmation() {
                     <span>{travelers}</span>
                   </div>
                   
-                  {/* Tax rows removed */}
+                  {/* Tax Lines Removed */}
 
                   <div className="border-t pt-2 mt-2">
                     <div className="flex justify-between font-bold text-lg">
@@ -388,14 +393,14 @@ export default function BookingConfirmation() {
               </CardContent>
             </Card>
 
-            {/* Action Buttons - AI BUTTON ADDED */}
+            {/* Action Buttons */}
             <Card>
               <CardHeader>
                 <CardTitle>Booking Actions</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
                 
-                {/* Generate AI Itinerary Button - Moved Here */}
+                {/* Generate AI Itinerary Button */}
                 <Button 
                     onClick={() => setShowItineraryChatbot(true)}
                     className="w-full bg-blue-600 hover:bg-blue-700 text-white mb-2"
