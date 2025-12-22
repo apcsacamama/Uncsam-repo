@@ -157,7 +157,6 @@ export default function FAQ() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Navigation />
 
       {/* Header */}
       <div className="bg-white shadow-sm">

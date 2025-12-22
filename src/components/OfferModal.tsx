@@ -1,227 +1,197 @@
-import { TourPackage } from "../types/travel";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./ui/dialog";
+import { Dialog, DialogContent } from "./ui/dialog"; // Ensure imports match your file structure
 import { Button } from "./ui/button";
-import { X, MapPin, Clock, Check, Users, Info } from "lucide-react";
+import { Badge } from "./ui/badge";
+import { X, ArrowRight, MapPin, CheckCircle, Calendar, Users } from "lucide-react"; // Added missing icons
+import { TourPackage } from "../types/travel";
 import { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 
 interface OfferModalProps {
-  offer: TourPackage | null;
   isOpen: boolean;
   onClose: () => void;
+  offer: TourPackage | null; // 1. Allow offer to be null to prevent Typescript errors
 }
 
-// --- PRICING CONFIGURATION ---
-// Tier 1: 1-6 Travelers | Tier 2: 7-9 Travelers
 const TIERED_PRICING: Record<string, { tier1: number; tier2: number }> = {
-  "nara-tour": { tier1: 85000, tier2: 105000 },
   "tokyo-disney": { tier1: 60000, tier2: 80000 },
+  "nara-tour": { tier1: 85000, tier2: 105000 },
 };
-
-// Fixed price packages (Flat rate regardless of travelers up to max)
 const FIXED_PRICE_IDS = ["fukuoka-tour", "fukui-tour", "hiroshima-tour"];
 
-export default function OfferModal({
-  offer,
-  isOpen,
-  onClose,
-}: OfferModalProps) {
+export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) {
+  const navigate = useNavigate();
+  const [date, setDate] = useState("");
   const [travelers, setTravelers] = useState(1);
+  
+  // 2. SAFETY FIX: Use 'offer?.price || 0' so it doesn't crash if offer is null
+  const [calculatedPrice, setCalculatedPrice] = useState(offer?.price || 0);
 
-  // Reset traveler count when the modal opens or offer changes
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && offer) {
+      setDate("");
       setTravelers(1);
+      setCalculatedPrice(offer.price);
     }
   }, [isOpen, offer]);
 
-  if (!offer) return null;
+  useEffect(() => {
+    if (!offer) return; // Safety check
 
-  // --- PRICING LOGIC ---
-  let totalPrice = 0;
-  let pricingType: "tiered" | "fixed" | "per-person" = "per-person";
-
-  // Check 1: Is it a Tiered Package? (Tokyo / Nara)
-  if (TIERED_PRICING[offer.id]) {
-    pricingType = "tiered";
-    const config = TIERED_PRICING[offer.id];
-    if (travelers <= 6) {
-      totalPrice = config.tier1;
+    const packageId = (offer as any).slug || offer.id;
+    let price = 0;
+    
+    if (TIERED_PRICING[packageId]) {
+      const config = TIERED_PRICING[packageId];
+      price = travelers <= 6 ? config.tier1 : config.tier2;
+    } else if (FIXED_PRICE_IDS.includes(packageId)) {
+      price = offer.price;
     } else {
-      totalPrice = config.tier2;
+      price = offer.price; // Default fallback
     }
-  } 
-  // Check 2: Is it a Fixed Price Package? (Fukuoka / Fukui / Hiroshima)
-  else if (FIXED_PRICE_IDS.includes(offer.id)) {
-    pricingType = "fixed";
-    totalPrice = offer.price; // Flat rate from data file
-  } 
-  // Check 3: Default Fallback (Per Person)
-  else {
-    totalPrice = offer.price * travelers;
-  }
+    setCalculatedPrice(price);
+  }, [travelers, offer]);
+
+  const handleProceed = () => {
+    if (!offer) return; // Safety check
+    
+    if (!date) {
+      alert("Please select a travel date first.");
+      return;
+    }
+
+    const pkgId = (offer as any).slug || offer.id;
+
+    navigate(
+      `/payment?package=${pkgId}&date=${date}&travelers=${travelers}&price=${calculatedPrice}&name=Guest`
+    );
+  };
+
+  // 3. CRITICAL: If offer is null, do not render ANYTHING.
+  if (!isOpen || !offer) return null;
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-white rounded-xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
         
-        {/* Header */}
-        <DialogHeader className="mb-4">
-          <DialogTitle className="text-2xl font-bold text-gray-900 pr-8">
-            {offer.title}
-          </DialogTitle>
-          <button
+        {/* Header Image */}
+        <div className="relative h-48 w-full flex-shrink-0 bg-gray-200">
+          <img 
+            src={offer.image} 
+            alt={offer.title} 
+            className="w-full h-full object-cover"
+          />
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="absolute top-3 right-3 bg-white/20 hover:bg-white/40 text-white rounded-full"
             onClick={onClose}
-            className="absolute right-4 top-4 p-2 rounded-full bg-gray-100 hover:bg-gray-200 transition-colors"
           >
-            <X className="h-4 w-4 text-gray-500" />
-          </button>
-        </DialogHeader>
-
-        <div className="grid md:grid-cols-2 gap-8">
-          {/* LEFT COLUMN: Image & Description */}
-          <div className="space-y-6">
-            <div className="overflow-hidden rounded-xl shadow-sm">
-              <img
-                src={offer.image}
-                alt={offer.title}
-                className="w-full h-64 object-cover hover:scale-105 transition-transform duration-500"
-              />
-            </div>
-
-            <div className="flex items-center space-x-4 text-sm text-gray-600 bg-gray-50 p-3 rounded-lg">
-              <div className="flex items-center">
-                <Clock className="w-4 h-4 mr-2 text-red-500" />
+            <X className="w-5 h-5" />
+          </Button>
+          <div className="absolute bottom-3 left-4">
+             <Badge className="bg-white/90 text-black hover:bg-white backdrop-blur-sm border-none text-sm px-3 py-1">
                 {offer.duration}
-              </div>
-              <div className="flex items-center">
-                <MapPin className="w-4 h-4 mr-2 text-red-500" />
-                {offer.destinations.length} destinations
-              </div>
-            </div>
-
-            <div className="prose prose-sm text-gray-600">
-              <p>{offer.description}</p>
-            </div>
-          </div>
-
-          {/* RIGHT COLUMN: Details & Booking */}
-          <div className="space-y-6">
-            
-            {/* Destinations List */}
-            <div>
-              <h3 className="text-lg font-bold text-gray-900 mb-3 flex items-center">
-                <MapPin className="w-5 h-5 mr-2 text-red-600" />
-                Destinations
-              </h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {offer.destinations.map((destination, index) => (
-                  <div
-                    key={index}
-                    className="flex items-start text-sm text-gray-600 bg-gray-50 p-2 rounded"
-                  >
-                    <span className="w-1.5 h-1.5 bg-red-400 rounded-full mt-1.5 mr-2 flex-shrink-0" />
-                    {destination}
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Inclusions List */}
-            <div>
-              <h3 className="text-lg font-bold text-gray-900 mb-3 flex items-center">
-                <Check className="w-5 h-5 mr-2 text-green-600" />
-                What's Included
-              </h3>
-              <ul className="space-y-2">
-                {offer.inclusions.map((inclusion, index) => (
-                  <li
-                    key={index}
-                    className="flex items-center text-sm text-gray-600"
-                  >
-                    <Check className="w-4 h-4 mr-2 text-green-500 flex-shrink-0" />
-                    {inclusion}
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            <div className="border-t border-gray-200 my-4"></div>
-
-            {/* Travelers Selection & Price Calculation */}
-            <div className="bg-gray-50 p-6 rounded-xl border border-gray-100 shadow-sm">
-              <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wider mb-4">
-                Configure Booking
-              </h3>
-              
-              <div className="flex items-center justify-between mb-4">
-                <span className="text-gray-700 font-medium">Travelers</span>
-                <div className="flex items-center space-x-3 bg-white px-2 py-1 rounded-lg border border-gray-200">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 text-gray-600 hover:bg-gray-100"
-                    onClick={() => setTravelers(Math.max(1, travelers - 1))}
-                    disabled={travelers <= 1}
-                  >
-                    -
-                  </Button>
-                  <span className="text-lg font-bold w-6 text-center">
-                    {travelers}
-                  </span>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 text-gray-600 hover:bg-gray-100"
-                    onClick={() => setTravelers(travelers + 1)}
-                    disabled={travelers >= 9}
-                  >
-                    +
-                  </Button>
-                </div>
-              </div>
-
-              {/* Dynamic Info Text */}
-              <div className="mb-4 min-h-[1.5rem]">
-                {pricingType === "tiered" && (
-                  <p className="text-xs text-blue-600 flex items-center justify-end">
-                    <Info className="w-3 h-3 mr-1" />
-                    Tier: {travelers <= 6 ? "1-6 Travelers" : "7-9 Travelers"}
-                  </p>
-                )}
-                {pricingType === "fixed" && (
-                  <p className="text-xs text-green-600 flex items-center justify-end">
-                    <Info className="w-3 h-3 mr-1" />
-                    Flat rate (up to 9 pax)
-                  </p>
-                )}
-              </div>
-
-              {/* Total Price Display */}
-              <div className="flex justify-between items-end border-t border-gray-200 pt-4 mb-6">
-                <div className="text-sm text-gray-500">Total Price</div>
-                <div className="text-3xl font-bold text-red-600">
-                  ¥{totalPrice.toLocaleString()}
-                </div>
-              </div>
-
-              {/* Action Button */}
-              <Link
-                to={`/payment?location=${encodeURIComponent(offer.title)}&price=${totalPrice}&travelers=${travelers}&package=${offer.id}`}
-                className="block"
-              >
-                <Button
-                  className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-4 text-lg rounded-lg shadow-md hover:shadow-lg transition-all"
-                  onClick={onClose}
-                >
-                  Proceed to Booking
-                </Button>
-              </Link>
-            </div>
-
+             </Badge>
           </div>
         </div>
-      </DialogContent>
-    </Dialog>
+
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto p-6">
+           <h2 className="text-2xl font-bold text-gray-900 mb-2">{offer.title}</h2>
+           <p className="text-gray-600 mb-6">{offer.description}</p>
+
+           <div className="grid md:grid-cols-2 gap-8">
+              {/* Left Column: Details */}
+              <div className="space-y-6">
+                 <div>
+                    <h3 className="font-semibold text-gray-900 mb-3 flex items-center">
+                        <MapPin className="w-4 h-4 mr-2 text-red-600" />
+                        Destinations
+                    </h3>
+                    <ul className="space-y-2">
+                       {offer.destinations.map((dest, i) => (
+                          <li key={i} className="text-sm text-gray-600 flex items-start">
+                             <div className="w-1.5 h-1.5 rounded-full bg-gray-300 mt-1.5 mr-2" />
+                             {dest}
+                          </li>
+                       ))}
+                    </ul>
+                 </div>
+
+                 <div>
+                    <h3 className="font-semibold text-gray-900 mb-3 flex items-center">
+                        <CheckCircle className="w-4 h-4 mr-2 text-green-600" />
+                        Inclusions
+                    </h3>
+                    <ul className="space-y-2">
+                       {offer.inclusions?.map((inc, i) => (
+                          <li key={i} className="text-sm text-gray-600 flex items-center">
+                             <CheckCircle className="w-3 h-3 mr-2 text-green-500" />
+                             {inc}
+                          </li>
+                       ))}
+                    </ul>
+                 </div>
+              </div>
+
+              {/* Right Column: Booking Form */}
+              <div className="bg-gray-50 p-5 rounded-lg border border-gray-100 h-fit">
+                 <h3 className="font-bold text-gray-900 mb-4 border-b pb-2">Plan Your Trip</h3>
+                 
+                 <div className="space-y-4">
+                    {/* Date Picker */}
+                    <div>
+                       <label className="text-sm font-medium text-gray-700 mb-1 block">Travel Date</label>
+                       <div className="relative">
+                          <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                          <input 
+                             type="date"
+                             className="w-full pl-10 pr-4 py-2 border rounded-md text-sm focus:ring-2 focus:ring-red-500 focus:outline-none bg-white"
+                             min={new Date().toISOString().split("T")[0]}
+                             value={date}
+                             onChange={(e) => setDate(e.target.value)}
+                          />
+                       </div>
+                    </div>
+
+                    {/* Travelers Counter */}
+                    <div>
+                       <label className="text-sm font-medium text-gray-700 mb-1 block">Travelers</label>
+                       <div className="relative">
+                          <Users className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                          <select 
+                             className="w-full pl-10 pr-4 py-2 border rounded-md text-sm focus:ring-2 focus:ring-red-500 focus:outline-none bg-white appearance-none"
+                             value={travelers}
+                             onChange={(e) => setTravelers(parseInt(e.target.value))}
+                          >
+                             {[1,2,3,4,5,6,7,8,9,10,11,12].map(num => (
+                                <option key={num} value={num}>{num} Person{num > 1 ? 's' : ''}</option>
+                             ))}
+                          </select>
+                       </div>
+                    </div>
+
+                    {/* Price Summary */}
+                    <div className="pt-4 mt-2 border-t">
+                       <div className="flex justify-between items-end mb-1">
+                          <span className="text-sm text-gray-600">Total Price</span>
+                          <span className="text-2xl font-bold text-red-600">¥{calculatedPrice.toLocaleString()}</span>
+                       </div>
+                       <p className="text-xs text-gray-400 text-right">Includes taxes & fees</p>
+                    </div>
+
+                    <Button 
+                       className="w-full bg-red-600 hover:bg-red-700 text-white mt-2"
+                       onClick={handleProceed}
+                       disabled={!date}
+                    >
+                       Proceed to Booking <ArrowRight className="w-4 h-4 ml-2" />
+                    </Button>
+                 </div>
+              </div>
+           </div>
+        </div>
+      </div>
+    </div>
   );
 }

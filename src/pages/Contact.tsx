@@ -112,7 +112,6 @@ export default function Contact() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Navigation />
 
       {/* Hero Section */}
       <div className="bg-red-600 text-white py-16">

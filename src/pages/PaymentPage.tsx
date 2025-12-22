@@ -82,7 +82,6 @@ export default function PaymentPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Navigation />
 
       <div className="max-w-6xl mx-auto px-4 py-12">
         <div className="flex items-center gap-2 mb-8 text-sm text-gray-500">

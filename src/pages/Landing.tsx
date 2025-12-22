@@ -1,4 +1,3 @@
-import Navigation from "../components/Navigation";
 import HeroSection from "../components/HeroSection";
 import OfferCard from "../components/OfferCard";
 import FAQChatbot from "../components/FAQChatbot";
@@ -30,7 +29,6 @@ export default function Landing() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Navigation />
       <HeroSection />
 
       {/* Featured Offers Section */}
@@ -50,7 +48,7 @@ export default function Landing() {
             <OfferCard
               key={offer.id}
               offer={offer}
-              onViewDetails={handleViewDetails}
+              onBookNow={() => handleViewDetails(offer)}
             />
           ))}
         </div>

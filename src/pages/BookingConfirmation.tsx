@@ -1,5 +1,7 @@
 import Navigation from "../components/Navigation";
 import ItineraryChatbot from "../components/ItineraryChatbot";
+import InvoiceModal from "../components/ReceiptModal"; // <--- 1. Import InvoiceModal
+import { supabase } from "../lib/supabaseClient"; 
 import {
   Card,
   CardContent,
@@ -18,20 +20,18 @@ import {
   Download,
   Share,
   Sparkles,
-  Plane // Added Plane icon for the Add-on
+  Plane,
+  Loader2
 } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
-import { tourPackages } from "../data/offers";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 
-// --- PRICING CONFIGURATION ---
 const TIERED_PRICING: Record<string, { tier1: number; tier2: number }> = {
   "nara-tour": { tier1: 85000, tier2: 105000 },
   "tokyo-disney": { tier1: 60000, tier2: 80000 },
 };
 const FIXED_PRICE_IDS = ["fukuoka-tour", "fukui-tour", "hiroshima-tour"];
 
-// --- DEFAULT INCLUSIONS FOR CUSTOM TOURS ---
 const STANDARD_INCLUSIONS = [
   "12-Hour Private Tour",
   "Professional Driver",
@@ -43,7 +43,6 @@ const STANDARD_INCLUSIONS = [
 export default function BookingConfirmation() {
   const [searchParams] = useSearchParams();
   
-  // URL Params
   const packageId = searchParams.get("package");
   const travelersParam = searchParams.get("travelers") || "1";
   const travelers = parseInt(travelersParam);
@@ -51,32 +50,64 @@ export default function BookingConfirmation() {
   const urlPrice = searchParams.get("price");
   const travelDateParam = searchParams.get("date");
   const locationParam = searchParams.get("location");
-  
-  // Read Add-ons from URL
   const addonsParam = searchParams.get("addons"); 
   const hasAirportTransfer = addonsParam && addonsParam.includes("airport-transfer");
 
-  // Customer Data
   const customerName = searchParams.get("name") || "Valued Customer";
   const customerEmail = searchParams.get("email") || "email@example.com";
   const customerPhone = searchParams.get("phone") || "N/A";
 
   const [showItineraryChatbot, setShowItineraryChatbot] = useState(false);
+  // 2. Add state to control Invoice Modal visibility
+  const [showInvoice, setShowInvoice] = useState(false);
+  
   const [bookingId] = useState(`BK${Date.now()}`);
 
-  const selectedPackage = packageId
-    ? tourPackages.find((p) => p.id === packageId)
-    : null;
+  const [selectedPackage, setSelectedPackage] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(!isCustom);
 
-  // --- DETERMINE DISPLAY DATA ---
-  // 1. Inclusions Logic (Standard Package Inclusions ONLY)
+  // --- FETCH FROM DB ---
+  useEffect(() => {
+    if (packageId && !isCustom) {
+      fetchPackage();
+    }
+  }, [packageId, isCustom]);
+
+  const fetchPackage = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('tour_packages')
+        .select('*')
+        .or(`id.eq.${packageId},slug.eq.${packageId}`) 
+        .single();
+      
+      if (error) {
+         const { data: slugData, error: slugError } = await supabase
+            .from('tour_packages')
+            .select('*')
+            .eq('slug', packageId)
+            .single();
+            
+         if (slugError) throw slugError;
+         setSelectedPackage(slugData);
+      } else {
+         setSelectedPackage(data);
+      }
+    } catch (error) {
+      console.error("Error fetching package details:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const displayInclusions = selectedPackage 
-    ? selectedPackage.inclusions 
+    ? selectedPackage.inclusions || STANDARD_INCLUSIONS 
     : STANDARD_INCLUSIONS;
 
-  // 2. Destinations Logic
   const displayDestinations = useMemo(() => {
-    if (selectedPackage) return selectedPackage.destinations;
+    if (selectedPackage && selectedPackage.destinations) {
+        return selectedPackage.destinations;
+    }
     
     if (locationParam === "nara") return ["Todai-ji Temple", "Nara Park", "Kasuga Taisha", "Local Spot"];
     if (locationParam === "hakone") return ["Lake Ashi", "Hakone Shrine", "Owakudani", "Open Air Museum"];
@@ -85,19 +116,20 @@ export default function BookingConfirmation() {
     return ["Custom Itinerary Point 1", "Custom Itinerary Point 2", "Custom Itinerary Point 3"];
   }, [selectedPackage, locationParam]);
 
-  // --- PRICING LOGIC ---
   let totalPrice = 0;
 
   if (urlPrice) {
     totalPrice = parseInt(urlPrice);
   } else if (selectedPackage) {
-    if (TIERED_PRICING[selectedPackage.id]) {
-      const config = TIERED_PRICING[selectedPackage.id];
+    const identifier = selectedPackage.slug || selectedPackage.id;
+
+    if (TIERED_PRICING[identifier]) {
+      const config = TIERED_PRICING[identifier];
       totalPrice = travelers <= 6 ? config.tier1 : config.tier2;
-    } else if (FIXED_PRICE_IDS.includes(selectedPackage.id)) {
+    } else if (FIXED_PRICE_IDS.includes(identifier)) {
       totalPrice = selectedPackage.price;
     } else {
-      totalPrice = selectedPackage.price * travelers;
+      totalPrice = selectedPackage.price * travelers; 
     }
   }
 
@@ -119,11 +151,18 @@ export default function BookingConfirmation() {
     licenseNumber: "JP-2024-001",
   };
 
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-green-600" />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       <Navigation />
 
-      {/* Success Header */}
       <div className="bg-gradient-to-r from-green-600 to-green-700 text-white py-12">
         <div className="max-w-4xl mx-auto px-4 text-center">
           <div className="flex justify-center mb-4">
@@ -140,9 +179,7 @@ export default function BookingConfirmation() {
 
       <div className="max-w-4xl mx-auto px-4 py-12">
         <div className="grid lg:grid-cols-3 gap-8">
-          {/* Booking Details */}
           <div className="lg:col-span-2 space-y-6">
-            {/* Booking Summary */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -194,14 +231,13 @@ export default function BookingConfirmation() {
                   </div>
                 </div>
 
-                {/* DESTINATIONS SECTION */}
                 <div>
                   <h4 className="font-medium text-gray-900 mb-2">
                     {isCustom ? "Planned Destinations (Custom)" : "Included Destinations"}
                   </h4>
                   <div className="grid grid-cols-2 gap-2">
-                    {displayDestinations.map(
-                      (destination, index) => (
+                    {displayDestinations?.map(
+                      (destination: string, index: number) => (
                         <div
                           key={index}
                           className="flex items-center text-sm text-gray-600"
@@ -214,13 +250,12 @@ export default function BookingConfirmation() {
                   </div>
                 </div>
 
-                {/* INCLUSIONS SECTION (Does NOT include Airport Transfer) */}
                 <div>
                   <h4 className="font-medium text-gray-900 mb-2">
                     Inclusions
                   </h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-1">
-                    {displayInclusions.map((inclusion, index) => (
+                    {displayInclusions.map((inclusion: string, index: number) => (
                       <div
                         key={index}
                         className="flex items-center text-sm text-gray-600"
@@ -234,7 +269,6 @@ export default function BookingConfirmation() {
               </CardContent>
             </Card>
 
-            {/* Driver Information */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -246,10 +280,7 @@ export default function BookingConfirmation() {
                 <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
                   <div className="flex items-center space-x-3 mb-3">
                     <div className="bg-green-600 rounded-full w-12 h-12 flex items-center justify-center text-white font-bold text-lg">
-                      {driverDetails.name
-                        .split(" ")
-                        .map((n) => n[0])
-                        .join("")}
+                      {driverDetails.name.split(" ").map((n) => n[0]).join("")}
                     </div>
                     <div>
                       <h3 className="font-semibold text-green-900">
@@ -285,10 +316,7 @@ export default function BookingConfirmation() {
                       </h4>
                       <div className="flex gap-2">
                         {driverDetails.languages.map((lang, index) => (
-                          <Badge
-                            key={index}
-                            className="bg-green-100 text-green-800 text-xs"
-                          >
+                          <Badge key={index} className="bg-green-100 text-green-800 text-xs">
                             {lang}
                           </Badge>
                         ))}
@@ -296,22 +324,9 @@ export default function BookingConfirmation() {
                     </div>
                   </div>
                 </div>
-
-                <div className="text-sm text-gray-600">
-                  <p className="mb-2">
-                    <strong>Important:</strong> Your driver will contact you 24
-                    hours before your tour to confirm pickup details and answer
-                    any questions.
-                  </p>
-                  <p>
-                    For immediate assistance, you can contact your driver
-                    directly at the number provided above.
-                  </p>
-                </div>
               </CardContent>
             </Card>
 
-            {/* Customer Information */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -323,9 +338,7 @@ export default function BookingConfirmation() {
                 <div className="grid md:grid-cols-2 gap-4">
                   <div>
                     <h4 className="font-medium text-gray-900 mb-1">Name</h4>
-                    <p className="text-gray-600">
-                      {bookingDetails.customerName}
-                    </p>
+                    <p className="text-gray-600">{bookingDetails.customerName}</p>
                   </div>
                   <div>
                     <h4 className="font-medium text-gray-900 mb-1">Email</h4>
@@ -344,60 +357,9 @@ export default function BookingConfirmation() {
                 </div>
               </CardContent>
             </Card>
-
-            {/* Next Steps */}
-            <Card>
-              <CardHeader>
-                <CardTitle>What's Next?</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="flex items-start space-x-3">
-                    <div className="bg-blue-100 rounded-full p-2 mt-1">
-                      <Mail className="w-4 h-4 text-blue-600" />
-                    </div>
-                    <div>
-                      <h4 className="font-medium">Confirmation Email</h4>
-                      <p className="text-gray-600 text-sm">
-                        You'll receive a detailed confirmation email within the
-                        next few minutes.
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-start space-x-3">
-                    <div className="bg-green-100 rounded-full p-2 mt-1">
-                      <Phone className="w-4 h-4 text-green-600" />
-                    </div>
-                    <div>
-                      <h4 className="font-medium">Pre-Travel Contact</h4>
-                      <p className="text-gray-600 text-sm">
-                        Our team will contact you 48 hours before your travel
-                        date with final details.
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-start space-x-3">
-                    <div className="bg-yellow-100 rounded-full p-2 mt-1">
-                      <Calendar className="w-4 h-4 text-yellow-600" />
-                    </div>
-                    <div>
-                      <h4 className="font-medium">Travel Day</h4>
-                      <p className="text-gray-600 text-sm">
-                        Be ready for pickup at your hotel lobby at the scheduled
-                        time.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
           </div>
 
-          {/* Payment Summary & Actions */}
           <div className="space-y-6">
-            {/* Payment Summary */}
             <Card>
               <CardHeader>
                 <CardTitle>Payment Summary</CardTitle>
@@ -407,17 +369,13 @@ export default function BookingConfirmation() {
                   <div className="flex justify-between text-sm">
                     <span>Package Price:</span>
                     <span>
-                      ¥
-                      {/* Calculate Base Price by subtracting known addons */}
-                      {(totalPrice - (hasAirportTransfer ? 8000 : 0)).toLocaleString()}
+                      ¥{(totalPrice - (hasAirportTransfer ? 8000 : 0)).toLocaleString()}
                     </span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span>Travelers:</span>
                     <span>{travelers}</span>
                   </div>
-
-                  {/* FIX: Add-on displayed clearly here, NOT in Inclusions */}
                   {hasAirportTransfer && (
                     <div className="flex justify-between text-sm text-blue-700 bg-blue-50 p-2 rounded border border-blue-100 mt-2">
                         <div className="flex items-center">
@@ -427,7 +385,6 @@ export default function BookingConfirmation() {
                         <span className="font-medium">+ ¥8,000</span>
                     </div>
                   )}
-
                   <div className="border-t pt-2 mt-2">
                     <div className="flex justify-between font-bold text-lg">
                       <span>Total Paid:</span>
@@ -437,23 +394,18 @@ export default function BookingConfirmation() {
                     </div>
                   </div>
                 </div>
-
                 <div className="text-xs text-gray-500 bg-gray-50 p-3 rounded">
-                  Payment Method: Credit Card ending in ****1234
-                  <br />
+                  Payment Method: Credit Card ending in ****1234<br />
                   Transaction ID: TXN{Date.now()}
                 </div>
               </CardContent>
             </Card>
 
-            {/* Action Buttons */}
             <Card>
               <CardHeader>
                 <CardTitle>Booking Actions</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                 
-                {/* Generate AI Itinerary Button */}
                 <Button 
                     onClick={() => setShowItineraryChatbot(true)}
                     className="w-full bg-blue-600 hover:bg-blue-700 text-white mb-2"
@@ -461,22 +413,16 @@ export default function BookingConfirmation() {
                     <Sparkles className="w-4 h-4 mr-2" />
                     Generate AI Itinerary
                 </Button>
-
-                <Button className="w-full" variant="outline">
+                
+                {/* 3. New Download Receipt Button */}
+                <Button 
+                    className="w-full" 
+                    variant="outline"
+                    onClick={() => setShowInvoice(true)}
+                >
                   <Download className="w-4 h-4 mr-2" />
                   Download Receipt
                 </Button>
-
-                <Button className="w-full" variant="outline">
-                  <Share className="w-4 h-4 mr-2" />
-                  Share Booking
-                </Button>
-
-                <Link to="/profile" className="block">
-                  <Button className="w-full bg-red-600 hover:bg-red-700">
-                    View My Bookings
-                  </Button>
-                </Link>
 
                 <Link to="/offers" className="block">
                   <Button className="w-full" variant="outline">
@@ -485,38 +431,23 @@ export default function BookingConfirmation() {
                 </Link>
               </CardContent>
             </Card>
-
-            {/* Contact Support */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Need Help?</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3 text-sm">
-                  <div>
-                    <h4 className="font-medium">Customer Support</h4>
-                    <p className="text-gray-600">Available 24/7</p>
-                    <p className="text-blue-600">+81-3-1234-5678</p>
-                  </div>
-
-                  <div>
-                    <h4 className="font-medium">Email Support</h4>
-                    <p className="text-blue-600">support@unclesam-travel.com</p>
-                  </div>
-
-                  <Link to="/faq">
-                    <Button size="sm" variant="outline" className="w-full">
-                      View FAQ
-                    </Button>
-                  </Link>
-                </div>
-              </CardContent>
-            </Card>
           </div>
         </div>
       </div>
+      
+      {/* 4. Render Invoice Modal */}
+      <InvoiceModal 
+        isOpen={showInvoice}
+        onClose={() => setShowInvoice(false)}
+        bookingDetails={bookingDetails}
+        packageDetails={selectedPackage}
+        paymentDetails={{
+            totalPrice: totalPrice,
+            travelers: travelers,
+            hasAirportTransfer: hasAirportTransfer
+        }}
+      />
 
-      {/* AI Chatbot Component */}
       <ItineraryChatbot
         selectedDestinations={displayDestinations}
         isVisible={showItineraryChatbot}

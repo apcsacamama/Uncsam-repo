@@ -180,7 +180,6 @@ export default function CustomTour() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Navigation />
 
       {/* Hero Section */}
       <div

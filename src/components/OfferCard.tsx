@@ -4,10 +4,12 @@ import { Clock, MapPin, Users } from "lucide-react";
 
 interface OfferCardProps {
   offer: TourPackage;
-  onViewDetails: (offer: TourPackage) => void;
+  // 1. Renamed to match the parent component
+  onBookNow: () => void; 
 }
 
-export default function OfferCard({ offer, onViewDetails }: OfferCardProps) {
+// 2. Updated props here as well
+export default function OfferCard({ offer, onBookNow }: OfferCardProps) {
   return (
     <div className="bg-white rounded-lg shadow-lg overflow-hidden hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 flex flex-col h-full">
       {/* Image Container */}
@@ -40,7 +42,7 @@ export default function OfferCard({ offer, onViewDetails }: OfferCardProps) {
           </p>
         </div>
 
-        {/* Key Details (Grid Layout for better alignment) */}
+        {/* Key Details */}
         <div className="grid grid-cols-2 gap-y-2 mb-6 text-sm text-gray-500">
           <div className="flex items-center">
             <Clock className="w-4 h-4 mr-2 text-red-500" />
@@ -50,7 +52,6 @@ export default function OfferCard({ offer, onViewDetails }: OfferCardProps) {
             <MapPin className="w-4 h-4 mr-2 text-red-500" />
             {offer.destinations.length} Stops
           </div>
-          {/* Added Users Icon to indicate Private Group */}
           <div className="flex items-center col-span-2">
             <Users className="w-4 h-4 mr-2 text-red-500" />
             Private Group / Transfer
@@ -82,7 +83,7 @@ export default function OfferCard({ offer, onViewDetails }: OfferCardProps) {
 
           {/* Action Button */}
           <Button
-            onClick={() => onViewDetails(offer)}
+            onClick={onBookNow} // 3. Connected to the correct prop
             className="w-full bg-red-600 hover:bg-red-700 text-white font-medium py-2 rounded-lg transition-colors duration-200 shadow-md hover:shadow-lg"
           >
             View Details

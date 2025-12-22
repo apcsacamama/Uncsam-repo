@@ -10,37 +10,87 @@ import {
 } from "../components/ui/card";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, AlertCircle } from "lucide-react";
+import { supabase } from "../lib/supabaseClient";
 
 export default function SignIn() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+    setErrorMsg("");
 
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    try {
+      const cleanEmail = email.trim();
 
-    // For demo purposes, redirect to dashboard if email contains "admin"
-    if (email.includes("admin")) {
-      navigate("/dashboard");
-    } else {
-      navigate("/profile");
+      // 1. SECURITY CHECK (Optional - Safe to fail)
+      // Check if account is locked due to too many attempts
+      try {
+        const { data: isLocked } = await supabase.rpc('check_lockout', {
+            user_email: cleanEmail
+        });
+        if (isLocked) {
+            setErrorMsg("Account locked. Too many failed attempts. Try again in 30 mins.");
+            setIsLoading(false);
+            return;
+        }
+      } catch (err) {
+        // If this fails (function missing), allow login to proceed
+        console.warn("Lockout check skipped");
+      }
+
+      // 2. ATTEMPT REAL LOGIN
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: cleanEmail,
+        password,
+      });
+
+      if (error) {
+        // --- LOGIN FAILED ---
+        // Log the failure in DB (Fire and forget)
+        supabase.rpc('handle_failed_login', { user_email: cleanEmail });
+        
+        setErrorMsg("Invalid email or password.");
+      } else {
+        // --- LOGIN SUCCESS ---
+        
+        if (data.user) {
+           // Reset failure counters (Fire and forget)
+           supabase.rpc('handle_successful_login', { user_id: data.user.id });
+           
+           // 3. CHECK ROLE & REDIRECT
+           const { data: profile } = await supabase
+             .from('profiles')
+             .select('role')
+             .eq('id', data.user.id)
+             .single();
+
+           if (profile?.role === 'admin') {
+             navigate("/dashboard");
+           } else {
+             // 4. FIX: Send customer to Profile Page
+             navigate("/profile"); 
+           }
+        }
+      }
+
+    } catch (err) {
+      setErrorMsg("An unexpected error occurred.");
+      console.error(err);
+    } finally {
+      setIsLoading(false);
     }
-
-    setIsLoading(false);
   };
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Navigation />
 
-      {/* Background Image Section */}
       <div
         className="min-h-screen relative flex items-center justify-center"
         style={{
@@ -52,24 +102,25 @@ export default function SignIn() {
       >
         <div className="absolute inset-0 bg-black bg-opacity-50" />
 
-        {/* Sign In Form */}
         <div className="relative z-10 w-full max-w-md px-4">
           <Card className="bg-white/95 backdrop-blur-sm shadow-2xl">
             <CardHeader className="text-center pb-2">
               <CardTitle className="text-2xl font-bold text-gray-900">
-                Sign in or create an account
+                Sign In
               </CardTitle>
             </CardHeader>
 
             <CardContent className="space-y-6">
+              {errorMsg && (
+                <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg flex items-start text-sm">
+                  <AlertCircle className="w-5 h-5 mr-2 flex-shrink-0 mt-0.5" />
+                  {errorMsg}
+                </div>
+              )}
+
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="space-y-2">
-                  <Label
-                    htmlFor="email"
-                    className="text-sm font-medium text-gray-700"
-                  >
-                    Email
-                  </Label>
+                  <Label htmlFor="email">Email</Label>
                   <Input
                     id="email"
                     type="email"
@@ -82,12 +133,7 @@ export default function SignIn() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label
-                    htmlFor="password"
-                    className="text-sm font-medium text-gray-700"
-                  >
-                    Password
-                  </Label>
+                  <Label htmlFor="password">Password</Label>
                   <div className="relative">
                     <Input
                       id="password"
@@ -103,11 +149,7 @@ export default function SignIn() {
                       onClick={() => setShowPassword(!showPassword)}
                       className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
                     >
-                      {showPassword ? (
-                        <EyeOff className="w-4 h-4" />
-                      ) : (
-                        <Eye className="w-4 h-4" />
-                      )}
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </button>
                   </div>
                 </div>
@@ -117,7 +159,7 @@ export default function SignIn() {
                   disabled={isLoading}
                   className="w-full bg-red-600 hover:bg-red-700 text-white font-medium py-2 rounded-lg transition-colors duration-200"
                 >
-                  {isLoading ? "Signing in..." : "Continue"}
+                  {isLoading ? "Signing in..." : "Sign In"}
                 </Button>
               </form>
 
@@ -133,30 +175,10 @@ export default function SignIn() {
 
                 <div className="text-center text-sm text-gray-600">
                   Don't have an account?{" "}
-                  <Link
-                    to="/signup"
-                    className="text-red-600 hover:text-red-700 font-medium"
-                  >
+                  <Link to="/signup" className="text-red-600 hover:text-red-700 font-medium">
                     Create one here
                   </Link>
                 </div>
-
-                <div className="text-center">
-                  <Link
-                    to="/forgot-password"
-                    className="text-sm text-red-600 hover:text-red-700"
-                  >
-                    Forgot your password?
-                  </Link>
-                </div>
-              </div>
-
-              {/* Demo Credentials */}
-              <div className="mt-6 p-3 bg-blue-50 rounded-lg text-xs text-blue-800">
-                <p className="font-medium mb-1">Demo Credentials:</p>
-                <p>Customer: customer@demo.com</p>
-                <p>Owner: admin@demo.com</p>
-                <p>Password: any password</p>
               </div>
             </CardContent>
           </Card>
