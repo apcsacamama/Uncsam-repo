@@ -30,7 +30,7 @@ A modern, fully-featured travel booking website built with React, TypeScript, an
 
 #### 2. Itinerary AI Chatbot
 
-- **Trigger**: Appears when customers select 2+ destinations in custom tour builder
+- **Trigger**: Appears after the customers have paid for their custom tour/ offered tour
 - **Features**:
   - Real-time weather checking for destinations
   - Weather warnings and alternative suggestions
