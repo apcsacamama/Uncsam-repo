@@ -1,5 +1,6 @@
 import Navigation from "../components/Navigation";
 import FAQChatbot from "../components/FAQChatbot";
+import { supabase } from "../lib/supabaseClient"; // Ensure this path matches your file
 import {
   Card,
   CardContent,
@@ -9,8 +10,8 @@ import {
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Badge } from "../components/ui/badge";
-import { mockBookings, dashboardStats, tourPackages as initialPackages } from "../data/offers";
-import { useState, useMemo } from "react";
+import { mockBookings, dashboardStats } from "../data/offers";
+import { useState, useMemo, useEffect } from "react";
 import {
   Users,
   DollarSign,
@@ -22,7 +23,8 @@ import {
   MapPin,
   X,
   Save,
-  Package
+  Package,
+  Loader2
 } from "lucide-react";
 import {
   BarChart,
@@ -41,19 +43,39 @@ import {
 export default function Dashboard() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
-  
-  // State for Revenue Filter
   const [selectedMonth, setSelectedMonth] = useState<string>("all");
 
-  // --- NEW: State for Editing Packages ---
-  const [packages, setPackages] = useState(initialPackages);
+  // --- SUPABASE STATE ---
+  const [packages, setPackages] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // --- EDITING STATE ---
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingPackageId, setEditingPackageId] = useState<string | null>(null);
-  
-  // Temporary state for the form inputs being edited
   const [editForm, setEditForm] = useState({ title: "", price: 0, description: "" });
 
-  // --- REVENUE CALCULATION LOGIC ---
+  // 1. Fetch Packages from Supabase on Load
+  useEffect(() => {
+    fetchPackages();
+  }, []);
+
+  const fetchPackages = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('tour_packages')
+        .select('*')
+        .order('id', { ascending: true });
+      
+      if (error) throw error;
+      setPackages(data || []);
+    } catch (error) {
+      console.error("Error fetching packages:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // 2. Revenue Calculation
   const currentRevenue = useMemo(() => {
     const filteredByMonth = mockBookings.filter((booking) => {
       if (selectedMonth === "all") return true;
@@ -83,34 +105,57 @@ export default function Dashboard() {
     }
   };
 
-  // --- NEW: Handle Edit Logic ---
-  const startEditing = (pkg: typeof packages[0]) => {
+  // 3. Handle Edit Start
+  const startEditing = (pkg: any) => {
     setEditingPackageId(pkg.id);
-    setEditForm({ title: pkg.title, price: pkg.price, description: pkg.description });
+    setEditForm({ title: pkg.title, price: pkg.price, description: pkg.description || "" });
+    setIsEditModalOpen(true);
   };
 
-  const savePackage = () => {
-    setPackages(packages.map(p => 
-      p.id === editingPackageId 
-        ? { ...p, title: editForm.title, price: editForm.price, description: editForm.description }
-        : p
-    ));
-    setEditingPackageId(null); // Return to list view
+  // 4. Save to Supabase
+  const savePackage = async () => {
+    if (!editingPackageId) return;
+
+    try {
+      const { error } = await supabase
+        .from('tour_packages')
+        .update({
+          title: editForm.title,
+          price: editForm.price,
+          description: editForm.description
+        })
+        .eq('id', editingPackageId);
+
+      if (error) throw error;
+
+      // Update local state instantly
+      setPackages(packages.map(p => 
+        p.id === editingPackageId 
+          ? { ...p, title: editForm.title, price: editForm.price, description: editForm.description }
+          : p
+      ));
+
+      setEditingPackageId(null);
+      setIsEditModalOpen(false); // Close modal if you want, or keep it open for list view
+      alert("Package updated successfully!");
+
+    } catch (error) {
+      console.error("Error updating:", error);
+      alert("Failed to update package.");
+    }
   };
 
-  // Data for Graphs
+  // Chart Data
   const bookingStatusData = [
     { name: "Pending", bookings: dashboardStats.pendingBookings, fill: "#EAB308" },
     { name: "Completed", bookings: dashboardStats.completedBookings, fill: "#22C55E" },
   ];
-
   const destinationData = [
     { name: "Nagoya", value: 45 },
     { name: "Tokyo", value: 32 },
     { name: "Hiroshima", value: 28 },
     { name: "Kyoto", value: 15 },
   ];
-
   const COLORS = ["#DC2626", "#2563EB", "#16A34A", "#9333EA"];
   const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
@@ -118,7 +163,6 @@ export default function Dashboard() {
     <div className="min-h-screen bg-gray-50">
       <Navigation />
 
-      {/* Header */}
       <div className="bg-white shadow-sm">
         <div className="max-w-7xl mx-auto px-4 py-6">
           <div className="flex justify-between items-center">
@@ -136,9 +180,8 @@ export default function Dashboard() {
 
       <div className="max-w-7xl mx-auto px-4 py-8">
         
-        {/* Top Section: Revenue & Booking Graph */}
+        {/* Top Section */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          {/* Revenue Card */}
           <Card className="md:col-span-1 bg-gradient-to-br from-white to-gray-50 border-l-4 border-l-green-500 relative overflow-visible">
             <CardContent className="p-6 flex flex-col justify-center h-full">
               <div className="flex items-center justify-between mb-4">
@@ -172,7 +215,6 @@ export default function Dashboard() {
             </CardContent>
           </Card>
 
-          {/* Bar Graph */}
           <Card className="md:col-span-2">
             <CardHeader><CardTitle>Booking Status Overview</CardTitle></CardHeader>
             <CardContent>
@@ -225,7 +267,11 @@ export default function Dashboard() {
                         <Badge className={getStatusColor(booking.status)}>{booking.status}</Badge>
                       </div>
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-gray-600 mb-3">
-                        <div><span className="font-medium">Package:</span><p>{initialPackages.find((p) => p.id === booking.packageId)?.title || "Unknown"}</p></div>
+                        <div>
+                          <span className="font-medium">Package:</span>
+                          {/* We try to find package title from our DB packages first, fallback to mock */}
+                          <p>{packages.find((p) => p.id === booking.packageId)?.title || "Unknown Package"}</p>
+                        </div>
                         <div><span className="font-medium">Travel Date:</span><p>{booking.travelDate}</p></div>
                         <div><span className="font-medium">Travelers:</span><p>{booking.travelers} people</p></div>
                         <div><span className="font-medium">Total:</span><p className="font-bold text-red-600">¥{booking.totalPrice.toLocaleString()}</p></div>
@@ -248,7 +294,7 @@ export default function Dashboard() {
               <CardContent className="space-y-3">
                 <Button className="w-full justify-start" variant="outline"><Plus className="w-4 h-4 mr-2" />Add New Destination</Button>
                 
-                {/* --- UPDATED BUTTON WITH ONCLICK --- */}
+                {/* Edit Button Triggers Modal */}
                 <Button 
                   className="w-full justify-start hover:bg-red-50 hover:text-red-600 hover:border-red-200" 
                   variant="outline"
@@ -286,7 +332,7 @@ export default function Dashboard() {
 
       <FAQChatbot />
 
-      {/* --- NEW: EDIT PACKAGES MODAL --- */}
+      {/* --- EDIT PACKAGES MODAL --- */}
       {isEditModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <Card className="w-full max-w-2xl max-h-[80vh] flex flex-col shadow-2xl">
@@ -297,12 +343,15 @@ export default function Dashboard() {
               </Button>
             </CardHeader>
             <CardContent className="overflow-y-auto p-0 flex-1">
-              {/* If editing a specific package */}
-              {editingPackageId ? (
+              {isLoading ? (
+                <div className="flex justify-center items-center h-40">
+                  <Loader2 className="w-8 h-8 animate-spin text-red-600" />
+                </div>
+              ) : editingPackageId ? (
                 <div className="p-6 space-y-4">
                    <div className="flex items-center justify-between mb-2">
                      <h3 className="text-lg font-semibold text-gray-700">Editing Package</h3>
-                     <Button variant="ghost" size="sm" onClick={() => setEditingPackageId(null)}>Cancel</Button>
+                     <Button variant="ghost" size="sm" onClick={() => setEditingPackageId(null)}>Back to List</Button>
                    </div>
                    
                    <div className="space-y-3">
@@ -357,6 +406,11 @@ export default function Dashboard() {
                       </Button>
                     </div>
                   ))}
+                  {packages.length === 0 && (
+                     <div className="p-8 text-center text-gray-500">
+                        No packages found in Supabase.
+                     </div>
+                  )}
                 </div>
               )}
             </CardContent>
