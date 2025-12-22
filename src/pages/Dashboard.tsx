@@ -1,6 +1,5 @@
 import Navigation from "../components/Navigation";
 import FAQChatbot from "../components/FAQChatbot";
-import AIIntegrationStatus from "../components/AIIntegrationStatus";
 import {
   Card,
   CardContent,
@@ -15,10 +14,6 @@ import { useState } from "react";
 import {
   Users,
   DollarSign,
-  Calendar,
-  CheckCircle,
-  Clock,
-  XCircle,
   Search,
   Eye,
   Edit,
@@ -26,6 +21,19 @@ import {
   TrendingUp,
   MapPin,
 } from "lucide-react";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+  Legend,
+} from "recharts";
 
 export default function Dashboard() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -55,6 +63,30 @@ export default function Dashboard() {
     }
   };
 
+  // Data for Bar Graph (Pending vs Completed)
+  const bookingStatusData = [
+    {
+      name: "Pending",
+      bookings: dashboardStats.pendingBookings,
+      fill: "#EAB308", // Yellow-500
+    },
+    {
+      name: "Completed",
+      bookings: dashboardStats.completedBookings,
+      fill: "#22C55E", // Green-500
+    },
+  ];
+
+  // Data for Pie Graph (Popular Destinations)
+  const destinationData = [
+    { name: "Nagoya", value: 45 },
+    { name: "Tokyo", value: 32 },
+    { name: "Hiroshima", value: 28 },
+    { name: "Kyoto", value: 15 },
+  ];
+
+  const COLORS = ["#DC2626", "#2563EB", "#16A34A", "#9333EA"]; // Red, Blue, Green, Purple
+
   return (
     <div className="min-h-screen bg-gray-50">
       <Navigation />
@@ -80,92 +112,74 @@ export default function Dashboard() {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 py-8">
-        {/* Stats Overview */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">Total Bookings</p>
-                  <p className="text-3xl font-bold text-gray-900">
-                    {dashboardStats.totalBookings}
-                  </p>
-                </div>
-                <div className="bg-blue-100 p-3 rounded-full">
-                  <Calendar className="w-6 h-6 text-blue-600" />
-                </div>
-              </div>
-              <div className="flex items-center mt-4 text-sm">
-                <TrendingUp className="w-4 h-4 text-green-500 mr-1" />
-                <span className="text-green-500">+12%</span>
-                <span className="text-gray-500 ml-1">from last month</span>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">Total Revenue</p>
-                  <p className="text-3xl font-bold text-gray-900">
-                    ¥{dashboardStats.totalRevenue.toLocaleString()}
-                  </p>
-                </div>
+        {/* Top Section: Revenue & Booking Graph */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          {/* Total Revenue Card */}
+          <Card className="md:col-span-1 bg-gradient-to-br from-white to-gray-50 border-l-4 border-l-green-500">
+            <CardContent className="p-6 flex flex-col justify-center h-full">
+              <div className="flex items-center justify-between mb-4">
+                <p className="text-sm font-medium text-gray-500 uppercase tracking-wider">
+                  Total Revenue
+                </p>
                 <div className="bg-green-100 p-3 rounded-full">
                   <DollarSign className="w-6 h-6 text-green-600" />
                 </div>
               </div>
-              <div className="flex items-center mt-4 text-sm">
-                <TrendingUp className="w-4 h-4 text-green-500 mr-1" />
-                <span className="text-green-500">+8%</span>
-                <span className="text-gray-500 ml-1">from last month</span>
+              <div>
+                <p className="text-4xl font-extrabold text-gray-900">
+                  ¥{dashboardStats.totalRevenue.toLocaleString()}
+                </p>
+                <div className="flex items-center mt-2 text-sm">
+                  <TrendingUp className="w-4 h-4 text-green-500 mr-1" />
+                  <span className="text-green-500 font-medium">+8%</span>
+                  <span className="text-gray-500 ml-1">from last month</span>
+                </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">Pending Bookings</p>
-                  <p className="text-3xl font-bold text-gray-900">
-                    {dashboardStats.pendingBookings}
-                  </p>
-                </div>
-                <div className="bg-yellow-100 p-3 rounded-full">
-                  <Clock className="w-6 h-6 text-yellow-600" />
-                </div>
-              </div>
-              <div className="flex items-center mt-4 text-sm">
-                <span className="text-yellow-500">Requires attention</span>
+          {/* Bar Graph: Booking Status */}
+          <Card className="md:col-span-2">
+            <CardHeader>
+              <CardTitle>Booking Status Overview</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-[200px] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    data={bookingStatusData}
+                    layout="vertical"
+                    margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
+                    <XAxis type="number" hide />
+                    <YAxis
+                      dataKey="name"
+                      type="category"
+                      axisLine={false}
+                      tickLine={false}
+                      width={80}
+                      tick={{ fill: '#4B5563', fontSize: 14 }}
+                    />
+                    <Tooltip
+                      cursor={{ fill: 'transparent' }}
+                      contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                    />
+                    <Bar
+                      dataKey="bookings"
+                      radius={[0, 4, 4, 0]}
+                      barSize={40}
+                      label={{ position: 'right', fill: '#6B7280', fontSize: 12 }}
+                    >
+                      {bookingStatusData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.fill} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
               </div>
             </CardContent>
           </Card>
-
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">Completed Bookings</p>
-                  <p className="text-3xl font-bold text-gray-900">
-                    {dashboardStats.completedBookings}
-                  </p>
-                </div>
-                <div className="bg-green-100 p-3 rounded-full">
-                  <CheckCircle className="w-6 h-6 text-green-600" />
-                </div>
-              </div>
-              <div className="flex items-center mt-4 text-sm">
-                <span className="text-green-500">Success rate: 94%</span>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* AI Integration Status - Full Width */}
-        <div className="mb-8">
-          <AIIntegrationStatus />
         </div>
 
         <div className="grid lg:grid-cols-3 gap-8">
@@ -287,34 +301,45 @@ export default function Dashboard() {
               </CardContent>
             </Card>
 
-            {/* Popular Destinations */}
+            {/* Popular Destinations Pie Chart */}
             <Card>
               <CardHeader>
                 <CardTitle>Popular Destinations</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center">
-                    <div className="flex items-center">
-                      <MapPin className="w-4 h-4 text-red-600 mr-2" />
-                      <span className="text-sm">Nagoya</span>
-                    </div>
-                    <span className="text-sm font-medium">45 bookings</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <div className="flex items-center">
-                      <MapPin className="w-4 h-4 text-red-600 mr-2" />
-                      <span className="text-sm">Tokyo</span>
-                    </div>
-                    <span className="text-sm font-medium">32 bookings</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <div className="flex items-center">
-                      <MapPin className="w-4 h-4 text-red-600 mr-2" />
-                      <span className="text-sm">Hiroshima</span>
-                    </div>
-                    <span className="text-sm font-medium">28 bookings</span>
-                  </div>
+                <div className="h-[250px] w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={destinationData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={60}
+                        outerRadius={80}
+                        paddingAngle={5}
+                        dataKey="value"
+                      >
+                        {destinationData.map((entry, index) => (
+                          <Cell
+                            key={`cell-${index}`}
+                            fill={COLORS[index % COLORS.length]}
+                          />
+                        ))}
+                      </Pie>
+                      <Tooltip 
+                         contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                      />
+                      <Legend 
+                        verticalAlign="bottom" 
+                        height={36}
+                        iconType="circle"
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+                <div className="text-center text-sm text-gray-500 mt-2">
+                  <MapPin className="w-3 h-3 inline mr-1" />
+                  Based on recent bookings
                 </div>
               </CardContent>
             </Card>

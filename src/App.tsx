@@ -9,7 +9,7 @@ import Offers from "./pages/Offers";
 import CustomTour from "./pages/CustomTour";
 import Dashboard from "./pages/Dashboard";
 import BookingConfirmation from "./pages/BookingConfirmation";
-import PaymentPage from "./pages/PaymentPage"; // <--- 1. IMPORT ADDED HERE
+import PaymentPage from "./pages/PaymentPage";
 import Profile from "./pages/Profile";
 import FAQ from "./pages/FAQ";
 import About from "./pages/About";
