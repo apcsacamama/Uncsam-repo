@@ -40,7 +40,7 @@ A modern, fully-featured travel booking website built with React, TypeScript, an
 
 ### Booking System
 
-- **Pricing Model**: Per pax (per passenger) pricing
+- **Pricing Model**: Per 1-6 pax and 7-9 pax pricing
 - **Package Inclusions**:
   - 12-hour tour duration
   - Private tour with dedicated tour assistant
@@ -173,9 +173,9 @@ The chatbot responds to keywords like:
 - Revenue tracking
 - Popular destination insights
 
-## 📊 Mock Data
+## 📊 UncleSam Data
 
-The application includes comprehensive mock data for:
+The application includes comprehensive UncleSam Tours data for:
 
 - Tour packages with realistic pricing
 - Customer bookings and history
@@ -199,4 +199,4 @@ This project is created for UncleSam Tours. All rights reserved.
 
 ---
 
-_Built with ❤️ for creating unforgettable travel experiences in Japan since 1988._
+_From cherry blossoms to neon lights, we will guide you on discovering the hidden gems of Japan through our utmost service tours!_
