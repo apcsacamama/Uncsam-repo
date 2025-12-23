@@ -20,11 +20,14 @@ export default function Navigation() {
   
   // UI State
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   
   // Auth State
   const [user, setUser] = useState<SupabaseUser | null>(null);
   const [isAdmin, setIsAdmin] = useState(false); 
+
+  // --- NEW: Check if we are on an Auth Page ---
+  const isAuthPage = ["/signin", "/signup"].includes(location.pathname);
 
   // --- HELPER: Check Admin Role ---
   const checkAdminStatus = async (userId: string) => {
@@ -187,15 +190,18 @@ export default function Navigation() {
                 </DropdownMenuContent>
               </DropdownMenu>
             ) : (
-              <Link to="/signin">
-                <Button
-                  variant="outline"
-                  className="bg-transparent border-white text-white hover:bg-white hover:text-red-600 transition-colors"
-                >
-                  <User className="w-4 h-4 mr-2" />
-                  SIGN IN
-                </Button>
-              </Link>
+              // HIDE BUTTON IF ON AUTH PAGE
+              !isAuthPage && (
+                <Link to="/signin">
+                  <Button
+                    variant="outline"
+                    className="bg-transparent border-white text-white hover:bg-white hover:text-red-600 transition-colors"
+                  >
+                    <User className="w-4 h-4 mr-2" />
+                    SIGN IN
+                  </Button>
+                </Link>
+              )
             )}
 
             {/* Mobile Menu Button */}
@@ -259,7 +265,9 @@ export default function Navigation() {
                   </button>
                 </div>
               )}
-              {!isLoading && !user && (
+              
+              {/* HIDE LINK IN MOBILE MENU IF ON AUTH PAGE */}
+              {!isLoading && !user && !isAuthPage && (
                  <Link
                    to="/signin"
                    className="block px-3 py-2 rounded-md text-base font-medium text-red-100 hover:bg-red-700 hover:text-white border-t border-red-500 mt-2"

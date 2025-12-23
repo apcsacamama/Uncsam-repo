@@ -2,8 +2,8 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import Navigation from "./components/Navigation"; // <--- 1. Import Navigation
+import { BrowserRouter, Routes, Route } from "react-router-dom"; // Removed useLocation
+import Navigation from "./components/Navigation";
 import Landing from "./pages/Landing";
 import SignIn from "./pages/SignIn";
 import SignUp from "./pages/SignUp";
@@ -26,7 +26,8 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        {/* 2. Place Navigation here so it stays on every page without reloading */}
+        
+        {/* Navigation is back directly, so it shows on every page */}
         <Navigation /> 
         
         <Routes>
