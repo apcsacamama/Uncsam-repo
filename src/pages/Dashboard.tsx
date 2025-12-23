@@ -1,6 +1,6 @@
 import Navigation from "../components/Navigation";
 import FAQChatbot from "../components/FAQChatbot";
-import { supabase } from "../lib/supabaseClient"; // Ensure this path matches your file
+import { supabase } from "../lib/supabaseClient"; 
 import {
   Card,
   CardContent,
@@ -24,7 +24,10 @@ import {
   X,
   Save,
   Package,
-  Loader2
+  Loader2,
+  Trash2,
+  Shield,
+  UserPlus
 } from "lucide-react";
 import {
   BarChart,
@@ -40,6 +43,15 @@ import {
   Legend,
 } from "recharts";
 
+// --- TYPES ---
+type UserProfile = {
+  id: string;
+  email: string; 
+  full_name?: string;
+  role: 'admin' | 'staff' | 'customer';
+  created_at?: string;
+};
+
 export default function Dashboard() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -49,15 +61,46 @@ export default function Dashboard() {
   const [packages, setPackages] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // --- EDITING STATE ---
+  // --- EDITING PACKAGES STATE ---
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingPackageId, setEditingPackageId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState({ title: "", price: 0, description: "" });
 
-  // 1. Fetch Packages from Supabase on Load
+  // --- ACCOUNT MANAGEMENT STATE ---
+  const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
+  const [accountTab, setAccountTab] = useState<'staff' | 'customer'>('staff');
+  const [profiles, setProfiles] = useState<UserProfile[]>([]);
+  const [isUserLoading, setIsUserLoading] = useState(false);
+  
+  // --- NEW: SAFETY STATE ---
+  // We store the current user's email to prevent them from editing themselves
+  const [currentUserEmail, setCurrentUserEmail] = useState<string>(""); 
+
+  // Account Form State (For Creating/Editing)
+  const [isUserFormOpen, setIsUserFormOpen] = useState(false);
+  const [editingUserId, setEditingUserId] = useState<string | null>(null);
+  const [userForm, setUserForm] = useState({ email: "", full_name: "", role: "staff", password: "" });
+
+  // 1. Fetch Data on Load
   useEffect(() => {
     fetchPackages();
+    getCurrentUser(); // <--- Fetch current user info on load
   }, []);
+
+  // Fetch Users when Account Modal opens
+  useEffect(() => {
+    if (isAccountModalOpen) {
+      fetchProfiles();
+    }
+  }, [isAccountModalOpen]);
+
+  // --- NEW: Helper to get current user ---
+  const getCurrentUser = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user && user.email) {
+      setCurrentUserEmail(user.email);
+    }
+  };
 
   const fetchPackages = async () => {
     try {
@@ -75,7 +118,25 @@ export default function Dashboard() {
     }
   };
 
-  // 2. Revenue Calculation
+  const fetchProfiles = async () => {
+    setIsUserLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      // @ts-ignore 
+      setProfiles(data || []);
+    } catch (error) {
+      console.error("Error fetching profiles:", error);
+    } finally {
+      setIsUserLoading(false);
+    }
+  };
+
+  // --- REVENUE CALCULATION ---
   const currentRevenue = useMemo(() => {
     const filteredByMonth = mockBookings.filter((booking) => {
       if (selectedMonth === "all") return true;
@@ -105,17 +166,15 @@ export default function Dashboard() {
     }
   };
 
-  // 3. Handle Edit Start
+  // --- PACKAGE MANAGEMENT FUNCTIONS ---
   const startEditing = (pkg: any) => {
     setEditingPackageId(pkg.id);
     setEditForm({ title: pkg.title, price: pkg.price, description: pkg.description || "" });
     setIsEditModalOpen(true);
   };
 
-  // 4. Save to Supabase
   const savePackage = async () => {
     if (!editingPackageId) return;
-
     try {
       const { error } = await supabase
         .from('tour_packages')
@@ -127,23 +186,112 @@ export default function Dashboard() {
         .eq('id', editingPackageId);
 
       if (error) throw error;
-
-      // Update local state instantly
       setPackages(packages.map(p => 
         p.id === editingPackageId 
           ? { ...p, title: editForm.title, price: editForm.price, description: editForm.description }
           : p
       ));
-
       setEditingPackageId(null);
-      setIsEditModalOpen(false); // Close modal if you want, or keep it open for list view
+      setIsEditModalOpen(false);
       alert("Package updated successfully!");
-
     } catch (error) {
       console.error("Error updating:", error);
       alert("Failed to update package.");
     }
   };
+
+  // --- ACCOUNT MANAGEMENT FUNCTIONS ---
+
+  const handleCreateUser = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .insert([{
+          email: userForm.email, 
+          full_name: userForm.full_name,
+          role: userForm.role
+        }])
+        .select();
+
+      if (error) throw error;
+
+      alert("Staff account created! (Note: In production, this requires an Edge Function to generate the Auth ID)");
+      fetchProfiles();
+      setIsUserFormOpen(false);
+      setUserForm({ email: "", full_name: "", role: "staff", password: "" });
+    } catch (error) {
+      console.error("Error creating user:", error);
+      alert("Failed to create user profile.");
+    }
+  };
+
+  const handleUpdateUser = async () => {
+    if (!editingUserId) return;
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          full_name: userForm.full_name,
+          role: userForm.role
+        })
+        .eq('id', editingUserId);
+
+      if (error) throw error;
+      alert("User updated successfully!");
+      fetchProfiles();
+      setIsUserFormOpen(false);
+      setEditingUserId(null);
+    } catch (error) {
+      console.error("Error updating user:", error);
+    }
+  };
+
+  const handleDeleteUser = async (id: string) => {
+    if (!window.confirm("Are you sure you want to delete this account? This cannot be undone.")) return;
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+      fetchProfiles(); 
+    } catch (error) {
+      console.error("Error deleting user:", error);
+      alert("Failed to delete user.");
+    }
+  };
+
+  const openUserForm = (user?: UserProfile) => {
+    if (user) {
+      setEditingUserId(user.id);
+      setUserForm({ 
+        email: user.email || "", 
+        full_name: user.full_name || "", 
+        role: user.role, 
+        password: "" 
+      });
+    } else {
+      setEditingUserId(null);
+      setUserForm({ email: "", full_name: "", role: "staff", password: "" });
+    }
+    setIsUserFormOpen(true);
+  };
+
+  // --- UPDATE: SAFETY FILTER ---
+  // This filters out the "Super Admin" (admin@demo.com) AND the currently logged-in user
+  const filteredProfiles = profiles.filter(p => {
+    
+    // SAFETY CHECK 1: Never show 'admin@demo.com' in the list
+    if (p.email === "admin@demo.com") return false;
+
+    // SAFETY CHECK 2: Never show the current logged-in user in the list
+    // (This prevents you from accidentally downgrading yourself)
+    if (p.email === currentUserEmail) return false;
+
+    if (accountTab === 'staff') return p.role === 'admin' || p.role === 'staff';
+    return p.role === 'customer'; 
+  });
 
   // Chart Data
   const bookingStatusData = [
@@ -268,7 +416,6 @@ export default function Dashboard() {
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-gray-600 mb-3">
                         <div>
                           <span className="font-medium">Package:</span>
-                          {/* We try to find package title from our DB packages first, fallback to mock */}
                           <p>{packages.find((p) => p.id === booking.packageId)?.title || "Unknown Package"}</p>
                         </div>
                         <div><span className="font-medium">Travel Date:</span><p>{booking.travelDate}</p></div>
@@ -293,7 +440,7 @@ export default function Dashboard() {
               <CardContent className="space-y-3">
                 <Button className="w-full justify-start" variant="outline"><Plus className="w-4 h-4 mr-2" />Add New Destination</Button>
                 
-                {/* Edit Button Triggers Modal */}
+                {/* Edit Packages Button */}
                 <Button 
                   className="w-full justify-start hover:bg-red-50 hover:text-red-600 hover:border-red-200" 
                   variant="outline"
@@ -303,7 +450,16 @@ export default function Dashboard() {
                   Edit Tour Packages
                 </Button>
                 
-                <Button className="w-full justify-start" variant="outline"><Users className="w-4 h-4 mr-2" />Customer Management</Button>
+                {/* Account Management Button */}
+                <Button 
+                  className="w-full justify-start hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200" 
+                  variant="outline"
+                  onClick={() => setIsAccountModalOpen(true)}
+                >
+                  <Users className="w-4 h-4 mr-2" />
+                  Account Management
+                </Button>
+
                 <Button className="w-full justify-start" variant="outline"><TrendingUp className="w-4 h-4 mr-2" />View Analytics</Button>
               </CardContent>
             </Card>
@@ -357,26 +513,26 @@ export default function Dashboard() {
                      <div>
                        <label className="text-sm font-medium text-gray-700">Package Title</label>
                        <Input 
-                          value={editForm.title} 
-                          onChange={(e) => setEditForm({...editForm, title: e.target.value})} 
-                          className="mt-1"
-                        />
+                         value={editForm.title} 
+                         onChange={(e) => setEditForm({...editForm, title: e.target.value})} 
+                         className="mt-1"
+                       />
                      </div>
                      <div>
                        <label className="text-sm font-medium text-gray-700">Price (¥)</label>
                        <Input 
-                          type="number"
-                          value={editForm.price} 
-                          onChange={(e) => setEditForm({...editForm, price: parseInt(e.target.value)})} 
-                          className="mt-1"
-                        />
+                         type="number"
+                         value={editForm.price} 
+                         onChange={(e) => setEditForm({...editForm, price: parseInt(e.target.value)})} 
+                         className="mt-1"
+                       />
                      </div>
                      <div>
                        <label className="text-sm font-medium text-gray-700">Description</label>
                        <textarea 
-                          className="w-full min-h-[100px] mt-1 p-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          value={editForm.description}
-                          onChange={(e) => setEditForm({...editForm, description: e.target.value})}
+                         className="w-full min-h-[100px] mt-1 p-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                         value={editForm.description}
+                         onChange={(e) => setEditForm({...editForm, description: e.target.value})}
                        />
                      </div>
                    </div>
@@ -386,32 +542,170 @@ export default function Dashboard() {
                    </Button>
                 </div>
               ) : (
-                /* List View of Packages */
                 <div className="divide-y">
                   {packages.map((pkg) => (
                     <div key={pkg.id} className="p-4 flex items-center justify-between hover:bg-gray-50 transition-colors">
                       <div className="flex items-start space-x-3">
-                         <div className="bg-blue-100 p-2 rounded-lg mt-1">
-                           <Package className="w-5 h-5 text-blue-600" />
-                         </div>
-                         <div>
-                           <h4 className="font-semibold text-gray-900">{pkg.title}</h4>
-                           <p className="text-sm text-gray-500 line-clamp-1">{pkg.description}</p>
-                           <p className="text-sm font-bold text-green-600 mt-1">¥{pkg.price.toLocaleString()}</p>
-                         </div>
-                      </div>
-                      <Button variant="outline" size="sm" onClick={() => startEditing(pkg)}>
-                        <Edit className="w-4 h-4 mr-2" /> Edit
-                      </Button>
+                          <div className="bg-blue-100 p-2 rounded-lg mt-1">
+                            <Package className="w-5 h-5 text-blue-600" />
+                          </div>
+                          <div>
+                            <h4 className="font-semibold text-gray-900">{pkg.title}</h4>
+                            <p className="text-sm text-gray-500 line-clamp-1">{pkg.description}</p>
+                            <p className="text-sm font-bold text-green-600 mt-1">¥{pkg.price.toLocaleString()}</p>
+                          </div>
+                       </div>
+                       <Button variant="outline" size="sm" onClick={() => startEditing(pkg)}>
+                         <Edit className="w-4 h-4 mr-2" /> Edit
+                       </Button>
                     </div>
                   ))}
-                  {packages.length === 0 && (
-                     <div className="p-8 text-center text-gray-500">
-                        No packages found in Supabase.
-                     </div>
-                  )}
                 </div>
               )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* --- ACCOUNT MANAGEMENT MODAL --- */}
+      {isAccountModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <Card className="w-full max-w-3xl max-h-[85vh] flex flex-col shadow-2xl bg-white">
+            <CardHeader className="border-b bg-gray-50 flex flex-row justify-between items-center sticky top-0">
+              <div>
+                <CardTitle className="text-xl">Account Management</CardTitle>
+                <p className="text-sm text-gray-500">Manage staff and customer access</p>
+              </div>
+              <Button variant="ghost" size="sm" onClick={() => setIsAccountModalOpen(false)}>
+                <X className="w-5 h-5" />
+              </Button>
+            </CardHeader>
+            
+            <CardContent className="p-0 flex flex-col overflow-hidden h-full">
+              {/* Tabs */}
+              <div className="flex border-b">
+                <button
+                  className={`flex-1 py-3 text-sm font-medium ${accountTab === 'staff' ? 'border-b-2 border-red-600 text-red-600 bg-red-50' : 'text-gray-500 hover:text-gray-700'}`}
+                  onClick={() => setAccountTab('staff')}
+                >
+                  <Shield className="w-4 h-4 inline mr-2" />
+                  Staff & Admin
+                </button>
+                <button
+                  className={`flex-1 py-3 text-sm font-medium ${accountTab === 'customer' ? 'border-b-2 border-red-600 text-red-600 bg-red-50' : 'text-gray-500 hover:text-gray-700'}`}
+                  onClick={() => setAccountTab('customer')}
+                >
+                  <Users className="w-4 h-4 inline mr-2" />
+                  Customers
+                </button>
+              </div>
+
+              {/* Action Bar (Only for Staff) */}
+              {accountTab === 'staff' && !isUserFormOpen && (
+                <div className="p-4 bg-gray-50 border-b flex justify-end">
+                   <Button size="sm" className="bg-red-600 hover:bg-red-700" onClick={() => openUserForm()}>
+                     <UserPlus className="w-4 h-4 mr-2" />
+                     Create New Staff
+                   </Button>
+                </div>
+              )}
+
+              {/* Content Area */}
+              <div className="flex-1 overflow-y-auto p-4">
+                 {isUserLoading ? (
+                    <div className="flex justify-center items-center h-40">
+                      <Loader2 className="w-8 h-8 animate-spin text-red-600" />
+                    </div>
+                 ) : isUserFormOpen ? (
+                    /* --- CREATE / EDIT USER FORM --- */
+                    <div className="max-w-md mx-auto py-4">
+                       <h3 className="text-lg font-bold mb-4">{editingUserId ? 'Update Staff Account' : 'Create New Staff Account'}</h3>
+                       <div className="space-y-4">
+                          <div>
+                            <label className="text-sm font-medium text-gray-700">Full Name</label>
+                            <Input 
+                              value={userForm.full_name} 
+                              onChange={(e) => setUserForm({...userForm, full_name: e.target.value})} 
+                            />
+                          </div>
+                          <div>
+                            <label className="text-sm font-medium text-gray-700">Email Address</label>
+                            <Input 
+                              type="email" 
+                              value={userForm.email} 
+                              onChange={(e) => setUserForm({...userForm, email: e.target.value})}
+                              disabled={!!editingUserId} // Usually email is immutable or harder to change in simple UIs
+                            />
+                          </div>
+                          {!editingUserId && (
+                             <div>
+                               <label className="text-sm font-medium text-gray-700">Password</label>
+                               <Input 
+                                 type="password" 
+                                 value={userForm.password} 
+                                 onChange={(e) => setUserForm({...userForm, password: e.target.value})}
+                                 placeholder="Set initial password"
+                               />
+                             </div>
+                          )}
+                          <div>
+                            <label className="text-sm font-medium text-gray-700">Role</label>
+                            <select 
+                              className="w-full mt-1 p-2 border rounded-md text-sm bg-white"
+                              value={userForm.role}
+                              onChange={(e) => setUserForm({...userForm, role: e.target.value as any})}
+                            >
+                              <option value="staff">Staff</option>
+                              <option value="admin">Admin</option>
+                            </select>
+                          </div>
+                          
+                          <div className="flex gap-3 pt-4">
+                            <Button className="flex-1 bg-gray-200 text-gray-800 hover:bg-gray-300" onClick={() => setIsUserFormOpen(false)}>Cancel</Button>
+                            <Button className="flex-1 bg-red-600 hover:bg-red-700" onClick={editingUserId ? handleUpdateUser : handleCreateUser}>
+                              {editingUserId ? 'Update Account' : 'Create Account'}
+                            </Button>
+                          </div>
+                       </div>
+                    </div>
+                 ) : (
+                    /* --- USER LIST --- */
+                    <div className="space-y-2">
+                       {filteredProfiles.length > 0 ? filteredProfiles.map((user) => (
+                          <div key={user.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50">
+                             <div className="flex items-center gap-3">
+                                <div className={`w-10 h-10 rounded-full flex items-center justify-center ${user.role === 'admin' ? 'bg-purple-100 text-purple-600' : user.role === 'staff' ? 'bg-blue-100 text-blue-600' : 'bg-green-100 text-green-600'}`}>
+                                   {user.role === 'admin' ? <Shield className="w-5 h-5" /> : <Users className="w-5 h-5" />}
+                                </div>
+                                <div>
+                                   <p className="font-medium text-gray-900">{user.full_name || "Unnamed User"}</p>
+                                   <p className="text-sm text-gray-500">{user.email}</p>
+                                </div>
+                             </div>
+                             
+                             <div className="flex items-center gap-2">
+                                <Badge variant="outline" className="uppercase text-xs">{user.role}</Badge>
+                                {accountTab === 'staff' && (
+                                   <>
+                                      <Button variant="ghost" size="sm" onClick={() => openUserForm(user)}>
+                                         <Edit className="w-4 h-4 text-gray-500" />
+                                      </Button>
+                                      <Button variant="ghost" size="sm" onClick={() => handleDeleteUser(user.id)}>
+                                         <Trash2 className="w-4 h-4 text-red-500" />
+                                      </Button>
+                                   </>
+                                )}
+                             </div>
+                          </div>
+                       )) : (
+                          <div className="text-center py-10 text-gray-500">
+                             <Users className="w-10 h-10 mx-auto mb-2 opacity-20" />
+                             <p>No {accountTab} accounts found.</p>
+                          </div>
+                       )}
+                    </div>
+                 )}
+              </div>
             </CardContent>
           </Card>
         </div>

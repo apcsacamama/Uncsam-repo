@@ -1,6 +1,6 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Button } from "./ui/button";
-import { User, Menu, X, LogOut, LayoutDashboard } from "lucide-react"; 
+import { User, Menu, X, LogOut, LayoutDashboard, Shield } from "lucide-react"; 
 import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { User as SupabaseUser } from "@supabase/supabase-js";
@@ -20,23 +20,25 @@ export default function Navigation() {
   
   // UI State
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   
   // Auth State
   const [user, setUser] = useState<SupabaseUser | null>(null);
   const [isAdmin, setIsAdmin] = useState(false); 
 
-  // --- NEW: Check if we are on an Auth Page ---
+  // Check if we are on an Auth Page
   const isAuthPage = ["/signin", "/signup"].includes(location.pathname);
 
   // --- HELPER: Check Admin Role ---
   const checkAdminStatus = async (userId: string) => {
     try {
-      const { data: profile } = await supabase
+      const { data: profile, error } = await supabase
         .from('profiles')
         .select('role')
         .eq('id', userId)
         .single();
+      
+      if (error) return false;
       return profile?.role === 'admin';
     } catch (error) {
       console.error("Error fetching profile role:", error);
@@ -44,15 +46,38 @@ export default function Navigation() {
     }
   };
 
+  // --- AUTO-LOGOUT FUNCTION ---
+  const forceLogout = () => {
+    console.log("⚠️ Detecting stale session. Auto-cleaning...");
+    localStorage.clear(); 
+    sessionStorage.clear();
+    setUser(null);
+    setIsAdmin(false);
+    // Do not redirect automatically here, just clear state so UI updates
+  };
+
   // --- AUTH LISTENER ---
   useEffect(() => {
     let mounted = true;
 
     const initializeAuth = async () => {
+      // 1. TIMEOUT GUARD: Force stop loading after 3 seconds
+      // This prevents the button from "disappearing" if the network hangs
+      const timer = setTimeout(() => {
+        if (mounted && isLoading) {
+          console.log("⚠️ Auth check timed out. Showing default state.");
+          setIsLoading(false);
+        }
+      }, 3000);
+
       try {
-        // 1. Get initial session
-        const { data: { session } } = await supabase.auth.getSession();
+        // 2. Try to get the session
+        const { data, error } = await supabase.auth.getSession();
         
+        if (error) throw error;
+
+        const session = data.session;
+
         if (mounted) {
           setUser(session?.user ?? null);
           if (session?.user) {
@@ -62,21 +87,30 @@ export default function Navigation() {
         }
       } catch (error) {
         console.error("Auth init error:", error);
+        if (mounted) forceLogout();
       } finally {
-        if (mounted) setIsLoading(false);
+        if (mounted) {
+          setIsLoading(false);
+          clearTimeout(timer); // Clear the safety timer if we finished successfully
+        }
       }
     };
 
     initializeAuth();
 
-    // 2. Listen for changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!mounted) return;
       
+      if (event === 'SIGNED_OUT') {
+        setUser(null);
+        setIsAdmin(false);
+        navigate("/signin");
+        return;
+      }
+
       setUser(session?.user ?? null);
       
       if (session?.user) {
-        // Only fetch role if we have a user
         const isOwner = await checkAdminStatus(session.user.id);
         if (mounted) setIsAdmin(isOwner);
       } else {
@@ -92,20 +126,24 @@ export default function Navigation() {
     };
   }, []);
 
-  // --- OPTIMISTIC SIGN OUT ---
+  // --- MANUAL SIGN OUT ---
   const handleSignOut = async (e?: Event | React.SyntheticEvent) => {
     if (e) e.preventDefault();
     
-    // 1. Clear UI State Immediately
+    // 1. FORCE CLEAR BROWSER MEMORY
+    localStorage.clear();
+    sessionStorage.clear();
+    
+    // 2. Clear UI State Immediately
     setUser(null);
     setIsAdmin(false);
     setIsMenuOpen(false);
     
-    // 2. Redirect Immediately
+    // 3. Redirect Immediately
     navigate("/signin");
 
-    // 3. Perform Server Logout
-    await supabase.auth.signOut();
+    // 4. Tell Server (Fire and Forget)
+    supabase.auth.signOut();
   };
 
   const navLinks = [
@@ -148,16 +186,17 @@ export default function Navigation() {
           {/* Right Side Actions (User Menu / Sign In) */}
           <div className="flex items-center space-x-4">
             {isLoading ? (
-               // Simple loading spinner placeholder
+               // Loading State: Simple placeholder
                <div className="w-10 h-10 animate-pulse bg-red-500 rounded-full" /> 
             ) : user ? (
+              // LOGGED IN STATE
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button 
                     variant="ghost" 
                     className="relative h-10 w-10 rounded-full border border-white/30 hover:bg-red-700 text-white p-0"
                   >
-                    <User className="h-5 w-5" />
+                    {isAdmin ? <Shield className="h-5 w-5" /> : <User className="h-5 w-5" />}
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent className="w-56" align="end">
@@ -190,8 +229,9 @@ export default function Navigation() {
                 </DropdownMenuContent>
               </DropdownMenu>
             ) : (
-              // HIDE BUTTON IF ON AUTH PAGE
-              !isAuthPage && (
+              // LOGGED OUT STATE
+              // Check specifically if user is NULL to ensure button renders
+              (!isAuthPage) && (
                 <Link to="/signin">
                   <Button
                     variant="outline"
@@ -266,7 +306,7 @@ export default function Navigation() {
                 </div>
               )}
               
-              {/* HIDE LINK IN MOBILE MENU IF ON AUTH PAGE */}
+              {/* Force show Sign In if not loading and no user */}
               {!isLoading && !user && !isAuthPage && (
                  <Link
                    to="/signin"
