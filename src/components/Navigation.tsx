@@ -148,8 +148,8 @@ export default function Navigation() {
 
   const navLinks = [
     { path: "/", label: "HOME" },
-    { path: "/offers", label: "OFFERS" },
-    { path: "/custom", label: "CUSTOM" },
+    { path: "/offers", label: "TOUR OFFERS" },
+    { path: "/custom", label: "CUSTOM TOURS" },
     { path: "/about", label: "ABOUT" },
     { path: "/contact", label: "CONTACT" },
   ];

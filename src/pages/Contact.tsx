@@ -1,4 +1,5 @@
 import Navigation from "../components/Navigation";
+import { supabase } from "../lib/supabaseClient"; 
 import {
   Card,
   CardContent,
@@ -13,15 +14,15 @@ import { Badge } from "../components/ui/badge";
 import {
   Mail,
   Phone,
-  MapPin,
-  Clock,
   Send,
   MessageCircle,
   Calendar,
-  Users,
   Star,
   CheckCircle,
   Globe,
+  Ticket,
+  Loader2,
+  Copy
 } from "lucide-react";
 import { useState } from "react";
 
@@ -35,16 +36,54 @@ export default function Contact() {
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [ticketCode, setTicketCode] = useState("");
+
+  // Helper function to generate a short, readable ticket ID
+  const generateTicketCode = () => {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // No I, O, 1, 0 to avoid confusion
+    let result = '';
+    for (let i = 0; i < 6; i++) {
+      result += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return `UST-${result}`;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
 
-    // Simulate form submission
-    await new Promise((resolve) => setTimeout(resolve, 2000));
+    const newTicketCode = generateTicketCode();
 
-    setSubmitted(true);
-    setIsSubmitting(false);
+    try {
+      // Insert into your existing 'support_ticket' table
+      const { error } = await supabase
+        .from('support_ticket')
+        .insert([
+          {
+            ticket_code: newTicketCode, // Using the new column we added
+            name: formData.name,        // Using the new column
+            email: formData.email,      // Using the new column
+            phone: formData.phone,      // Using the new column
+            tour_type: formData.tourType, // Using the new column
+            subject: `Inquiry: ${formData.tourType}`, // Mapping to your existing 'subject'
+            message: formData.message,  // Mapping to your existing 'message'
+            status: 'open',             // Mapping to your existing 'status'
+            created_at: new Date().toISOString() // Saving current time
+          }
+        ]);
+
+      if (error) throw error;
+
+      // On success, show receipt
+      setTicketCode(newTicketCode);
+      setSubmitted(true);
+      
+    } catch (error) {
+      console.error("Error submitting ticket:", error);
+      alert("Something went wrong sending your message. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleChange = (
@@ -55,6 +94,17 @@ export default function Contact() {
     setFormData({
       ...formData,
       [e.target.name]: e.target.value,
+    });
+  };
+
+  const handleReset = () => {
+    setSubmitted(false);
+    setFormData({
+      name: "",
+      email: "",
+      phone: "",
+      message: "",
+      tourType: "general",
     });
   };
 
@@ -226,23 +276,37 @@ export default function Contact() {
                 Send us a Message
               </CardTitle>
               <p className="text-gray-600">
-                Fill out the form below and we'll get back to you within 24
-                hours
+                Fill out the form below and we'll get back to you within 24 hours
               </p>
             </CardHeader>
             <CardContent>
               {submitted ? (
                 <div className="text-center py-8">
-                  <CheckCircle className="w-16 h-16 text-green-600 mx-auto mb-4" />
-                  <h3 className="text-xl font-semibold text-gray-900 mb-2">
-                    Message Sent Successfully!
+                  <div className="mb-6 flex justify-center">
+                    <div className="bg-green-100 rounded-full p-4">
+                        <CheckCircle className="w-16 h-16 text-green-600" />
+                    </div>
+                  </div>
+                  
+                  <h3 className="text-2xl font-bold text-gray-900 mb-2">
+                    Inquiry Received!
                   </h3>
                   <p className="text-gray-600 mb-6">
-                    Thank you for contacting UncleSam Tours. We'll respond to
-                    your inquiry within 24 hours.
+                    Thank you for contacting UncleSam Tours. We have received your message.
                   </p>
+
+                  {/* TICKET RECEIPT SECTION */}
+                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-6 mb-6 max-w-sm mx-auto relative">
+                     <p className="text-xs uppercase tracking-wide text-gray-500 font-semibold mb-2">Support Ticket Number</p>
+                     <div className="flex items-center justify-center space-x-2">
+                        <Ticket className="w-5 h-5 text-red-600" />
+                        <span className="text-3xl font-mono font-bold text-gray-900 tracking-wider">{ticketCode}</span>
+                     </div>
+                     <p className="text-xs text-gray-500 mt-2">Please save this code for your reference.</p>
+                  </div>
+
                   <Button
-                    onClick={() => setSubmitted(false)}
+                    onClick={handleReset}
                     variant="outline"
                     className="border-red-600 text-red-600 hover:bg-red-50"
                   >
@@ -325,7 +389,7 @@ export default function Contact() {
                   >
                     {isSubmitting ? (
                       <>
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                        <Loader2 className="animate-spin h-4 w-4 mr-2" />
                         Sending Message...
                       </>
                     ) : (

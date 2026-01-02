@@ -210,7 +210,7 @@ export default function BookingConfirmation() {
                     <h4 className="font-medium text-gray-900 mb-1">
                       Travel Date
                     </h4>
-                    <p className="text-gray-600 font-semibold text-red-600">
+                    <p className="text-gray-600">
                         {bookingDetails.travelDate}
                     </p>
                   </div>

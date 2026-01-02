@@ -10,7 +10,7 @@ import {
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Badge } from "../components/ui/badge";
-import { mockBookings, dashboardStats } from "../data/offers";
+import { dashboardStats } from "../data/offers";
 import { useState, useMemo, useEffect } from "react";
 import {
   Users,
@@ -27,7 +27,7 @@ import {
   Loader2,
   Trash2,
   Shield,
-  UserPlus
+  UserPlus,
 } from "lucide-react";
 import {
   BarChart,
@@ -52,6 +52,70 @@ type UserProfile = {
   created_at?: string;
 };
 
+// --- LOCAL DATA ---
+const mockBookings = [
+  {
+    id: 1,
+    customerName: "Alice Johnson",
+    email: "alice@example.com",
+    status: "pending", 
+    packageId: 1,
+    travelDate: "2025-04-10",
+    travelers: 2,
+    totalPrice: 240000,
+  },
+  {
+    id: 2,
+    customerName: "Bob Smith",
+    email: "bob@example.com",
+    status: "completed",
+    packageId: 2,
+    travelDate: "2023-12-15",
+    travelers: 1,
+    totalPrice: 150000,
+  },
+  {
+    id: 3,
+    customerName: "Charlie Brown",
+    email: "charlie@example.com",
+    status: "confirmed",
+    packageId: 3,
+    travelDate: "2025-05-20",
+    travelers: 4,
+    totalPrice: 500000,
+  },
+  {
+    id: 4,
+    customerName: "Diana Prince",
+    email: "diana@example.com",
+    status: "pending",
+    packageId: 1,
+    travelDate: "2025-06-01",
+    travelers: 2,
+    totalPrice: 240000,
+  },
+  {
+    id: 5,
+    customerName: "Evan Wright",
+    email: "evan@example.com",
+    status: "completed",
+    packageId: 2,
+    travelDate: "2024-01-10",
+    travelers: 1,
+    totalPrice: 150000,
+  },
+  {
+    id: 6,
+    customerName: "Fiona Gallagher",
+    email: "fiona@example.com",
+    status: "confirmed",
+    packageId: 3,
+    travelDate: "2025-08-15",
+    travelers: 3,
+    totalPrice: 375000,
+  }
+];
+
 export default function Dashboard() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -72,11 +136,19 @@ export default function Dashboard() {
   const [profiles, setProfiles] = useState<UserProfile[]>([]);
   const [isUserLoading, setIsUserLoading] = useState(false);
   
-  // --- NEW: SAFETY STATE ---
-  // We store the current user's email to prevent them from editing themselves
+  // --- ADD DESTINATION STATE (UPDATED) ---
+  const [isDestinationModalOpen, setIsDestinationModalOpen] = useState(false);
+  const [isSavingDest, setIsSavingDest] = useState(false);
+  const [destinationForm, setDestinationForm] = useState({ 
+    name: "", 
+    description: "", 
+    location: "nagoya" // Default value
+  });
+  
+  // --- SAFETY STATE ---
   const [currentUserEmail, setCurrentUserEmail] = useState<string>(""); 
 
-  // Account Form State (For Creating/Editing)
+  // Account Form State
   const [isUserFormOpen, setIsUserFormOpen] = useState(false);
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [userForm, setUserForm] = useState({ email: "", full_name: "", role: "staff", password: "" });
@@ -84,17 +156,15 @@ export default function Dashboard() {
   // 1. Fetch Data on Load
   useEffect(() => {
     fetchPackages();
-    getCurrentUser(); // <--- Fetch current user info on load
+    getCurrentUser(); 
   }, []);
 
-  // Fetch Users when Account Modal opens
   useEffect(() => {
     if (isAccountModalOpen) {
       fetchProfiles();
     }
   }, [isAccountModalOpen]);
 
-  // --- NEW: Helper to get current user ---
   const getCurrentUser = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (user && user.email) {
@@ -158,8 +228,8 @@ export default function Dashboard() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case "confirmed": return "bg-green-100 text-green-800";
-      case "pending": return "bg-yellow-100 text-yellow-800";
+      case "confirmed": return "bg-green-100 text-green-800"; // Paid
+      case "pending": return "bg-yellow-100 text-yellow-800"; // On List
       case "completed": return "bg-blue-100 text-blue-800";
       case "cancelled": return "bg-red-100 text-red-800";
       default: return "bg-gray-100 text-gray-800";
@@ -197,6 +267,40 @@ export default function Dashboard() {
     } catch (error) {
       console.error("Error updating:", error);
       alert("Failed to update package.");
+    }
+  };
+
+  // --- NEW: DESTINATION SAVING LOGIC ---
+  const handleSaveDestination = async () => {
+    if (!destinationForm.name || !destinationForm.location) {
+        alert("Please provide a name and location.");
+        return;
+    }
+    
+    setIsSavingDest(true);
+    try {
+        // Create a simple "slug" for the ID (e.g. "Tokyo Tower" -> "tokyo-tower")
+        const id = destinationForm.name.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-');
+
+        const { error } = await supabase
+            .from('tour_destinations')
+            .insert([{
+                id: id,
+                name: destinationForm.name,
+                description: destinationForm.description,
+                location: destinationForm.location
+            }]);
+
+        if (error) throw error;
+
+        alert("Destination saved successfully! It will now appear on the Custom Tour page.");
+        setIsDestinationModalOpen(false);
+        setDestinationForm({ name: "", description: "", location: "nagoya" });
+    } catch (error) {
+        console.error("Error saving destination:", error);
+        alert("Failed to save destination. Check console or ensuring you are logged in.");
+    } finally {
+        setIsSavingDest(false);
     }
   };
 
@@ -278,17 +382,9 @@ export default function Dashboard() {
     setIsUserFormOpen(true);
   };
 
-  // --- UPDATE: SAFETY FILTER ---
-  // This filters out the "Super Admin" (admin@demo.com) AND the currently logged-in user
   const filteredProfiles = profiles.filter(p => {
-    
-    // SAFETY CHECK 1: Never show 'admin@demo.com' in the list
     if (p.email === "admin@demo.com") return false;
-
-    // SAFETY CHECK 2: Never show the current logged-in user in the list
-    // (This prevents you from accidentally downgrading yourself)
     if (p.email === currentUserEmail) return false;
-
     if (accountTab === 'staff') return p.role === 'admin' || p.role === 'staff';
     return p.role === 'customer'; 
   });
@@ -317,10 +413,7 @@ export default function Dashboard() {
               <h1 className="text-3xl font-bold text-gray-900">Owner Dashboard</h1>
               <p className="text-gray-600 mt-1">Manage your travel bookings and offers</p>
             </div>
-            <Button className="bg-red-600 hover:bg-red-700">
-              <Plus className="w-4 h-4 mr-2" />
-              Add New Offer
-            </Button>
+            {/* REMOVED "Add New Offer" button from here as requested */}
           </div>
         </div>
       </div>
@@ -438,7 +531,15 @@ export default function Dashboard() {
             <Card>
               <CardHeader><CardTitle>Quick Actions</CardTitle></CardHeader>
               <CardContent className="space-y-3">
-                <Button className="w-full justify-start" variant="outline"><Plus className="w-4 h-4 mr-2" />Add New Destination</Button>
+                {/* Add New Destination Button */}
+                <Button 
+                  className="w-full justify-start" 
+                  variant="outline"
+                  onClick={() => setIsDestinationModalOpen(true)}
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add New Destination
+                </Button>
                 
                 {/* Edit Packages Button */}
                 <Button 
@@ -459,8 +560,6 @@ export default function Dashboard() {
                   <Users className="w-4 h-4 mr-2" />
                   Account Management
                 </Button>
-
-                <Button className="w-full justify-start" variant="outline"><TrendingUp className="w-4 h-4 mr-2" />View Analytics</Button>
               </CardContent>
             </Card>
 
@@ -487,15 +586,74 @@ export default function Dashboard() {
 
       <FAQChatbot />
 
+      {/* --- ADD NEW DESTINATION MODAL (UPDATED) --- */}
+      {isDestinationModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <Card className="w-full max-w-lg shadow-2xl">
+            <CardHeader className="flex flex-row items-center justify-between border-b bg-gray-50">
+              <CardTitle>Add New Destination</CardTitle>
+              <Button variant="ghost" size="sm" onClick={() => setIsDestinationModalOpen(false)}>
+                <X className="w-5 h-5" />
+              </Button>
+            </CardHeader>
+            <CardContent className="p-6 space-y-4">
+               <div>
+                 <label className="text-sm font-medium text-gray-700">Region / Location</label>
+                 <select
+                   className="w-full mt-1 p-2 border rounded-md text-sm bg-white"
+                   value={destinationForm.location}
+                   onChange={(e) => setDestinationForm({...destinationForm, location: e.target.value})}
+                 >
+                    <option value="nagoya">Nagoya</option>
+                    <option value="hakone">Hakone</option>
+                    <option value="nara">Nara</option>
+                 </select>
+               </div>
+               <div>
+                 <label className="text-sm font-medium text-gray-700">Destination Name</label>
+                 <Input 
+                   value={destinationForm.name}
+                   onChange={(e) => setDestinationForm({...destinationForm, name: e.target.value})}
+                   placeholder="e.g. Kyoto Tower"
+                   className="mt-1"
+                 />
+               </div>
+               <div>
+                 <label className="text-sm font-medium text-gray-700">Description</label>
+                 <textarea 
+                   className="w-full min-h-[100px] mt-1 p-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                   value={destinationForm.description}
+                   onChange={(e) => setDestinationForm({...destinationForm, description: e.target.value})}
+                   placeholder="Brief description of the destination..."
+                 />
+               </div>
+               <Button onClick={handleSaveDestination} disabled={isSavingDest} className="w-full bg-green-600 hover:bg-green-700 mt-2">
+                 {isSavingDest ? (
+                    <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Saving...</>
+                 ) : (
+                    <><Save className="w-4 h-4 mr-2" /> Add Destination</>
+                 )}
+               </Button>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
       {/* --- EDIT PACKAGES MODAL --- */}
       {isEditModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <Card className="w-full max-w-2xl max-h-[80vh] flex flex-col shadow-2xl">
             <CardHeader className="flex flex-row items-center justify-between border-b bg-gray-50">
               <CardTitle>Manage Tour Packages</CardTitle>
-              <Button variant="ghost" size="sm" onClick={() => { setIsEditModalOpen(false); setEditingPackageId(null); }}>
-                <X className="w-5 h-5" />
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button className="bg-red-600 hover:bg-red-700 h-8 text-xs">
+                  <Plus className="w-3 h-3 mr-1" />
+                  Add New Offer
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => { setIsEditModalOpen(false); setEditingPackageId(null); }}>
+                  <X className="w-5 h-5" />
+                </Button>
+              </div>
             </CardHeader>
             <CardContent className="overflow-y-auto p-0 flex-1">
               {isLoading ? (
@@ -582,7 +740,6 @@ export default function Dashboard() {
             </CardHeader>
             
             <CardContent className="p-0 flex flex-col overflow-hidden h-full">
-              {/* Tabs */}
               <div className="flex border-b">
                 <button
                   className={`flex-1 py-3 text-sm font-medium ${accountTab === 'staff' ? 'border-b-2 border-red-600 text-red-600 bg-red-50' : 'text-gray-500 hover:text-gray-700'}`}
@@ -600,7 +757,6 @@ export default function Dashboard() {
                 </button>
               </div>
 
-              {/* Action Bar (Only for Staff) */}
               {accountTab === 'staff' && !isUserFormOpen && (
                 <div className="p-4 bg-gray-50 border-b flex justify-end">
                    <Button size="sm" className="bg-red-600 hover:bg-red-700" onClick={() => openUserForm()}>
@@ -610,14 +766,12 @@ export default function Dashboard() {
                 </div>
               )}
 
-              {/* Content Area */}
               <div className="flex-1 overflow-y-auto p-4">
                  {isUserLoading ? (
                     <div className="flex justify-center items-center h-40">
                       <Loader2 className="w-8 h-8 animate-spin text-red-600" />
                     </div>
                  ) : isUserFormOpen ? (
-                    /* --- CREATE / EDIT USER FORM --- */
                     <div className="max-w-md mx-auto py-4">
                        <h3 className="text-lg font-bold mb-4">{editingUserId ? 'Update Staff Account' : 'Create New Staff Account'}</h3>
                        <div className="space-y-4">
@@ -634,7 +788,7 @@ export default function Dashboard() {
                               type="email" 
                               value={userForm.email} 
                               onChange={(e) => setUserForm({...userForm, email: e.target.value})}
-                              disabled={!!editingUserId} // Usually email is immutable or harder to change in simple UIs
+                              disabled={!!editingUserId} 
                             />
                           </div>
                           {!editingUserId && (
@@ -669,7 +823,6 @@ export default function Dashboard() {
                        </div>
                     </div>
                  ) : (
-                    /* --- USER LIST --- */
                     <div className="space-y-2">
                        {filteredProfiles.length > 0 ? filteredProfiles.map((user) => (
                           <div key={user.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50">

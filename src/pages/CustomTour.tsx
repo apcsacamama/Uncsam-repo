@@ -1,6 +1,7 @@
 import Navigation from "../components/Navigation";
 import { Button } from "../components/ui/button";
 import { Label } from "../components/ui/label";
+import { supabase } from "../lib/supabaseClient"; // Import Supabase
 import {
   Card,
   CardContent,
@@ -14,7 +15,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "../components/ui/popover";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
   CalendarIcon,
   MapPin,
@@ -28,20 +29,20 @@ import { format, isBefore, startOfToday, isSameDay } from "date-fns";
 import { cn } from "../lib/utils";
 import { Link } from "react-router-dom";
 
-
 // --- CONFIGURATION: Pricing Tiers ---
 const PRICING_CONFIG: Record<string, { tier1: number; tier2: number }> = {
   nara: { tier1: 85000, tier2: 105000 },
   hakone: { tier1: 75000, tier2: 95000 },
   nagoya: { tier1: 85000, tier2: 105000 },
+  // Note: If you add new regions in the dashboard, add their pricing here.
 };
 
 const MAX_TRAVELERS = 9;
 const MIN_DESTINATIONS = 4;
 const MAX_DESTINATIONS = 5;
 
-// --- DATA: Destinations List ---
-const ALL_DESTINATIONS = [
+// --- DATA: Default Destinations (Fallback if DB is empty) ---
+const DEFAULT_DESTINATIONS = [
   // NARA
   { id: "hasedera", name: "Hasedera Temple", description: "Temple with a massive wooden statue", location: "nara" },
   { id: "kotoku-in", name: "Kotoku-in", description: "The Great Buddha", location: "nara" },
@@ -85,11 +86,41 @@ export default function CustomTour() {
   const [selectedTransportation, setSelectedTransportation] = useState<string[]>(["private-van"]); 
   const [travelers, setTravelers] = useState(1);
 
+  // --- NEW: Dynamic Destinations State ---
+  // Initialize with DEFAULT_DESTINATIONS so the page isn't empty while loading or if DB is empty
+  const [allDestinations, setAllDestinations] = useState<any[]>(DEFAULT_DESTINATIONS);
+
+  // --- NEW: Fetch Destinations from Supabase ---
+  useEffect(() => {
+    const fetchDestinations = async () => {
+      try {
+        // Assumes your table is named 'tour_destinations'
+        const { data, error } = await supabase
+          .from('tour_destinations')
+          .select('*');
+        
+        if (error) {
+           console.error("Error fetching destinations:", error);
+           // Keep using DEFAULT_DESTINATIONS if error
+        } else if (data && data.length > 0) {
+           // If we have data from the DB, use it to replace or merge
+           // Here we replace the default list with the DB list
+           setAllDestinations(data);
+        }
+      } catch (err) {
+        console.error("Unexpected error:", err);
+      }
+    };
+
+    fetchDestinations();
+  }, []);
+
   // --- LOGIC: Filter destinations ---
+  // Updated to use 'allDestinations' state instead of static constant
   const filteredDestinations = useMemo(() => {
     if (!location) return [];
-    return ALL_DESTINATIONS.filter((dest) => dest.location === location);
-  }, [location]);
+    return allDestinations.filter((dest) => dest.location === location);
+  }, [location, allDestinations]);
 
   // Handle Location Change (Reset everything)
   const handleLocationChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -151,6 +182,9 @@ export default function CustomTour() {
     if (!location) return 0;
     const config = PRICING_CONFIG[location];
     
+    // Safety check if location exists but not in config (e.g. new dynamic location)
+    if (!config) return 0;
+
     // Tier 1: 1-6 Travelers
     if (travelers <= 6) {
         return config.tier1;
@@ -164,7 +198,6 @@ export default function CustomTour() {
 
   const basePrice = getPackagePrice();
 
-  // FIX: Transportation total logic (Removed * travelers multiplier)
   const transportationPriceTotal = selectedTransportation.reduce((total, transportId) => {
       const transport = transportationOptions.find((t) => t.id === transportId);
       return total + (transport ? transport.price : 0); 
@@ -423,7 +456,7 @@ export default function CustomTour() {
                         >
                           {transport.price === 0
                             ? "Included in package"
-                            : `¥${transport.price.toLocaleString()} per group`} {/* Fixed Label */}
+                            : `¥${transport.price.toLocaleString()} per group`}
                         </p>
                         {transport.addon && (
                           <p className="text-xs text-gray-500 mt-1">
@@ -496,7 +529,7 @@ export default function CustomTour() {
                       </h4>
                       <ul className="text-xs text-gray-600 space-y-1">
                         {selectedDestinations.map((id) => {
-                          const destination = ALL_DESTINATIONS.find(
+                          const destination = allDestinations.find(
                             (d) => d.id === id,
                           );
                           return destination ? (
