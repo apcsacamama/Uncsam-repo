@@ -100,7 +100,6 @@
   }
 }
 
-/* Custom styles for travel booking app */
 @layer components {
   .hero-gradient {
     background: linear-gradient(

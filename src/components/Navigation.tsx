@@ -32,16 +32,20 @@ export default function Navigation() {
   // --- HELPER: Check Admin Role ---
   const checkAdminStatus = async (userId: string) => {
     try {
+      // CHANGED: 'profiles' -> 'user'
       const { data: profile, error } = await supabase
-        .from('profiles')
+        .from('user') 
         .select('role')
         .eq('id', userId)
         .single();
       
-      if (error) return false;
-      return profile?.role === 'admin';
+      if (error) {
+        console.error("Error fetching user role:", error);
+        return false;
+      }
+      return profile?.role === 'admin' || profile?.role === 'staff';
     } catch (error) {
-      console.error("Error fetching profile role:", error);
+      console.error("Check admin status failed:", error);
       return false;
     }
   };
@@ -53,7 +57,6 @@ export default function Navigation() {
     sessionStorage.clear();
     setUser(null);
     setIsAdmin(false);
-    // Do not redirect automatically here, just clear state so UI updates
   };
 
   // --- AUTH LISTENER ---
@@ -61,8 +64,6 @@ export default function Navigation() {
     let mounted = true;
 
     const initializeAuth = async () => {
-      // 1. TIMEOUT GUARD: Force stop loading after 3 seconds
-      // This prevents the button from "disappearing" if the network hangs
       const timer = setTimeout(() => {
         if (mounted && isLoading) {
           console.log("⚠️ Auth check timed out. Showing default state.");
@@ -71,7 +72,6 @@ export default function Navigation() {
       }, 3000);
 
       try {
-        // 2. Try to get the session
         const { data, error } = await supabase.auth.getSession();
         
         if (error) throw error;
@@ -91,7 +91,7 @@ export default function Navigation() {
       } finally {
         if (mounted) {
           setIsLoading(false);
-          clearTimeout(timer); // Clear the safety timer if we finished successfully
+          clearTimeout(timer); 
         }
       }
     };
@@ -129,20 +129,12 @@ export default function Navigation() {
   // --- MANUAL SIGN OUT ---
   const handleSignOut = async (e?: Event | React.SyntheticEvent) => {
     if (e) e.preventDefault();
-    
-    // 1. FORCE CLEAR BROWSER MEMORY
     localStorage.clear();
     sessionStorage.clear();
-    
-    // 2. Clear UI State Immediately
     setUser(null);
     setIsAdmin(false);
     setIsMenuOpen(false);
-    
-    // 3. Redirect Immediately
     navigate("/signin");
-
-    // 4. Tell Server (Fire and Forget)
     supabase.auth.signOut();
   };
 
@@ -181,12 +173,25 @@ export default function Navigation() {
                 {link.label}
               </Link>
             ))}
+
+            {/* --- ADDED: MANAGE ACCOUNTS (Desktop) --- */}
+            {isAdmin && (
+              <Link
+                to="/manage-accounts"
+                className={`font-medium transition-colors hover:text-red-200 ${
+                  isActive("/manage-accounts")
+                    ? "text-white border-b-2 border-white pb-1"
+                    : "text-red-100"
+                }`}
+              >
+                MANAGE ACCOUNTS
+              </Link>
+            )}
           </div>
 
           {/* Right Side Actions (User Menu / Sign In) */}
           <div className="flex items-center space-x-4">
             {isLoading ? (
-               // Loading State: Simple placeholder
                <div className="w-10 h-10 animate-pulse bg-red-500 rounded-full" /> 
             ) : user ? (
               // LOGGED IN STATE
@@ -216,8 +221,8 @@ export default function Navigation() {
 
                   {isAdmin && (
                     <DropdownMenuItem onSelect={() => navigate("/dashboard")} className="cursor-pointer bg-red-50 focus:bg-red-100">
-                      <LayoutDashboard className="mr-2 h-4 w-4 text-red-600" />
-                      <span className="text-red-600 font-medium">Owner Dashboard</span>
+                        <LayoutDashboard className="mr-2 h-4 w-4 text-red-600" />
+                        <span className="text-red-600 font-medium">Owner Dashboard</span>
                     </DropdownMenuItem>
                   )}
 
@@ -230,7 +235,6 @@ export default function Navigation() {
               </DropdownMenu>
             ) : (
               // LOGGED OUT STATE
-              // Check specifically if user is NULL to ensure button renders
               (!isAuthPage) && (
                 <Link to="/signin">
                   <Button
@@ -272,6 +276,21 @@ export default function Navigation() {
                   {link.label}
                 </Link>
               ))}
+
+              {/* --- ADDED: MANAGE ACCOUNTS (Mobile) --- */}
+              {isAdmin && (
+                <Link
+                  to="/manage-accounts"
+                  className={`block px-3 py-2 rounded-md text-base font-medium transition-colors ${
+                    isActive("/manage-accounts")
+                      ? "bg-red-800 text-white"
+                      : "text-red-100 hover:bg-red-700 hover:text-white"
+                  }`}
+                  onClick={() => setIsMenuOpen(false)}
+                >
+                  MANAGE ACCOUNTS
+                </Link>
+              )}
               
               {!isLoading && user && (
                 <div className="border-t border-red-500 my-2 pt-2">
@@ -289,7 +308,7 @@ export default function Navigation() {
                   {isAdmin && (
                     <Link
                       to="/dashboard"
-                      className="block px-3 py-2 rounded-md text-base font-bold text-white bg-red-700 hover:bg-red-800 mt-1 mb-1"
+                      className="block px-3 py-2 rounded-md text-base font-bold text-white bg-red-700 hover:bg-red-800 mt-2"
                       onClick={() => setIsMenuOpen(false)}
                     >
                       <LayoutDashboard className="inline w-4 h-4 mr-2" />
@@ -306,7 +325,6 @@ export default function Navigation() {
                 </div>
               )}
               
-              {/* Force show Sign In if not loading and no user */}
               {!isLoading && !user && !isAuthPage && (
                  <Link
                    to="/signin"

@@ -332,6 +332,16 @@ export default function CustomTour() {
                     )}
                   </div>
                 </div>
+
+                {/* --- ADDED: EXCLUSION DISCLAIMER --- */}
+                <div className="mt-6 flex items-start gap-3 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                  <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                  <div className="text-sm text-amber-800">
+                    <p className="font-bold mb-1">Important Notice</p>
+                    <p>Air fare and hotel accommodation are <strong>not included</strong> in the tour package price.</p>
+                  </div>
+                </div>
+
               </CardContent>
             </Card>
 

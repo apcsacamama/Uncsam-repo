@@ -16,6 +16,9 @@ import { supabase } from "../lib/supabaseClient";
 import { TourPackage } from "../types/travel";
 import { Badge } from "../components/ui/badge";
 
+// --- ADDED: Import the hook ---
+import { useRefreshOnFocus } from "../hooks/useRefreshOnFocus";
+
 export default function Offers() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedOffer, setSelectedOffer] = useState<TourPackage | null>(null);
@@ -94,6 +97,9 @@ export default function Offers() {
       setIsLoading(false);
     }
   };
+
+  // --- ADDED: Use the hook here ---
+  useRefreshOnFocus(fetchPackages);
 
   // --- Filter Logic ---
   const filteredPackages = useMemo(() => {

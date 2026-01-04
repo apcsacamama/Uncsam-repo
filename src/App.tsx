@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom"; // Removed useLocation
+import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Navigation from "./components/Navigation";
 import Landing from "./pages/Landing";
 import SignIn from "./pages/SignIn";
@@ -16,6 +16,7 @@ import Profile from "./pages/Profile";
 import FAQ from "./pages/FAQ";
 import About from "./pages/About";
 import Contact from "./pages/Contact";
+import ManageAccounts from "./pages/ManageAccounts";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -27,29 +28,22 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         
-        {/* Navigation is back directly, so it shows on every page */}
         <Navigation /> 
         
         <Routes>
           <Route path="/" element={<Landing />} />
           <Route path="/signin" element={<SignIn />} />
           <Route path="/signup" element={<SignUp />} />
-          
           <Route path="/offers" element={<Offers />} />
           <Route path="/custom" element={<CustomTour />} />
           <Route path="/dashboard" element={<Dashboard />} />
-          
           <Route path="/payment" element={<PaymentPage />} />
-
-          <Route
-            path="/booking-confirmation"
-            element={<BookingConfirmation />}
-          />
+          <Route path="/booking-confirmation" element={<BookingConfirmation />}/>
           <Route path="/profile" element={<Profile />} />
           <Route path="/faq" element={<FAQ />} />
           <Route path="/about" element={<About />} />
           <Route path="/contact" element={<Contact />} />
-          
+          <Route path="/manage-accounts" element={<ManageAccounts />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>

@@ -12,6 +12,13 @@ import { Textarea } from "../components/ui/textarea";
 import { Label } from "../components/ui/label";
 import { Badge } from "../components/ui/badge";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../components/ui/select"; 
+import {
   Mail,
   Phone,
   Send,
@@ -22,25 +29,45 @@ import {
   Globe,
   Ticket,
   Loader2,
-  Copy
+  Copy,
+  WifiOff // Added icon for error state
 } from "lucide-react";
 import { useState } from "react";
+
+// Common Country Codes List
+const COUNTRY_CODES = [
+  { code: "+81", label: "🇯🇵 Japan (+81)" },
+  { code: "+1", label: "🇺🇸 USA/CA (+1)" },
+  { code: "+63", label: "🇵🇭 Phil (+63)" },
+  { code: "+61", label: "🇦🇺 Aus (+61)" },
+  { code: "+44", label: "🇬🇧 UK (+44)" },
+  { code: "+65", label: "🇸🇬 SG (+65)" },
+  { code: "+86", label: "🇨🇳 China (+86)" },
+  { code: "+82", label: "🇰🇷 Korea (+82)" },
+  { code: "+886", label: "🇹🇼 Taiwan (+886)" },
+  { code: "+33", label: "🇫🇷 France (+33)" },
+  { code: "+49", label: "🇩🇪 Ger (+49)" },
+];
 
 export default function Contact() {
   const [formData, setFormData] = useState({
     name: "",
     email: "",
-    phone: "",
+    // phone is handled by separate states below
     message: "",
     tourType: "general",
   });
+
+  // Split Phone State
+  const [countryCode, setCountryCode] = useState("+81");
+  const [phoneNumber, setPhoneNumber] = useState("");
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [ticketCode, setTicketCode] = useState("");
 
-  // Helper function to generate a short, readable ticket ID
   const generateTicketCode = () => {
-    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // No I, O, 1, 0 to avoid confusion
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
     let result = '';
     for (let i = 0; i < 6; i++) {
       result += chars.charAt(Math.floor(Math.random() * chars.length));
@@ -53,34 +80,50 @@ export default function Contact() {
     setIsSubmitting(true);
 
     const newTicketCode = generateTicketCode();
+    const fullPhoneNumber = `${countryCode} ${phoneNumber}`;
+
+    // --- FIX: TIMEOUT GUARD ---
+    // If Supabase doesn't respond in 5 seconds, we force an error so it doesn't load forever.
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error("Timeout")), 5000)
+    );
+
+    const insertPromise = supabase
+      .from('support_ticket')
+      .insert([
+        {
+          ticket_code: newTicketCode,
+          name: formData.name,
+          email: formData.email,
+          phone: fullPhoneNumber,
+          tour_type: formData.tourType,
+          subject: `Inquiry: ${formData.tourType}`,
+          message: formData.message,
+          status: 'open',
+          created_at: new Date().toISOString()
+        }
+      ]);
 
     try {
-      // Insert into your existing 'support_ticket' table
-      const { error } = await supabase
-        .from('support_ticket')
-        .insert([
-          {
-            ticket_code: newTicketCode, // Using the new column we added
-            name: formData.name,        // Using the new column
-            email: formData.email,      // Using the new column
-            phone: formData.phone,      // Using the new column
-            tour_type: formData.tourType, // Using the new column
-            subject: `Inquiry: ${formData.tourType}`, // Mapping to your existing 'subject'
-            message: formData.message,  // Mapping to your existing 'message'
-            status: 'open',             // Mapping to your existing 'status'
-            created_at: new Date().toISOString() // Saving current time
-          }
-        ]);
+      console.log("Attempting to send ticket...");
+      
+      // Race: Whichever finishes first wins (The Insert or the 5s Timer)
+      const result: any = await Promise.race([insertPromise, timeoutPromise]);
+      const { error } = result;
 
       if (error) throw error;
 
-      // On success, show receipt
       setTicketCode(newTicketCode);
       setSubmitted(true);
       
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error submitting ticket:", error);
-      alert("Something went wrong sending your message. Please try again.");
+      
+      if (error.message === "Timeout") {
+        alert("Connection timed out. The database might be asleep. Please click 'Send' again.");
+      } else {
+        alert("Something went wrong sending your message. Please try again.");
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -102,10 +145,11 @@ export default function Contact() {
     setFormData({
       name: "",
       email: "",
-      phone: "",
       message: "",
       tourType: "general",
     });
+    setPhoneNumber("");
+    setCountryCode("+81");
   };
 
   const contactMethods = [
@@ -297,12 +341,12 @@ export default function Contact() {
 
                   {/* TICKET RECEIPT SECTION */}
                   <div className="bg-gray-50 border border-gray-200 rounded-lg p-6 mb-6 max-w-sm mx-auto relative">
-                     <p className="text-xs uppercase tracking-wide text-gray-500 font-semibold mb-2">Support Ticket Number</p>
-                     <div className="flex items-center justify-center space-x-2">
+                      <p className="text-xs uppercase tracking-wide text-gray-500 font-semibold mb-2">Support Ticket Number</p>
+                      <div className="flex items-center justify-center space-x-2">
                         <Ticket className="w-5 h-5 text-red-600" />
                         <span className="text-3xl font-mono font-bold text-gray-900 tracking-wider">{ticketCode}</span>
-                     </div>
-                     <p className="text-xs text-gray-500 mt-2">Please save this code for your reference.</p>
+                      </div>
+                      <p className="text-xs text-gray-500 mt-2">Please save this code for your reference.</p>
                   </div>
 
                   <Button
@@ -341,15 +385,32 @@ export default function Contact() {
                     </div>
                   </div>
 
+                  {/* MODIFIED: Phone Number Section with Dropdown */}
                   <div>
                     <Label htmlFor="phone">Phone Number</Label>
-                    <Input
-                      id="phone"
-                      name="phone"
-                      value={formData.phone}
-                      onChange={handleChange}
-                      placeholder="+81 XXX-XXXX-XXXX"
-                    />
+                    <div className="flex gap-2">
+                        <Select value={countryCode} onValueChange={setCountryCode}>
+                            <SelectTrigger className="w-[140px] bg-white">
+                                <SelectValue placeholder="Code" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {COUNTRY_CODES.map((item) => (
+                                    <SelectItem key={item.code} value={item.code}>
+                                        {item.label}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                        <Input
+                            id="phone"
+                            name="phone"
+                            value={phoneNumber}
+                            onChange={(e) => setPhoneNumber(e.target.value)}
+                            placeholder="123-4567"
+                            className="flex-1"
+                            type="tel"
+                        />
+                    </div>
                   </div>
 
                   <div>
