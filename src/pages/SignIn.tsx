@@ -65,17 +65,17 @@ export default function SignIn() {
            supabase.rpc('handle_successful_login', { user_id: data.user.id });
            
            // 3. CHECK ROLE & REDIRECT
-           const { data: profile } = await supabase
-             .from('profiles')
+           const { data: user } = await supabase
+             .from('user')
              .select('role')
              .eq('id', data.user.id)
              .single();
 
-           if (profile?.role === 'admin') {
+           if (user?.role === 'admin') {
              navigate("/dashboard");
            } else {
-             // 4. FIX: Send customer to Profile Page
-             navigate("/profile"); 
+             // 4. FIX: Send customer to User Page
+             navigate("/user"); 
            }
         }
       }
