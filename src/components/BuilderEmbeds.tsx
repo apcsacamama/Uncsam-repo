@@ -1,5 +1,3 @@
-// Builder.io Custom Code Blocks for AI Integration
-
 // FAQ Chatbot Embed Code for Builder.io
 export const FAQChatbotEmbed = `
 <div id="unclesam-faq-chatbot">
