@@ -34,8 +34,6 @@ import {
   ResponsiveContainer,
 } from "recharts";
 
-// --- TYPES ---
-// (Removed UserProfile types as they moved to Manage Accounts)
 
 // --- LOCAL DATA ---
 const mockBookings = [
@@ -59,7 +57,6 @@ export default function Dashboard() {
 
   const [packages, setPackages] = useState<any[]>([]);
 
-  // 1. Fetch Data on Load
   useEffect(() => {
     fetchPackages();
   }, []);
@@ -74,14 +71,13 @@ export default function Dashboard() {
     }
   };
 
-  // --- REVENUE CALCULATION (With Date Range) ---
   const currentRevenue = useMemo(() => {
     const startIndex = months.indexOf(startMonth);
     const endIndex = months.indexOf(endMonth);
 
     const filteredByRange = mockBookings.filter((booking) => {
       const bookingDate = new Date(booking.travelDate);
-      const bookingMonthIndex = bookingDate.getMonth(); // 0-11
+      const bookingMonthIndex = bookingDate.getMonth();
       
       // Handle Wrap around (e.g., Nov to Feb) or Standard (Jan to Mar)
       if (startIndex <= endIndex) {
@@ -141,7 +137,7 @@ export default function Dashboard() {
       
       <div className="max-w-7xl mx-auto space-y-8">
         <div>
-           <h1 className="text-3xl font-bold text-gray-900">Owner Dashboard</h1>
+           <h1 className="text-3xl font-bold text-gray-900">Hi UncleSam!</h1>
            <p className="text-gray-500">Overview of performance and bookings</p>
         </div>
 

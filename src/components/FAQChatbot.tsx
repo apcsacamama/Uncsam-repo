@@ -21,7 +21,7 @@ interface Message {
 
 const faqResponses = {
   booking:
-    'To make a booking, browse our offers page, select a package, and click "Get Tickets". Follow the form to complete your reservation. You\'ll receive a confirmation email once booked.',
+    'To make a booking, browse our offers page, select a package, and click "Proceed to booking". Follow the form to complete your reservation. You\'ll receive a confirmation email once booked.',
   payment:
     "We accept all major credit cards (Visa, MasterCard, American Express), debit cards, and PayPal. Payment is processed immediately upon booking confirmation.",
   cancellation:
