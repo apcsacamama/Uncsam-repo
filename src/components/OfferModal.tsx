@@ -208,7 +208,10 @@ export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) 
     };
 
     setCart([...cart, newItem]);
-    setLocation("");
+    
+    // CHANGE: Do NOT reset location. Keep it for easier Day 2 booking.
+    // setLocation(""); <--- REMOVED
+    
     setCustomDate(undefined);
     setSelectedDestinations([]);
     setSelectedTransportation(["private-van"]);
@@ -401,7 +404,7 @@ export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) 
                         <div className="bg-white p-4 rounded-lg border shadow-sm flex items-center justify-between">
                             <div>
                                 <h3 className="font-bold text-gray-800">Step 1: Configure a Day</h3>
-                                <p className="text-sm text-gray-500">Choose location, date, and 4-5 spots, then click "Add to Trip".</p>
+                                <p className="text-sm text-gray-500">Choose location, date, and 4-5 destinations, then click "Add to Trip".</p>
                             </div>
                             <div className="bg-blue-50 text-blue-700 px-3 py-1 rounded text-sm font-medium">
                                 Trip Status: {cart.length} Days Added
@@ -439,7 +442,8 @@ export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) 
                              </Card>
 
                              <Card>
-                                <CardHeader className="py-3"><CardTitle className="text-sm">2. Transport</CardTitle></CardHeader>
+                                {/* UPDATED TITLE HERE */}
+                                <CardHeader className="py-3"><CardTitle className="text-sm">2. Add-ons</CardTitle></CardHeader>
                                 <CardContent className="space-y-2">
                                     {transportationOptions.map((t) => (
                                         <div key={t.id} className={cn("flex items-center justify-between p-2 border rounded text-sm", selectedTransportation.includes(t.id) || t.included ? "bg-gray-50" : "")}>
@@ -534,10 +538,19 @@ export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) 
                                                         <Trash2 className="w-3 h-3" />
                                                     </Button>
                                                 </div>
+                                                
+                                                {/* LIST OF DESTINATION NAMES */}
                                                 <div className="text-xs text-gray-500 border-t pt-2 mt-2">
-                                                    <p>{item.destinations.length} Stops selected</p>
+                                                    <p className="font-semibold mb-1 text-gray-700">Selected Destinations:</p>
+                                                    <ul className="list-disc pl-4 space-y-0.5 mb-2">
+                                                        {item.destinations.map(destId => {
+                                                            const destName = allDestinations.find(d => d.id === destId)?.name || destId;
+                                                            return <li key={destId}>{destName}</li>
+                                                        })}
+                                                    </ul>
                                                     <p className="font-bold text-red-600 mt-1 text-right">¥{item.price.toLocaleString()}</p>
                                                 </div>
+
                                             </div>
                                         ))}
                                     </div>
