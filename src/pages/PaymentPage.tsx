@@ -21,8 +21,7 @@ import {
   Lock, 
   ArrowRight,
   Loader2,
-  Layers,
-  CheckCircle
+  Layers
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -71,19 +70,19 @@ export default function PaymentPage() {
   const [displayData, setDisplayData] = useState({
     title: "Tour Package",
     date: "",
-    travelers: 1,
+    travelersLabel: "1", // Changed to string to handle ranges like "2-3"
     price: 0,
     location: "",
     details: [] as any[], 
     isCustom: false
   });
 
-  // --- 3. FETCH DESTINATIONS (To show names instead of IDs) ---
+  // --- 3. FETCH DESTINATIONS ---
   useEffect(() => {
     const fetchDestinations = async () => {
         const { data } = await supabase.from('tour_destinations').select('*');
         if (data && data.length > 0) {
-            setAllDestinations(prev => [...prev, ...data]); // Merge with defaults just in case
+            setAllDestinations(prev => [...prev, ...data]); 
         }
     };
     fetchDestinations();
@@ -95,7 +94,15 @@ export default function PaymentPage() {
       try {
         const cart = JSON.parse(decodeURIComponent(cartDataRaw));
         const total = parseInt(totalPriceParam || "0");
-        const travelerCount = cart.length > 0 ? cart[0].travelers : 1;
+        
+        // --- LOGIC: Handle Variable Travelers ---
+        let travelersDisplay = "1";
+        if (cart.length > 0) {
+            const counts = cart.map((item: any) => item.travelers);
+            const min = Math.min(...counts);
+            const max = Math.max(...counts);
+            travelersDisplay = min === max ? min.toString() : `${min} - ${max}`;
+        }
         
         let dateStr = "Multiple Dates";
         if (cart.length > 0) {
@@ -107,7 +114,7 @@ export default function PaymentPage() {
         setDisplayData({
           title: `Custom Itinerary (${cart.length} Days)`,
           date: dateStr,
-          travelers: travelerCount,
+          travelersLabel: travelersDisplay,
           price: total,
           location: "Japan (Multi-City)",
           details: cart,
@@ -120,7 +127,7 @@ export default function PaymentPage() {
       setDisplayData({
         title: "Standard Tour",
         date: dateParam || "Date not selected",
-        travelers: parseInt(travelersParam || "1"),
+        travelersLabel: travelersParam || "1",
         price: parseInt(priceParam || "0"),
         location: locationParam || "Japan",
         details: [],
@@ -151,7 +158,7 @@ export default function PaymentPage() {
       package: displayData.isCustom ? "custom-itinerary" : "standard",
       custom: displayData.isCustom ? "true" : "false",
       price: displayData.price.toString(),
-      travelers: displayData.travelers.toString(),
+      travelers: displayData.travelersLabel,
       location: displayData.location,
       date: displayData.date,
       name: `${formData.firstName} ${formData.lastName}`,
@@ -163,10 +170,9 @@ export default function PaymentPage() {
     navigate(`/booking-confirmation?${params.toString()}`);
   };
 
-  // Helper to find destination name
   const getDestName = (id: string) => {
       const found = allDestinations.find(d => d.id === id);
-      return found ? found.name : id; // Fallback to ID if name not found
+      return found ? found.name : id; 
   };
 
   return (
@@ -307,7 +313,7 @@ export default function PaymentPage() {
                             <span className="text-gray-600 flex items-center gap-2">
                                 <Users className="w-4 h-4" /> Travelers
                             </span>
-                            <span className="font-medium text-right">{displayData.travelers}</span>
+                            <span className="font-medium text-right">{displayData.travelersLabel}</span>
                         </div>
                     </div>
 
@@ -324,7 +330,16 @@ export default function PaymentPage() {
                                             <div>
                                                 <span className="text-[10px] font-bold text-white bg-gray-800 px-2 py-0.5 rounded-full uppercase">Day {idx + 1}</span>
                                                 <div className="font-bold text-gray-800 mt-1">{day.location.toUpperCase()}</div>
-                                                <div className="text-xs text-gray-500">{format(new Date(day.date), "MMM dd, yyyy")}</div>
+                                                
+                                                {/* --- ADDED: SPECIFIC DAY DETAILS --- */}
+                                                <div className="flex items-center gap-2 mt-1">
+                                                    <span className="text-xs text-gray-500">{format(new Date(day.date), "MMM dd")}</span>
+                                                    <span className="text-gray-300">•</span>
+                                                    <span className="text-xs text-gray-500 flex items-center">
+                                                        <Users className="w-3 h-3 mr-1" />
+                                                        {day.travelers}
+                                                    </span>
+                                                </div>
                                             </div>
                                             <div className="font-bold text-red-600 text-sm">¥{day.price.toLocaleString()}</div>
                                         </div>
