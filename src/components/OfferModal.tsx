@@ -496,6 +496,10 @@ export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) 
                                         {transportationOptions.map((t) => (
                                             <div key={t.id} className={cn("flex items-center space-x-2 bg-white px-3 py-2 rounded border transition-colors", (t.included || selectedTransportation.includes(t.id)) ? "border-gray-400" : "border-gray-200")}>
                                                 <Checkbox id={t.id} checked={t.included || selectedTransportation.includes(t.id)} disabled={t.included} onCheckedChange={(c) => !t.included && handleTransportationChange(t.id, c as boolean)} />
+                                                
+                                                {/* --- ICON RESTORED HERE --- */}
+                                                <t.icon className={cn("w-4 h-4", t.included ? "text-green-600" : "text-gray-500")} />
+                                                
                                                 <Label htmlFor={t.id} className="text-sm cursor-pointer">{t.label}</Label>
                                                 {t.price > 0 && <span className="text-xs font-bold text-gray-500 ml-1">+¥{t.price.toLocaleString()}</span>}
                                             </div>
