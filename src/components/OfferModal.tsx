@@ -209,9 +209,7 @@ export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) 
 
     setCart([...cart, newItem]);
     
-    // CHANGE: Do NOT reset location. Keep it for easier Day 2 booking.
-    // setLocation(""); <--- REMOVED
-    
+    // KEEP location selected for easier entry of next day
     setCustomDate(undefined);
     setSelectedDestinations([]);
     setSelectedTransportation(["private-van"]);
@@ -401,92 +399,84 @@ export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) 
                       
                       {/* LEFT COLUMN: BUILDER (8 cols) */}
                       <div className="lg:col-span-8 space-y-6">
-                        <div className="bg-white p-4 rounded-lg border shadow-sm flex items-center justify-between">
-                            <div>
-                                <h3 className="font-bold text-gray-800">Step 1: Configure a Day</h3>
-                                <p className="text-sm text-gray-500">Choose location, date, and 4-5 destinations, then click "Add to Trip".</p>
-                            </div>
-                            <div className="bg-blue-50 text-blue-700 px-3 py-1 rounded text-sm font-medium">
-                                Trip Status: {cart.length} Days Added
-                            </div>
-                        </div>
-
+                        
                         {/* 1. Location & Date Form */}
-                        <div className="grid md:grid-cols-2 gap-4">
-                             <Card>
-                                <CardHeader className="py-3"><CardTitle className="text-sm">1. Location & Date</CardTitle></CardHeader>
-                                <CardContent className="space-y-3">
-                                    <select value={location} onChange={handleLocationChange} className="w-full px-3 py-2 border rounded-md">
+                        <Card className="shadow-sm">
+                            <CardHeader className="py-4 border-b bg-gray-50/30">
+                                <CardTitle className="text-base font-bold text-gray-800">1. Location & Date</CardTitle>
+                            </CardHeader>
+                            <CardContent className="p-6 grid md:grid-cols-2 gap-6">
+                                <div className="space-y-2">
+                                    <Label className="text-xs text-gray-500 uppercase tracking-wide">Region</Label>
+                                    <select value={location} onChange={handleLocationChange} className="w-full px-3 py-2 border rounded-md bg-white focus:ring-2 focus:ring-red-500 focus:outline-none">
                                         <option value="">Select Region...</option>
                                         <option value="nagoya">Nagoya</option>
                                         <option value="hakone">Hakone</option>
                                         <option value="nara">Nara</option>
                                     </select>
-                                    <Popover>
-                                        <PopoverTrigger asChild>
-                                            <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !customDate && "text-muted-foreground")}>
-                                                <CalendarIcon className="mr-2 h-4 w-4" />{customDate ? format(customDate, "PPP") : "Pick a date"}
-                                            </Button>
-                                        </PopoverTrigger>
-                                        <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={customDate} onSelect={setCustomDate} disabled={isDateDisabled} initialFocus /></PopoverContent>
-                                    </Popover>
-                                    <div className="flex items-center justify-between border rounded p-2">
-                                        <span className="text-sm text-gray-600">Travelers</span>
-                                        <div className="flex items-center gap-2">
-                                            <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => setCustomTravelers(Math.max(1, customTravelers - 1))}>-</Button>
-                                            <span className="text-sm font-bold">{customTravelers}</span>
-                                            <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => setCustomTravelers(Math.min(9, customTravelers + 1))}>+</Button>
+                                </div>
+                                <div className="space-y-2">
+                                    <Label className="text-xs text-gray-500 uppercase tracking-wide">Date & Travelers</Label>
+                                    <div className="flex gap-2">
+                                        <Popover>
+                                            <PopoverTrigger asChild>
+                                                <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !customDate && "text-muted-foreground")}>
+                                                    <CalendarIcon className="mr-2 h-4 w-4" />{customDate ? format(customDate, "PPP") : "Pick a date"}
+                                                </Button>
+                                            </PopoverTrigger>
+                                            <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={customDate} onSelect={setCustomDate} disabled={isDateDisabled} initialFocus /></PopoverContent>
+                                        </Popover>
+                                        <div className="flex items-center border rounded-md px-2 bg-white">
+                                             <Users className="w-4 h-4 text-gray-400 mr-2"/>
+                                             <select 
+                                                className="bg-transparent border-none text-sm focus:ring-0 cursor-pointer py-1"
+                                                value={customTravelers}
+                                                onChange={(e) => setCustomTravelers(parseInt(e.target.value))}
+                                             >
+                                                {[1,2,3,4,5,6,7,8,9].map(n => <option key={n} value={n}>{n}</option>)}
+                                             </select>
                                         </div>
                                     </div>
-                                </CardContent>
-                             </Card>
-
-                             <Card>
-                                {/* UPDATED TITLE HERE */}
-                                <CardHeader className="py-3"><CardTitle className="text-sm">2. Add-ons</CardTitle></CardHeader>
-                                <CardContent className="space-y-2">
-                                    {transportationOptions.map((t) => (
-                                        <div key={t.id} className={cn("flex items-center justify-between p-2 border rounded text-sm", selectedTransportation.includes(t.id) || t.included ? "bg-gray-50" : "")}>
-                                            <div className="flex items-center gap-2">
-                                                <Checkbox id={t.id} checked={t.included || selectedTransportation.includes(t.id)} disabled={t.included} onCheckedChange={(c) => !t.included && handleTransportationChange(t.id, c as boolean)} />
-                                                <Label htmlFor={t.id}>{t.label}</Label>
-                                            </div>
-                                            {t.price > 0 && <span className="text-xs text-gray-500">+¥{t.price.toLocaleString()}</span>}
-                                        </div>
-                                    ))}
-                                </CardContent>
-                             </Card>
-                        </div>
+                                </div>
+                            </CardContent>
+                        </Card>
 
                         {/* 2. Destinations Selection */}
-                        <Card className="flex-1">
-                             <CardHeader className="py-3 bg-gray-50/50 border-b">
-                                <div className="flex justify-between items-center">
-                                    <CardTitle className="text-sm">3. Select Destinations (4-5)</CardTitle>
-                                    <span className={cn("text-xs font-bold px-2 py-1 rounded", selectedDestinations.length >= 4 && selectedDestinations.length <= 5 ? "bg-green-100 text-green-700" : "bg-gray-200 text-gray-600")}>
-                                        {selectedDestinations.length} Selected
-                                    </span>
-                                    {isAdmin && (
-                                        <Button size="sm" variant="outline" className="h-7 text-xs border-red-200 text-red-600 bg-red-50" onClick={() => setIsDestModalOpen(true)}>
-                                            <Settings className="w-3 h-3 mr-1" /> Manage
-                                        </Button>
-                                    )}
+                        <Card className="flex-1 shadow-sm">
+                             <CardHeader className="py-4 bg-gray-50/30 border-b flex flex-row justify-between items-center">
+                                <div className="flex items-center gap-3">
+                                    <CardTitle className="text-base font-bold text-gray-800">2. Select Destinations</CardTitle>
+                                    <Badge variant={selectedDestinations.length >= 4 ? "default" : "outline"} className={selectedDestinations.length >= 4 ? "bg-green-600 hover:bg-green-700" : ""}>
+                                        {selectedDestinations.length}/5 Selected
+                                    </Badge>
                                 </div>
+                                {isAdmin && (
+                                    <Button size="sm" variant="ghost" className="h-7 text-xs text-red-600 hover:bg-red-50" onClick={() => setIsDestModalOpen(true)}>
+                                        <Settings className="w-3 h-3 mr-1" /> Manage
+                                    </Button>
+                                )}
                              </CardHeader>
-                             <CardContent className="p-4">
+                             
+                             <CardContent className="p-6">
                                 {!location ? (
-                                    <div className="text-center py-8 text-gray-400 border-dashed border-2 rounded-lg">Select a region first</div>
+                                    <div className="text-center py-12 bg-gray-50 rounded-lg border-2 border-dashed border-gray-200">
+                                        <MapPin className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+                                        <p className="text-gray-500 font-medium">Please select a region in Step 1</p>
+                                        <p className="text-xs text-gray-400">Available destinations will appear here</p>
+                                    </div>
                                 ) : (
-                                    <div className="grid md:grid-cols-2 gap-3">
+                                    <div className="grid md:grid-cols-2 gap-4">
                                         {filteredDestinations.map((dest) => {
                                             const isSelected = selectedDestinations.includes(dest.id);
                                             const isDisabled = !isSelected && selectedDestinations.length >= MAX_DESTINATIONS;
                                             return (
-                                                <div key={dest.id} className={cn("flex items-start space-x-3 p-3 border rounded-lg transition-colors cursor-pointer", isSelected ? "border-red-500 bg-red-50" : "hover:bg-gray-50", isDisabled && "opacity-50")} onClick={() => !isDisabled && handleDestinationChange(dest.id, !isSelected)}>
-                                                    <Checkbox checked={isSelected} disabled={isDisabled} />
+                                                <div key={dest.id} className={cn("flex items-start space-x-3 p-3 border rounded-lg transition-all cursor-pointer group", isSelected ? "border-red-500 bg-red-50/50" : "hover:border-gray-300 hover:bg-gray-50", isDisabled && "opacity-50 grayscale")} onClick={() => !isDisabled && handleDestinationChange(dest.id, !isSelected)}>
+                                                    <div className={cn("mt-1 w-5 h-5 rounded border flex items-center justify-center transition-colors", isSelected ? "bg-red-600 border-red-600" : "border-gray-300 bg-white")}>
+                                                        {isSelected && <CheckCircle className="w-3.5 h-3.5 text-white" />}
+                                                    </div>
                                                     <div>
-                                                        <p className="font-bold text-sm text-gray-800">{dest.name}</p>
-                                                        <p className="text-xs text-gray-500 line-clamp-1">{dest.description}</p>
+                                                        <p className={cn("font-bold text-sm", isSelected ? "text-red-900" : "text-gray-700")}>{dest.name}</p>
+                                                        <p className="text-xs text-gray-500 line-clamp-2 mt-0.5">{dest.description}</p>
                                                     </div>
                                                 </div>
                                             );
@@ -494,12 +484,34 @@ export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) 
                                     </div>
                                 )}
                              </CardContent>
-                             <div className="p-4 border-t bg-gray-50 flex justify-between items-center">
-                                <div className="text-sm">
-                                    Current Day Price: <span className="font-bold text-red-600">¥{currentFormPrice.toLocaleString()}</span>
+
+                             {/* --- ADD-ONS SECTION (Moved to Bottom) --- */}
+                             {location && (
+                                 <div className="px-6 py-4 bg-gray-50 border-t border-b">
+                                     <h4 className="text-sm font-bold text-gray-700 mb-3 flex items-center">
+                                         <PlusCircle className="w-4 h-4 mr-2 text-gray-400"/>
+                                         Optional Add-ons
+                                     </h4>
+                                     <div className="flex flex-wrap gap-4">
+                                        {transportationOptions.map((t) => (
+                                            <div key={t.id} className={cn("flex items-center space-x-2 bg-white px-3 py-2 rounded border transition-colors", (t.included || selectedTransportation.includes(t.id)) ? "border-gray-400" : "border-gray-200")}>
+                                                <Checkbox id={t.id} checked={t.included || selectedTransportation.includes(t.id)} disabled={t.included} onCheckedChange={(c) => !t.included && handleTransportationChange(t.id, c as boolean)} />
+                                                <Label htmlFor={t.id} className="text-sm cursor-pointer">{t.label}</Label>
+                                                {t.price > 0 && <span className="text-xs font-bold text-gray-500 ml-1">+¥{t.price.toLocaleString()}</span>}
+                                            </div>
+                                        ))}
+                                     </div>
+                                 </div>
+                             )}
+
+                             {/* FOOTER ACTIONS */}
+                             <div className="p-6 bg-white flex justify-between items-center rounded-b-xl">
+                                <div>
+                                    <p className="text-xs text-gray-500 uppercase font-bold">Estimated Day Price</p>
+                                    <p className="text-2xl font-bold text-red-600">¥{currentFormPrice.toLocaleString()}</p>
                                 </div>
-                                <Button onClick={addToCart} disabled={!isCurrentFormValid} className="bg-gray-900 text-white hover:bg-black">
-                                    <PlusCircle className="w-4 h-4 mr-2" /> Add Day to Trip
+                                <Button size="lg" onClick={addToCart} disabled={!isCurrentFormValid} className="bg-gray-900 text-white hover:bg-black shadow-lg hover:shadow-xl transition-all">
+                                    <PlusCircle className="w-5 h-5 mr-2" /> Add Day to Trip
                                 </Button>
                              </div>
                         </Card>
@@ -517,30 +529,32 @@ export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) 
                             <CardContent className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
                                 {cart.length === 0 ? (
                                     <div className="text-center py-10 text-gray-400 space-y-2">
-                                        <AlertCircle className="w-10 h-10 mx-auto opacity-20" />
-                                        <p className="text-sm">Your trip is empty.</p>
-                                        <p className="text-xs">Configure a day on the left and click "Add to Trip".</p>
+                                        <div className="bg-white p-4 rounded-full w-16 h-16 mx-auto flex items-center justify-center shadow-sm">
+                                            <AlertCircle className="w-8 h-8 opacity-20" />
+                                        </div>
+                                        <p className="text-sm font-medium text-gray-600">Your trip is currently empty</p>
+                                        <p className="text-xs">Configure a day on the left and click "Add Day to Trip".</p>
                                     </div>
                                 ) : (
                                     <div className="space-y-3">
                                         {cart.map((item, index) => (
-                                            <div key={item.id} className="bg-white p-3 rounded-lg border shadow-sm relative group">
+                                            <div key={item.id} className="bg-white p-3 rounded-lg border shadow-sm relative group hover:shadow-md transition-shadow">
                                                 <div className="flex justify-between items-start mb-2">
                                                     <div>
-                                                        <span className="text-xs font-bold text-gray-400 uppercase">Day {index + 1}</span>
-                                                        <h4 className="font-bold text-gray-800">{item.location.toUpperCase()}</h4>
-                                                        <div className="flex items-center text-xs text-gray-600 mt-1">
+                                                        <span className="text-[10px] font-bold text-white bg-gray-800 px-2 py-0.5 rounded-full uppercase tracking-wider">Day {index + 1}</span>
+                                                        <h4 className="font-bold text-gray-800 mt-2 text-lg leading-tight">{item.location.toUpperCase()}</h4>
+                                                        <div className="flex items-center text-xs text-gray-500 mt-1 font-medium">
                                                             <CalendarIcon className="w-3 h-3 mr-1" />
                                                             {format(item.date, "MMM dd, yyyy")}
                                                         </div>
                                                     </div>
-                                                    <Button variant="ghost" size="icon" className="h-6 w-6 text-gray-300 hover:text-red-500" onClick={() => removeFromCart(item.id)}>
-                                                        <Trash2 className="w-3 h-3" />
+                                                    <Button variant="ghost" size="icon" className="h-6 w-6 text-gray-300 hover:text-red-500 hover:bg-red-50" onClick={() => removeFromCart(item.id)}>
+                                                        <Trash2 className="w-3.5 h-3.5" />
                                                     </Button>
                                                 </div>
                                                 
                                                 {/* LIST OF DESTINATION NAMES */}
-                                                <div className="text-xs text-gray-500 border-t pt-2 mt-2">
+                                                <div className="text-xs text-gray-500 border-t pt-2 mt-2 bg-gray-50/50 -mx-3 px-3 pb-1">
                                                     <p className="font-semibold mb-1 text-gray-700">Selected Destinations:</p>
                                                     <ul className="list-disc pl-4 space-y-0.5 mb-2">
                                                         {item.destinations.map(destId => {
@@ -548,7 +562,10 @@ export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) 
                                                             return <li key={destId}>{destName}</li>
                                                         })}
                                                     </ul>
-                                                    <p className="font-bold text-red-600 mt-1 text-right">¥{item.price.toLocaleString()}</p>
+                                                    <div className="flex justify-between items-end border-t border-dashed pt-2 mt-2">
+                                                        <span className="text-gray-400">Day Total</span>
+                                                        <span className="font-bold text-red-600">¥{item.price.toLocaleString()}</span>
+                                                    </div>
                                                 </div>
 
                                             </div>
