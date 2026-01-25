@@ -1,26 +1,26 @@
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
-import { Label } from "./ui/label"; // Imported from CustomTour
-import { Input } from "./ui/input"; // Imported from CustomTour
-import { Textarea } from "./ui/textarea"; // Imported from CustomTour
-import { Checkbox } from "./ui/checkbox"; // Imported from CustomTour
-import { Card, CardContent, CardHeader, CardTitle } from "./ui/card"; // Imported from CustomTour
-import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover"; // Imported from CustomTour
+import { Label } from "./ui/label"; 
+import { Input } from "./ui/input"; 
+import { Textarea } from "./ui/textarea"; 
+import { Checkbox } from "./ui/checkbox"; 
+import { Card, CardContent, CardHeader, CardTitle } from "./ui/card"; 
+import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover"; 
 import { Calendar } from "./ui/calendar";
 import { 
   X, ArrowRight, MapPin, CheckCircle, Calendar as CalendarIcon, 
   Users, Layers, ArrowLeft, Car, Plane, Info, AlertCircle, 
-  Settings, Plus, Save, Trash2, Loader2 
+  Settings, Save, Trash2, Loader2, PlusCircle
 } from "lucide-react";
 import { TourPackage } from "../types/travel";
 import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "../lib/supabaseClient"; // Ensure this exists
-import { useIsAdmin } from "../hooks/useIsAdmin"; // Ensure this exists
+import { supabase } from "../lib/supabaseClient"; 
+import { useIsAdmin } from "../hooks/useIsAdmin"; 
 import { format, isBefore, startOfToday, isSameDay } from "date-fns";
 import { cn } from "../lib/utils";
 
-// --- CUSTOM TOUR CONFIGURATION ---
+// --- CONFIGURATION ---
 const PRICING_CONFIG: Record<string, { tier1: number; tier2: number }> = {
   nara: { tier1: 85000, tier2: 105000 },
   hakone: { tier1: 75000, tier2: 95000 },
@@ -35,26 +35,32 @@ const DEFAULT_DESTINATIONS = [
   { id: "kotoku-in", name: "Kotoku-in", description: "The Great Buddha", location: "nara" },
 ];
 
-// --- OFFER MODAL CONFIGURATION ---
 const TIERED_PRICING: Record<string, { tier1: number; tier2: number }> = {
   "tokyo-disney": { tier1: 60000, tier2: 80000 },
   "nara-tour": { tier1: 85000, tier2: 105000 },
 };
 const FIXED_PRICE_IDS = ["fukuoka-tour", "fukui-tour", "hiroshima-tour"];
 
+// --- TYPES ---
 interface OfferModalProps {
   isOpen: boolean;
   onClose: () => void;
   offer: TourPackage | null;
 }
 
+type CartItem = {
+  id: string;
+  location: string;
+  date: Date;
+  travelers: number;
+  destinations: string[]; 
+  transportation: string[];
+  price: number;
+};
+
 export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) {
   const navigate = useNavigate();
   const { isAdmin } = useIsAdmin();
-
-  // --- VIEW MODE STATE ---
-  // 'offer' = The standard single package view
-  // 'custom' = The complex custom tour builder view
   const [viewMode, setViewMode] = useState<'offer' | 'custom'>('offer');
 
   // ==========================================
@@ -66,11 +72,15 @@ export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) 
 
   useEffect(() => {
     if (isOpen && offer) {
-      // Reset logic when modal opens
       setViewMode('offer'); 
       setOfferDate("");
       setOfferTravelers(1);
       setOfferCalculatedPrice(offer.price);
+      // Reset Custom State
+      setCart([]);
+      setLocation("");
+      setCustomDate(undefined);
+      setSelectedDestinations([]);
     }
   }, [isOpen, offer]);
 
@@ -101,6 +111,8 @@ export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) 
   // ==========================================
   // 2. CUSTOM TOUR MODE LOGIC
   // ==========================================
+  
+  const [cart, setCart] = useState<CartItem[]>([]);
   const [customDate, setCustomDate] = useState<Date>();
   const [location, setLocation] = useState("");
   const [selectedDestinations, setSelectedDestinations] = useState<string[]>([]);
@@ -108,27 +120,21 @@ export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) 
   const [customTravelers, setCustomTravelers] = useState(1);
   const [allDestinations, setAllDestinations] = useState<any[]>(DEFAULT_DESTINATIONS);
 
-  // Admin Custom Tour State
+  // -- ADMIN STATE --
   const [isDestModalOpen, setIsDestModalOpen] = useState(false);
   const [isSavingDest, setIsSavingDest] = useState(false);
   const [editingDestId, setEditingDestId] = useState<string | null>(null);
   const [destForm, setDestForm] = useState({ name: "", description: "", location: "nagoya" });
 
   useEffect(() => {
-    if (viewMode === 'custom') {
-        fetchDestinations();
-    }
+    if (viewMode === 'custom') fetchDestinations();
   }, [viewMode]);
 
   const fetchDestinations = async () => {
     try {
       const { data, error } = await supabase.from('tour_destinations').select('*');
-      if (!error && data && data.length > 0) {
-         setAllDestinations(data);
-      }
-    } catch (err) {
-      console.error("Unexpected error:", err);
-    }
+      if (!error && data && data.length > 0) setAllDestinations(data);
+    } catch (err) { console.error("Unexpected error:", err); }
   };
 
   const filteredDestinations = useMemo(() => {
@@ -140,19 +146,19 @@ export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) 
     const newLocation = e.target.value;
     setLocation(newLocation);
     setSelectedDestinations([]); 
-    setCustomTravelers(1); 
     setDestForm(prev => ({ ...prev, location: newLocation || "nagoya" }));
   };
 
   const isDateDisabled = (date: Date) => {
     if (isBefore(date, startOfToday())) return true; 
-    const isFullyBooked = FULLY_BOOKED_DATES.some(blockedDate => isSameDay(date, blockedDate));
-    return !!isFullyBooked;
+    const inCart = cart.some(item => isSameDay(item.date, date));
+    if (inCart) return true;
+    return FULLY_BOOKED_DATES.some(blockedDate => isSameDay(date, blockedDate));
   };
 
   const transportationOptions = [
-    { id: "private-van", label: "Private Van (Included)", icon: Car, price: 0, included: true, addon: false },
-    { id: "airport-transfer", label: "Airport Transfer (Add-on)", icon: Plane, price: 8000, included: false, addon: true },
+    { id: "private-van", label: "Private Van", icon: Car, price: 0, included: true, addon: false },
+    { id: "airport-transfer", label: "Airport Transfer", icon: Plane, price: 8000, included: false, addon: true },
   ];
 
   const handleDestinationChange = (destinationId: string, checked: boolean) => {
@@ -173,7 +179,52 @@ export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) 
     }
   };
 
-  // --- ADMIN HANDLERS ---
+  const getCurrentPrice = () => {
+    if (!location) return 0;
+    const config = PRICING_CONFIG[location];
+    if (!config) return 0;
+    const base = customTravelers <= 6 ? config.tier1 : config.tier2;
+    const transport = selectedTransportation.reduce((total, id) => {
+      const t = transportationOptions.find((opt) => opt.id === id);
+      return total + (t ? t.price : 0);
+    }, 0);
+    return base + transport;
+  };
+  
+  const currentFormPrice = getCurrentPrice();
+  const isCurrentFormValid = location && customDate && selectedDestinations.length >= MIN_DESTINATIONS;
+
+  const addToCart = () => {
+    if (!isCurrentFormValid || !customDate) return;
+
+    const newItem: CartItem = {
+        id: Math.random().toString(36).substr(2, 9),
+        location,
+        date: customDate,
+        travelers: customTravelers,
+        destinations: [...selectedDestinations],
+        transportation: [...selectedTransportation],
+        price: currentFormPrice
+    };
+
+    setCart([...cart, newItem]);
+    setLocation("");
+    setCustomDate(undefined);
+    setSelectedDestinations([]);
+    setSelectedTransportation(["private-van"]);
+  };
+
+  const removeFromCart = (id: string) => {
+    setCart(cart.filter(item => item.id !== id));
+  };
+
+  const cartTotal = cart.reduce((sum, item) => sum + item.price, 0);
+
+  const handleFinalCheckout = () => {
+    const cartData = encodeURIComponent(JSON.stringify(cart));
+    navigate(`/payment?custom=true&cartData=${cartData}&totalPrice=${cartTotal}&name=Valued+Customer`);
+  };
+
   const handleSaveDestination = async () => {
     if (!destForm.name || !destForm.location) {
         alert("Please provide a name and location.");
@@ -222,35 +273,11 @@ export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) 
       setDestForm({ name: dest.name, description: dest.description, location: dest.location });
   };
 
-  // --- CUSTOM PRICING ---
-  const getPackagePrice = () => {
-    if (!location) return 0;
-    const config = PRICING_CONFIG[location];
-    if (!config) return 0;
-    if (customTravelers <= 6) return config.tier1;
-    else if (customTravelers <= 9) return config.tier2;
-    return 0;
-  };
-
-  const basePrice = getPackagePrice();
-  const transportationPriceTotal = selectedTransportation.reduce((total, transportId) => {
-      const transport = transportationOptions.find((t) => t.id === transportId);
-      return total + (transport ? transport.price : 0); 
-    }, 0);
-  const customTotalPrice = basePrice + transportationPriceTotal;
-  const isDestinationCountValid = selectedDestinations.length >= MIN_DESTINATIONS && selectedDestinations.length <= MAX_DESTINATIONS;
-  const isCustomFormValid = location && customDate && isDestinationCountValid;
-  const addonsString = selectedTransportation.filter(t => t !== 'private-van').join(',');
-
   if (!isOpen || !offer) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-      {/* DYNAMIC WIDTH CONTAINER */}
-      <div className={cn(
-          "bg-white rounded-xl shadow-2xl w-full flex flex-col transition-all duration-300",
-          viewMode === 'custom' ? "max-w-6xl h-[95vh]" : "max-w-2xl max-h-[90vh]"
-      )}>
+      <div className={cn("bg-white rounded-xl shadow-2xl w-full flex flex-col transition-all duration-300", viewMode === 'custom' ? "max-w-7xl h-[95vh]" : "max-w-2xl max-h-[90vh]")}>
         
         {/* ================================================== */}
         {/* VIEW MODE: STANDARD OFFER */}
@@ -270,7 +297,9 @@ export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) 
             <div className="flex-1 overflow-y-auto p-6">
                <h2 className="text-2xl font-bold text-gray-900 mb-2">{offer.title}</h2>
                <p className="text-gray-600 mb-6">{offer.description}</p>
+
                <div className="grid md:grid-cols-2 gap-8">
+                  {/* Left Column: Details */}
                   <div className="space-y-6">
                      <div>
                         <h3 className="font-semibold text-gray-900 mb-3 flex items-center">
@@ -284,6 +313,7 @@ export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) 
                            ))}
                         </ul>
                      </div>
+
                      <div>
                         <h3 className="font-semibold text-gray-900 mb-3 flex items-center">
                             <CheckCircle className="w-4 h-4 mr-2 text-green-600" />Inclusions
@@ -297,6 +327,8 @@ export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) 
                         </ul>
                      </div>
                   </div>
+
+                  {/* Right Column: Booking Form */}
                   <div className="bg-gray-50 p-5 rounded-lg border border-gray-100 h-fit">
                      <h3 className="font-bold text-gray-900 mb-4 border-b pb-2">Plan Your Trip</h3>
                      <div className="space-y-4">
@@ -307,6 +339,7 @@ export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) 
                               <input type="date" className="w-full pl-10 pr-4 py-2 border rounded-md text-sm bg-white" min={new Date().toISOString().split("T")[0]} value={offerDate} onChange={(e) => setOfferDate(e.target.value)} />
                            </div>
                         </div>
+
                         <div>
                            <label className="text-sm font-medium text-gray-700 mb-1 block">Travelers</label>
                            <div className="relative">
@@ -316,6 +349,7 @@ export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) 
                               </select>
                            </div>
                         </div>
+
                         <div className="pt-4 mt-2 border-t">
                            <div className="flex justify-between items-end mb-1">
                               <span className="text-sm text-gray-600">Total Price</span>
@@ -323,8 +357,8 @@ export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) 
                            </div>
                            <p className="text-xs text-gray-400 text-right">Includes taxes & fees</p>
                         </div>
+
                         <div className="flex flex-col gap-2 mt-4">
-                          {/* SWITCH TO CUSTOM MODE */}
                           <Button variant="outline" className="w-full border-gray-300 text-gray-700 hover:bg-gray-50 hover:text-red-600" onClick={() => setViewMode('custom')}>
                               <Layers className="w-4 h-4 mr-2" />Book multiple tours or dates
                           </Button>
@@ -340,7 +374,7 @@ export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) 
         )}
 
         {/* ================================================== */}
-        {/* VIEW MODE: CUSTOM TOUR BUILDER */}
+        {/* VIEW MODE: CUSTOM TOUR BUILDER (CART) */}
         {/* ================================================== */}
         {viewMode === 'custom' && (
            <div className="flex flex-col h-full overflow-hidden">
@@ -351,87 +385,104 @@ export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) 
                         <ArrowLeft className="w-4 h-4 mr-2" /> Back to Offer
                      </Button>
                      <div>
-                        <h2 className="text-xl font-bold text-gray-900">Create Your Own Experience</h2>
-                        <p className="text-xs text-gray-500">Customize destinations, dates, and transport</p>
+                        <h2 className="text-xl font-bold text-gray-900">Build Your Itinerary</h2>
+                        <p className="text-xs text-gray-500">Add multiple days to create a full trip package</p>
                      </div>
                   </div>
                   <Button variant="ghost" size="icon" onClick={onClose}><X className="w-5 h-5" /></Button>
               </div>
 
-              {/* Scrollable Content */}
+              {/* Content Grid */}
               <div className="flex-1 overflow-y-auto p-4 md:p-6 bg-gray-50/50">
-                  <div className="grid lg:grid-cols-3 gap-6 h-full">
-                      {/* LEFT COLUMN: FORM */}
-                      <div className="lg:col-span-2 space-y-6">
-                        {/* 1. Location & Date */}
-                        <Card>
-                            <CardHeader className="py-4"><CardTitle className="text-lg flex items-center gap-2"><MapPin className="w-4 h-4 text-red-600"/> Location & Date</CardTitle></CardHeader>
-                            <CardContent className="space-y-4">
-                                <div className="space-y-2">
-                                    <Label>Select Location</Label>
-                                    <select value={location} onChange={handleLocationChange} className="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-red-500">
-                                        <option value="">Choose a region...</option>
+                  <div className="grid lg:grid-cols-12 gap-6 h-full">
+                      
+                      {/* LEFT COLUMN: BUILDER (8 cols) */}
+                      <div className="lg:col-span-8 space-y-6">
+                        <div className="bg-white p-4 rounded-lg border shadow-sm flex items-center justify-between">
+                            <div>
+                                <h3 className="font-bold text-gray-800">Step 1: Configure a Day</h3>
+                                <p className="text-sm text-gray-500">Choose location, date, and 4-5 spots, then click "Add to Trip".</p>
+                            </div>
+                            <div className="bg-blue-50 text-blue-700 px-3 py-1 rounded text-sm font-medium">
+                                Trip Status: {cart.length} Days Added
+                            </div>
+                        </div>
+
+                        {/* 1. Location & Date Form */}
+                        <div className="grid md:grid-cols-2 gap-4">
+                             <Card>
+                                <CardHeader className="py-3"><CardTitle className="text-sm">1. Location & Date</CardTitle></CardHeader>
+                                <CardContent className="space-y-3">
+                                    <select value={location} onChange={handleLocationChange} className="w-full px-3 py-2 border rounded-md">
+                                        <option value="">Select Region...</option>
                                         <option value="nagoya">Nagoya</option>
                                         <option value="hakone">Hakone</option>
                                         <option value="nara">Nara</option>
                                     </select>
-                                </div>
-                                <div className="grid md:grid-cols-2 gap-4">
-                                    <div className="space-y-2">
-                                        <Label>Travel Date</Label>
-                                        <Popover>
-                                            <PopoverTrigger asChild>
-                                                <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !customDate && "text-muted-foreground")}>
-                                                    <CalendarIcon className="mr-2 h-4 w-4" />{customDate ? format(customDate, "PPP") : "Pick a date"}
-                                                </Button>
-                                            </PopoverTrigger>
-                                            <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={customDate} onSelect={setCustomDate} disabled={isDateDisabled} initialFocus /></PopoverContent>
-                                        </Popover>
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label>Travelers</Label>
-                                        <div className="flex items-center space-x-3">
-                                            <Button variant="outline" size="sm" onClick={() => setCustomTravelers(Math.max(1, customTravelers - 1))} disabled={customTravelers <= 1}>-</Button>
-                                            <span className="text-lg font-medium w-8 text-center">{customTravelers}</span>
-                                            <Button variant="outline" size="sm" onClick={() => setCustomTravelers(customTravelers + 1)} disabled={customTravelers >= MAX_TRAVELERS}>+</Button>
-                                            <Users className="w-4 h-4 text-gray-500" />
+                                    <Popover>
+                                        <PopoverTrigger asChild>
+                                            <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !customDate && "text-muted-foreground")}>
+                                                <CalendarIcon className="mr-2 h-4 w-4" />{customDate ? format(customDate, "PPP") : "Pick a date"}
+                                            </Button>
+                                        </PopoverTrigger>
+                                        <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={customDate} onSelect={setCustomDate} disabled={isDateDisabled} initialFocus /></PopoverContent>
+                                    </Popover>
+                                    <div className="flex items-center justify-between border rounded p-2">
+                                        <span className="text-sm text-gray-600">Travelers</span>
+                                        <div className="flex items-center gap-2">
+                                            <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => setCustomTravelers(Math.max(1, customTravelers - 1))}>-</Button>
+                                            <span className="text-sm font-bold">{customTravelers}</span>
+                                            <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => setCustomTravelers(Math.min(9, customTravelers + 1))}>+</Button>
                                         </div>
                                     </div>
-                                </div>
-                            </CardContent>
-                        </Card>
+                                </CardContent>
+                             </Card>
 
-                        {/* 2. Choose Destinations */}
+                             <Card>
+                                <CardHeader className="py-3"><CardTitle className="text-sm">2. Transport</CardTitle></CardHeader>
+                                <CardContent className="space-y-2">
+                                    {transportationOptions.map((t) => (
+                                        <div key={t.id} className={cn("flex items-center justify-between p-2 border rounded text-sm", selectedTransportation.includes(t.id) || t.included ? "bg-gray-50" : "")}>
+                                            <div className="flex items-center gap-2">
+                                                <Checkbox id={t.id} checked={t.included || selectedTransportation.includes(t.id)} disabled={t.included} onCheckedChange={(c) => !t.included && handleTransportationChange(t.id, c as boolean)} />
+                                                <Label htmlFor={t.id}>{t.label}</Label>
+                                            </div>
+                                            {t.price > 0 && <span className="text-xs text-gray-500">+¥{t.price.toLocaleString()}</span>}
+                                        </div>
+                                    ))}
+                                </CardContent>
+                             </Card>
+                        </div>
+
+                        {/* 2. Destinations Selection */}
                         <Card className="flex-1">
-                             <CardHeader className="py-4">
+                             <CardHeader className="py-3 bg-gray-50/50 border-b">
                                 <div className="flex justify-between items-center">
-                                    <CardTitle className="text-lg">Choose Destinations</CardTitle>
-                                    <div className="flex items-center gap-3">
-                                        <span className={cn("text-xs font-medium", selectedDestinations.length >= MIN_DESTINATIONS && selectedDestinations.length <= MAX_DESTINATIONS ? "text-green-600" : "text-gray-500")}>
-                                            {selectedDestinations.length} / {MAX_DESTINATIONS} selected
-                                        </span>
-                                        {isAdmin && (
-                                            <Button size="sm" variant="outline" className="h-7 text-xs border-red-200 text-red-600 bg-red-50" onClick={() => setIsDestModalOpen(true)}>
-                                                <Settings className="w-3 h-3 mr-1" /> Manage
-                                            </Button>
-                                        )}
-                                    </div>
+                                    <CardTitle className="text-sm">3. Select Destinations (4-5)</CardTitle>
+                                    <span className={cn("text-xs font-bold px-2 py-1 rounded", selectedDestinations.length >= 4 && selectedDestinations.length <= 5 ? "bg-green-100 text-green-700" : "bg-gray-200 text-gray-600")}>
+                                        {selectedDestinations.length} Selected
+                                    </span>
+                                    {isAdmin && (
+                                        <Button size="sm" variant="outline" className="h-7 text-xs border-red-200 text-red-600 bg-red-50" onClick={() => setIsDestModalOpen(true)}>
+                                            <Settings className="w-3 h-3 mr-1" /> Manage
+                                        </Button>
+                                    )}
                                 </div>
                              </CardHeader>
-                             <CardContent>
+                             <CardContent className="p-4">
                                 {!location ? (
-                                    <div className="text-center py-8 text-gray-500 bg-gray-50 rounded-lg border border-dashed text-sm">Please select a location above first.</div>
+                                    <div className="text-center py-8 text-gray-400 border-dashed border-2 rounded-lg">Select a region first</div>
                                 ) : (
                                     <div className="grid md:grid-cols-2 gap-3">
                                         {filteredDestinations.map((dest) => {
                                             const isSelected = selectedDestinations.includes(dest.id);
                                             const isDisabled = !isSelected && selectedDestinations.length >= MAX_DESTINATIONS;
                                             return (
-                                                <div key={dest.id} className={cn("flex items-start space-x-3 p-3 border rounded-lg transition-colors", isSelected ? "border-red-500 bg-red-50" : "hover:bg-gray-50", isDisabled && "opacity-50 cursor-not-allowed")}>
-                                                    <Checkbox id={dest.id} checked={isSelected} disabled={isDisabled} onCheckedChange={(checked) => handleDestinationChange(dest.id, checked as boolean)} />
+                                                <div key={dest.id} className={cn("flex items-start space-x-3 p-3 border rounded-lg transition-colors cursor-pointer", isSelected ? "border-red-500 bg-red-50" : "hover:bg-gray-50", isDisabled && "opacity-50")} onClick={() => !isDisabled && handleDestinationChange(dest.id, !isSelected)}>
+                                                    <Checkbox checked={isSelected} disabled={isDisabled} />
                                                     <div>
-                                                        <Label htmlFor={dest.id} className="font-medium cursor-pointer">{dest.name}</Label>
-                                                        <p className="text-xs text-gray-500 line-clamp-2 mt-0.5">{dest.description}</p>
+                                                        <p className="font-bold text-sm text-gray-800">{dest.name}</p>
+                                                        <p className="text-xs text-gray-500 line-clamp-1">{dest.description}</p>
                                                     </div>
                                                 </div>
                                             );
@@ -439,68 +490,82 @@ export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) 
                                     </div>
                                 )}
                              </CardContent>
-                        </Card>
-
-                        {/* 3. Transport */}
-                        <Card>
-                            <CardHeader className="py-4"><CardTitle className="text-lg">Transport Options</CardTitle></CardHeader>
-                            <CardContent>
-                                <div className="space-y-3">
-                                    {transportationOptions.map((t) => (
-                                        <div key={t.id} className={cn("flex items-center space-x-3 p-3 border rounded-lg", t.included ? "bg-green-50 border-green-200" : "hover:bg-gray-50")}>
-                                            <Checkbox id={t.id} checked={t.included || selectedTransportation.includes(t.id)} disabled={t.included} onCheckedChange={(c) => !t.included && handleTransportationChange(t.id, c as boolean)} />
-                                            <t.icon className={cn("w-5 h-5", t.included ? "text-green-600" : "text-gray-600")} />
-                                            <div className="flex-1 flex justify-between items-center">
-                                                <Label className="text-sm font-medium">{t.label}</Label>
-                                                <span className={cn("text-xs font-bold", t.price === 0 ? "text-green-600" : "text-gray-700")}>{t.price === 0 ? "Included" : `+¥${t.price.toLocaleString()}`}</span>
-                                            </div>
-                                        </div>
-                                    ))}
+                             <div className="p-4 border-t bg-gray-50 flex justify-between items-center">
+                                <div className="text-sm">
+                                    Current Day Price: <span className="font-bold text-red-600">¥{currentFormPrice.toLocaleString()}</span>
                                 </div>
-                            </CardContent>
+                                <Button onClick={addToCart} disabled={!isCurrentFormValid} className="bg-gray-900 text-white hover:bg-black">
+                                    <PlusCircle className="w-4 h-4 mr-2" /> Add Day to Trip
+                                </Button>
+                             </div>
                         </Card>
                       </div>
 
-                      {/* RIGHT COLUMN: SUMMARY */}
-                      <div className="lg:col-span-1">
-                         <Card className="sticky top-0 shadow-lg border-t-4 border-t-red-600">
-                            <CardHeader className="py-4"><CardTitle className="text-lg">Tour Summary</CardTitle></CardHeader>
-                            <CardContent className="space-y-4">
-                                <div className="bg-gray-50 p-3 rounded-md border border-gray-100 space-y-2">
-                                    <div className="flex justify-between text-sm"><span>Base Price:</span> <span className="font-semibold">{basePrice > 0 ? `¥${basePrice.toLocaleString()}` : "---"}</span></div>
-                                    {transportationPriceTotal > 0 && <div className="flex justify-between text-sm text-blue-600"><span>Add-ons:</span> <span>+¥{transportationPriceTotal.toLocaleString()}</span></div>}
-                                    <div className="border-t pt-2 flex justify-between font-bold text-lg"><span>Total:</span> <span className="text-red-600">¥{customTotalPrice.toLocaleString()}</span></div>
-                                </div>
-                                
-                                {selectedDestinations.length > 0 && (
-                                    <div className="text-xs text-gray-600 border-t pt-2">
-                                        <p className="font-semibold mb-1">Selected Places:</p>
-                                        <ul className="space-y-1">{selectedDestinations.map(id => <li key={id}>• {allDestinations.find(d => d.id === id)?.name}</li>)}</ul>
+                      {/* RIGHT COLUMN: ITINERARY SUMMARY (4 cols) */}
+                      <div className="lg:col-span-4 flex flex-col h-full">
+                         <Card className="sticky top-0 shadow-lg border-t-4 border-t-red-600 flex flex-col h-full max-h-[calc(100vh-120px)]">
+                            <CardHeader className="py-4 border-b bg-white z-10">
+                                <CardTitle className="text-lg flex items-center gap-2">
+                                    <Layers className="w-5 h-5 text-red-600"/> Trip Itinerary
+                                </CardTitle>
+                            </CardHeader>
+                            
+                            <CardContent className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
+                                {cart.length === 0 ? (
+                                    <div className="text-center py-10 text-gray-400 space-y-2">
+                                        <AlertCircle className="w-10 h-10 mx-auto opacity-20" />
+                                        <p className="text-sm">Your trip is empty.</p>
+                                        <p className="text-xs">Configure a day on the left and click "Add to Trip".</p>
                                     </div>
-                                )}
-
-                                <Button 
-                                    className="w-full bg-red-600 hover:bg-red-700 h-12 text-md"
-                                    disabled={!isCustomFormValid}
-                                    onClick={() => navigate(`/payment?package=custom-${location}&location=${location}&custom=true&date=${customDate ? format(customDate, "yyyy-MM-dd") : ""}&travelers=${customTravelers}&price=${customTotalPrice}&addons=${addonsString}&name=Valued+Customer`)}
-                                >
-                                    {basePrice > 0 ? `Book Custom Tour` : "Select Details"}
-                                </Button>
-                                
-                                {!isCustomFormValid && (
-                                    <div className="text-xs text-red-500 space-y-1 bg-red-50 p-2 rounded">
-                                        {!location && <p>• Select a location</p>}
-                                        {!customDate && <p>• Pick a date</p>}
-                                        {selectedDestinations.length < MIN_DESTINATIONS && <p>• Select at least {MIN_DESTINATIONS} places</p>}
+                                ) : (
+                                    <div className="space-y-3">
+                                        {cart.map((item, index) => (
+                                            <div key={item.id} className="bg-white p-3 rounded-lg border shadow-sm relative group">
+                                                <div className="flex justify-between items-start mb-2">
+                                                    <div>
+                                                        <span className="text-xs font-bold text-gray-400 uppercase">Day {index + 1}</span>
+                                                        <h4 className="font-bold text-gray-800">{item.location.toUpperCase()}</h4>
+                                                        <div className="flex items-center text-xs text-gray-600 mt-1">
+                                                            <CalendarIcon className="w-3 h-3 mr-1" />
+                                                            {format(item.date, "MMM dd, yyyy")}
+                                                        </div>
+                                                    </div>
+                                                    <Button variant="ghost" size="icon" className="h-6 w-6 text-gray-300 hover:text-red-500" onClick={() => removeFromCart(item.id)}>
+                                                        <Trash2 className="w-3 h-3" />
+                                                    </Button>
+                                                </div>
+                                                <div className="text-xs text-gray-500 border-t pt-2 mt-2">
+                                                    <p>{item.destinations.length} Stops selected</p>
+                                                    <p className="font-bold text-red-600 mt-1 text-right">¥{item.price.toLocaleString()}</p>
+                                                </div>
+                                            </div>
+                                        ))}
                                     </div>
                                 )}
                             </CardContent>
+                            
+                            <div className="p-4 border-t bg-white shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] z-10">
+                                <div className="flex justify-between items-end mb-4">
+                                    <span className="text-sm text-gray-600 font-medium">Total Trip Price</span>
+                                    <div className="text-right">
+                                        <span className="text-2xl font-bold text-red-600">¥{cartTotal.toLocaleString()}</span>
+                                        <p className="text-xs text-gray-400">Tax included</p>
+                                    </div>
+                                </div>
+                                <Button 
+                                    className="w-full bg-red-600 hover:bg-red-700 h-12 text-md shadow-md"
+                                    disabled={cart.length === 0}
+                                    onClick={handleFinalCheckout}
+                                >
+                                    Proceed to Payment <ArrowRight className="w-4 h-4 ml-2" />
+                                </Button>
+                            </div>
                          </Card>
                       </div>
                   </div>
               </div>
-              
-              {/* INNER ADMIN MODAL FOR LOCATIONS */}
+
+               {/* INNER ADMIN MODAL FOR LOCATIONS */}
               {isDestModalOpen && (
                 <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
                    <Card className="w-full max-w-3xl max-h-[85vh] flex flex-col shadow-2xl animate-in zoom-in-95">
