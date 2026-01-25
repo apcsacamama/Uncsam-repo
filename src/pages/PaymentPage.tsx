@@ -21,7 +21,8 @@ import {
   Lock, 
   ArrowRight,
   Loader2,
-  Layers
+  Layers,
+  Plane // Ensure Plane is imported
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -105,7 +106,6 @@ export default function PaymentPage() {
         }
         
         // --- LOGIC: Handle Separate Dates ---
-        // Instead of range (Start - End), we join unique dates with " | "
         let dateStr = "Multiple Dates";
         if (cart.length > 0) {
             const uniqueDates = Array.from(new Set(cart.map((i: any) => format(new Date(i.date), "MMM dd, yyyy"))));
@@ -166,7 +166,6 @@ export default function PaymentPage() {
       email: formData.email,
       phone: formData.phone,
       paymentMethod: paymentMethod,
-      // --- CRITICAL FIX: Pass the cart data so the confirmation page can read it ---
       cartData: cartDataRaw || "" 
     });
 
@@ -354,6 +353,12 @@ export default function PaymentPage() {
                                                 {day.destinations.map((destId: string) => (
                                                     <li key={destId}>{getDestName(destId)}</li>
                                                 ))}
+                                                {/* --- RENDER AIRPORT TRANSFER ADD-ON --- */}
+                                                {day.transportation && day.transportation.includes("airport-transfer") && (
+                                                    <li className="text-blue-600 font-medium flex items-center -ml-1">
+                                                        <Plane className="w-3 h-3 mr-1" /> Airport Transfer (+¥8,000)
+                                                    </li>
+                                                )}
                                             </ul>
                                         </div>
                                     </div>
