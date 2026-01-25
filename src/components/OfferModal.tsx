@@ -208,8 +208,6 @@ export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) 
     };
 
     setCart([...cart, newItem]);
-    
-    // KEEP location selected for easier entry of next day
     setCustomDate(undefined);
     setSelectedDestinations([]);
     setSelectedTransportation(["private-van"]);
@@ -497,7 +495,6 @@ export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) 
                                             <div key={t.id} className={cn("flex items-center space-x-2 bg-white px-3 py-2 rounded border transition-colors", (t.included || selectedTransportation.includes(t.id)) ? "border-gray-400" : "border-gray-200")}>
                                                 <Checkbox id={t.id} checked={t.included || selectedTransportation.includes(t.id)} disabled={t.included} onCheckedChange={(c) => !t.included && handleTransportationChange(t.id, c as boolean)} />
                                                 
-                                                {/* --- ICON RESTORED HERE --- */}
                                                 <t.icon className={cn("w-4 h-4", t.included ? "text-green-600" : "text-gray-500")} />
                                                 
                                                 <Label htmlFor={t.id} className="text-sm cursor-pointer">{t.label}</Label>
@@ -547,10 +544,19 @@ export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) 
                                                     <div>
                                                         <span className="text-[10px] font-bold text-white bg-gray-800 px-2 py-0.5 rounded-full uppercase tracking-wider">Day {index + 1}</span>
                                                         <h4 className="font-bold text-gray-800 mt-2 text-lg leading-tight">{item.location.toUpperCase()}</h4>
-                                                        <div className="flex items-center text-xs text-gray-500 mt-1 font-medium">
-                                                            <CalendarIcon className="w-3 h-3 mr-1" />
-                                                            {format(item.date, "MMM dd, yyyy")}
+                                                        
+                                                        <div className="flex items-center gap-3 mt-1">
+                                                            <div className="flex items-center text-xs text-gray-500 font-medium">
+                                                                <CalendarIcon className="w-3 h-3 mr-1" />
+                                                                {format(item.date, "MMM dd, yyyy")}
+                                                            </div>
+                                                            {/* --- ADDED TRAVELER COUNT HERE --- */}
+                                                            <div className="flex items-center text-xs text-gray-500 font-medium">
+                                                                <Users className="w-3 h-3 mr-1" />
+                                                                {item.travelers} Traveler{item.travelers > 1 ? 's' : ''}
+                                                            </div>
                                                         </div>
+
                                                     </div>
                                                     <Button variant="ghost" size="icon" className="h-6 w-6 text-gray-300 hover:text-red-500 hover:bg-red-50" onClick={() => removeFromCart(item.id)}>
                                                         <Trash2 className="w-3.5 h-3.5" />
