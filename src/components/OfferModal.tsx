@@ -518,12 +518,12 @@ export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) 
                         </Card>
                       </div>
 
-                      {/* RIGHT COLUMN: ITINERARY SUMMARY (4 cols) */}
+                      {/* RIGHT COLUMN: CHOSEN TRIPS (4 cols) */}
                       <div className="lg:col-span-4 flex flex-col h-full">
                          <Card className="sticky top-0 shadow-lg border-t-4 border-t-red-600 flex flex-col h-full max-h-[calc(100vh-120px)]">
                             <CardHeader className="py-4 border-b bg-white z-10">
                                 <CardTitle className="text-lg flex items-center gap-2">
-                                    <Layers className="w-5 h-5 text-red-600"/> Trip Itinerary
+                                    <Layers className="w-5 h-5 text-red-600"/> Chosen Trips
                                 </CardTitle>
                             </CardHeader>
                             
@@ -550,7 +550,7 @@ export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) 
                                                                 <CalendarIcon className="w-3 h-3 mr-1" />
                                                                 {format(item.date, "MMM dd, yyyy")}
                                                             </div>
-                                                            {/* --- ADDED TRAVELER COUNT HERE --- */}
+                                                            {/* --- TRAVELER COUNT --- */}
                                                             <div className="flex items-center text-xs text-gray-500 font-medium">
                                                                 <Users className="w-3 h-3 mr-1" />
                                                                 {item.travelers} Traveler{item.travelers > 1 ? 's' : ''}
@@ -563,7 +563,7 @@ export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) 
                                                     </Button>
                                                 </div>
                                                 
-                                                {/* LIST OF DESTINATION NAMES */}
+                                                {/* LIST OF DESTINATIONS & ADD-ONS */}
                                                 <div className="text-xs text-gray-500 border-t pt-2 mt-2 bg-gray-50/50 -mx-3 px-3 pb-1">
                                                     <p className="font-semibold mb-1 text-gray-700">Selected Destinations:</p>
                                                     <ul className="list-disc pl-4 space-y-0.5 mb-2">
@@ -571,6 +571,11 @@ export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) 
                                                             const destName = allDestinations.find(d => d.id === destId)?.name || destId;
                                                             return <li key={destId}>{destName}</li>
                                                         })}
+                                                        {item.transportation.includes("airport-transfer") && (
+                                                            <li className="text-blue-600 font-medium flex items-center -ml-1">
+                                                                <Plane className="w-3 h-3 mr-1" /> Airport Transfer (+¥8,000)
+                                                            </li>
+                                                        )}
                                                     </ul>
                                                     <div className="flex justify-between items-end border-t border-dashed pt-2 mt-2">
                                                         <span className="text-gray-400">Day Total</span>
