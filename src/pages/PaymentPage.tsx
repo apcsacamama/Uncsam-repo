@@ -1,40 +1,34 @@
-import Navigation from "../components/Navigation";
-import ItineraryChatbot from "../components/ItineraryChatbot";
-import InvoiceModal from "../components/ReceiptModal"; 
-import { supabase } from "../lib/supabaseClient"; 
+import { Button } from "../components/ui/button";
+import { Input } from "../components/ui/input";
+import { Label } from "../components/ui/label";
 import {
   Card,
   CardContent,
   CardHeader,
   CardTitle,
+  CardDescription,
+  CardFooter
 } from "../components/ui/card";
-import { Button } from "../components/ui/button";
-import { Badge } from "../components/ui/badge";
-import {
-  CheckCircle,
-  Calendar,
-  Users,
-  MapPin,
-  Phone,
-  Mail,
-  Download,
-  Sparkles,
+import { RadioGroup, RadioGroupItem } from "../components/ui/radio-group";
+import { 
+  CreditCard, 
+  User, 
+  Mail, 
+  Phone, 
+  MapPin, 
+  Calendar, 
+  Users, 
+  Lock, 
+  ArrowRight,
   Loader2,
   Layers
 } from "lucide-react";
-import { Link, useSearchParams } from "react-router-dom";
 import { useState, useEffect } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { format } from "date-fns";
+import { supabase } from "../lib/supabaseClient";
 
-const STANDARD_INCLUSIONS = [
-  "12-Hour Private Tour",
-  "Professional Driver",
-  "Hotel Pick-up & Drop-off",
-  "Gas & Tolls Included",
-  "Private Van Transportation"
-];
-
-// Fallback data prevents crashes if DB is slow
+// Fallback if Supabase is empty/loading
 const DEFAULT_DESTINATIONS = [
   { id: "hasedera", name: "Hasedera Temple" },
   { id: "kotoku-in", name: "Kotoku-in" },
@@ -54,381 +48,351 @@ const DEFAULT_DESTINATIONS = [
   { id: "hakone-yunessun", name: "Hakone Kowakien Yunessun" },
 ];
 
-export default function BookingConfirmation() {
+export default function PaymentPage() {
   const [searchParams] = useSearchParams();
-  
-  // URL Parameters
-  const packageId = searchParams.get("package");
-  const travelersParam = searchParams.get("travelers") || "1";
+  const navigate = useNavigate();
+
+  // --- 1. GET URL PARAMETERS ---
   const isCustom = searchParams.get("custom") === "true";
-  const urlPrice = searchParams.get("price");
-  const locationParam = searchParams.get("location");
-  const addonsParam = searchParams.get("addons"); 
-  const cartDataRaw = searchParams.get("cartData");
-
-  const hasAirportTransfer = addonsParam && addonsParam.includes("airport-transfer");
-  const customerName = searchParams.get("name") || "Valued Customer";
-  const customerEmail = searchParams.get("email") || "email@example.com";
-  const customerPhone = searchParams.get("phone") || "N/A";
-
-  // State
-  const [showItineraryChatbot, setShowItineraryChatbot] = useState(false);
-  const [showInvoice, setShowInvoice] = useState(false);
-  const [bookingId] = useState(`BK${Math.floor(Date.now() / 1000)}`);
-
-  const [selectedPackage, setSelectedPackage] = useState<any>(null);
-  const [allDestinations, setAllDestinations] = useState<any[]>(DEFAULT_DESTINATIONS);
-  const [customItinerary, setCustomItinerary] = useState<any[]>([]);
   
-  // Display State
-  const [displayDate, setDisplayDate] = useState(searchParams.get("date") || "");
-  const [displayTravelers, setDisplayTravelers] = useState(travelersParam);
-  const [isLoading, setIsLoading] = useState(!isCustom);
+  // Standard Params
+  const locationParam = searchParams.get("location");
+  const dateParam = searchParams.get("date");
+  const travelersParam = searchParams.get("travelers");
+  const priceParam = searchParams.get("price");
 
-  // --- 1. FETCH DESTINATIONS & PACKAGE ---
+  // Custom Cart Params
+  const cartDataRaw = searchParams.get("cartData");
+  const totalPriceParam = searchParams.get("totalPrice");
+
+  // --- 2. STATE ---
+  const [allDestinations, setAllDestinations] = useState<any[]>(DEFAULT_DESTINATIONS);
+  const [displayData, setDisplayData] = useState({
+    title: "Tour Package",
+    date: "",
+    travelersLabel: "1", 
+    price: 0,
+    location: "",
+    details: [] as any[], 
+    isCustom: false
+  });
+
+  // --- 3. FETCH DESTINATIONS ---
   useEffect(() => {
-    const initData = async () => {
-        // Fetch Destination Names from Supabase
-        const { data: dests } = await supabase.from('tour_destinations').select('*');
-        if (dests && dests.length > 0) {
-            setAllDestinations(prev => [...prev, ...dests]);
-        }
-
-        // Fetch Standard Package Info (only if not custom)
-        if (packageId && !isCustom) {
-            const { data, error } = await supabase.from('tour_packages')
-                .select('*')
-                .or(`id.eq.${packageId},slug.eq.${packageId}`)
-                .single();
-            if (!error) setSelectedPackage(data);
-            setIsLoading(false);
-        } else {
-            setIsLoading(false);
+    const fetchDestinations = async () => {
+        const { data } = await supabase.from('tour_destinations').select('*');
+        if (data && data.length > 0) {
+            setAllDestinations(prev => [...prev, ...data]); 
         }
     };
-    initData();
-  }, [packageId, isCustom]);
+    fetchDestinations();
+  }, []);
 
-  // --- 2. PARSE CUSTOM CART DATA ---
+  // --- 4. PARSE DATA ---
   useEffect(() => {
     if (isCustom && cartDataRaw) {
-        try {
-            const cart = JSON.parse(decodeURIComponent(cartDataRaw));
-            setCustomItinerary(cart);
-
-            // Logic: Separate Dates (e.g. "Jan 28, Jan 29")
-            if (cart.length > 0) {
-                // Map dates, remove duplicates, and join with commas
-                const uniqueDates = Array.from(new Set(cart.map((i: any) => format(new Date(i.date), "MMM dd, yyyy"))));
-                setDisplayDate(uniqueDates.join(" | "));
-                
-                // Logic: Traveler Range (e.g. "2 - 3")
-                const counts = cart.map((i: any) => i.travelers);
-                const min = Math.min(...counts);
-                const max = Math.max(...counts);
-                setDisplayTravelers(min === max ? `${min}` : `${min} - ${max}`);
-            }
-        } catch (e) {
-            console.error("Error parsing cart", e);
+      try {
+        const cart = JSON.parse(decodeURIComponent(cartDataRaw));
+        const total = parseInt(totalPriceParam || "0");
+        
+        // --- LOGIC: Handle Variable Travelers ---
+        let travelersDisplay = "1";
+        if (cart.length > 0) {
+            const counts = cart.map((item: any) => item.travelers);
+            const min = Math.min(...counts);
+            const max = Math.max(...counts);
+            travelersDisplay = min === max ? min.toString() : `${min} - ${max}`;
         }
-    }
-  }, [isCustom, cartDataRaw]);
+        
+        // --- LOGIC: Handle Separate Dates ---
+        // Instead of range (Start - End), we join unique dates with " | "
+        let dateStr = "Multiple Dates";
+        if (cart.length > 0) {
+            const uniqueDates = Array.from(new Set(cart.map((i: any) => format(new Date(i.date), "MMM dd, yyyy"))));
+            dateStr = uniqueDates.join(" | ");
+        }
 
-  // Helper to get destination name from ID
+        setDisplayData({
+          title: `Custom Itinerary (${cart.length} Days)`,
+          date: dateStr,
+          travelersLabel: travelersDisplay,
+          price: total,
+          location: "Japan (Multi-City)",
+          details: cart,
+          isCustom: true
+        });
+      } catch (err) {
+        console.error("Error parsing cart data", err);
+      }
+    } else {
+      setDisplayData({
+        title: "Standard Tour",
+        date: dateParam || "Date not selected",
+        travelersLabel: travelersParam || "1",
+        price: parseInt(priceParam || "0"),
+        location: locationParam || "Japan",
+        details: [],
+        isCustom: false
+      });
+    }
+  }, [searchParams, isCustom, cartDataRaw, totalPriceParam, dateParam, travelersParam, priceParam, locationParam]);
+
+  // Form State
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState("card");
+  const [formData, setFormData] = useState({
+    firstName: "", lastName: "", email: "", phone: "",
+    cardName: "", cardNumber: "", expiry: "", cvc: ""
+  });
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsProcessing(true);
+    await new Promise(resolve => setTimeout(resolve, 2000));
+
+    const params = new URLSearchParams({
+      package: displayData.isCustom ? "custom-itinerary" : "standard",
+      custom: displayData.isCustom ? "true" : "false",
+      price: displayData.price.toString(),
+      travelers: displayData.travelersLabel,
+      location: displayData.location,
+      date: displayData.date,
+      name: `${formData.firstName} ${formData.lastName}`,
+      email: formData.email,
+      phone: formData.phone,
+      paymentMethod: paymentMethod,
+      // --- CRITICAL FIX: Pass the cart data so the confirmation page can read it ---
+      cartData: cartDataRaw || "" 
+    });
+
+    navigate(`/booking-confirmation?${params.toString()}`);
+  };
+
   const getDestName = (id: string) => {
       const found = allDestinations.find(d => d.id === id);
-      return found ? found.name : id;
+      return found ? found.name : id; 
   };
-
-  const displayInclusions = selectedPackage 
-    ? selectedPackage.inclusions || STANDARD_INCLUSIONS 
-    : STANDARD_INCLUSIONS;
-
-  let totalPrice = urlPrice ? parseInt(urlPrice) : 0;
-
-  // Driver Details
-  const driverDetails = {
-    name: "Takeshi Yamamoto",
-    phone: "+81 80-5331-1738",
-    languages: ["English", "Japanese", "Tagalog"],
-    vehicleType: "Private Van",
-    licenseNumber: "JP-2024-001",
-  };
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-green-600" />
-      </div>
-    );
-  }
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-12">
-      
-      {/* Success Header */}
-      <div className="bg-gradient-to-r from-green-600 to-green-700 text-white py-12">
-        <div className="max-w-4xl mx-auto px-4 text-center">
-          <div className="flex justify-center mb-4">
-            <div className="bg-white rounded-full p-3">
-              <CheckCircle className="w-12 h-12 text-green-600" />
-            </div>
-          </div>
-          <h1 className="text-4xl font-bold mb-2">Booking Confirmed!</h1>
-          <p className="text-xl text-green-100">
-            Thank you for your booking. Your Japanese adventure awaits!
-          </p>
+    <div className="min-h-screen bg-gray-50">
+      <div className="max-w-6xl mx-auto px-4 py-12">
+        <div className="flex items-center gap-2 mb-8 text-sm text-gray-500">
+            <span>Select Tour</span>
+            <span>→</span>
+            <span className="font-semibold text-red-600">Details & Payment</span>
+            <span>→</span>
+            <span>Confirmation</span>
         </div>
-      </div>
 
-      <div className="max-w-4xl mx-auto px-4 -mt-8">
+        <h1 className="text-3xl font-bold text-gray-900 mb-8">Secure Checkout</h1>
+
         <div className="grid lg:grid-cols-3 gap-8">
-            
-            {/* LEFT COLUMN: BOOKING DETAILS */}
-            <div className="lg:col-span-2 space-y-6">
-                
-                {/* 1. SUMMARY CARD */}
-                <Card className="shadow-lg border-t-4 border-t-[#2eb85c]">
-                    <CardHeader className="border-b bg-gray-50/50 pb-4">
-                        <CardTitle className="flex items-center gap-2 text-xl">
-                            <Calendar className="w-5 h-5 text-gray-500" /> Booking Summary
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-6 pt-6">
-                        
-                        {/* ID & Status */}
-                        <div className="flex justify-between items-center">
-                            <div>
-                                <p className="text-xs text-gray-500 uppercase font-bold tracking-wider">Booking ID</p>
-                                <p className="text-lg font-mono font-bold text-gray-800">{bookingId}</p>
-                            </div>
-                            <Badge className="bg-green-100 text-green-800 px-3 py-1 text-sm border-green-200">
-                                Confirmed
-                            </Badge>
+          
+          {/* LEFT COLUMN: FORMS */}
+          <div className="lg:col-span-2 space-y-8">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                    <User className="w-5 h-5 text-blue-600" /> Contact Information
+                </CardTitle>
+                <CardDescription>We'll use this to send your tickets and updates.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                        <Label htmlFor="firstName">First Name</Label>
+                        <Input id="firstName" name="firstName" placeholder="e.g. Taro" required value={formData.firstName} onChange={handleInputChange} />
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="lastName">Last Name</Label>
+                        <Input id="lastName" name="lastName" placeholder="e.g. Yamada" required value={formData.lastName} onChange={handleInputChange} />
+                    </div>
+                </div>
+                <div className="grid md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                        <Label htmlFor="email">Email Address</Label>
+                        <div className="relative">
+                            <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                            <Input id="email" name="email" type="email" placeholder="name@example.com" className="pl-9" required value={formData.email} onChange={handleInputChange} />
                         </div>
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="phone">Phone Number</Label>
+                        <div className="relative">
+                            <Phone className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                            <Input id="phone" name="phone" type="tel" placeholder="+81 90 1234 5678" className="pl-9" required value={formData.phone} onChange={handleInputChange} />
+                        </div>
+                    </div>
+                </div>
+              </CardContent>
+            </Card>
 
-                        {/* Core Details Grid */}
-                        <div className="grid md:grid-cols-2 gap-6 bg-gray-50 p-4 rounded-lg border border-gray-100">
-                            <div>
-                                <p className="text-xs text-gray-500 uppercase font-bold mb-1">Package</p>
-                                <p className="font-semibold text-gray-900">
-                                    {isCustom 
-                                        ? `Custom Tour (${locationParam ? locationParam.toUpperCase() : "Japan"})` 
-                                        : selectedPackage?.title || "Standard Package"}
-                                </p>
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                    <CreditCard className="w-5 h-5 text-blue-600" /> Payment Method
+                </CardTitle>
+                <CardDescription>All transactions are secure and encrypted.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <RadioGroup defaultValue="card" onValueChange={setPaymentMethod} className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <RadioGroupItem value="card" id="card" className="peer sr-only" />
+                        <Label htmlFor="card" className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-red-600 peer-data-[state=checked]:text-red-600 cursor-pointer">
+                            <CreditCard className="mb-3 h-6 w-6" /> Card
+                        </Label>
+                    </div>
+                    <div>
+                        <RadioGroupItem value="paypal" id="paypal" className="peer sr-only" />
+                        <Label htmlFor="paypal" className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-blue-600 peer-data-[state=checked]:text-blue-600 cursor-pointer">
+                            <svg className="mb-3 h-6 w-6" viewBox="0 0 24 24" fill="currentColor"><path d="M7.076 21.337H2.47a.641.641 0 0 1-.633-.74L4.944.901C5.026.382 5.474 0 5.998 0h7.46c2.57 0 4.578.543 5.69 1.81 1.01 1.15 1.304 2.42 1.012 4.287-.023.143-.047.288-.077.437-.946 5.05-4.336 6.794-9.116 6.794h-.303c-.62 0-1.064.44-1.136 1.06l-.769 4.877a.643.643 0 0 0 .633.744h.001c.62 0 1.064.44 1.136 1.06L9.48 22.38a.641.641 0 0 1-.633.744h-1.68a.643.643 0 0 1-.09-.007z"/></svg> PayPal
+                        </Label>
+                    </div>
+                </RadioGroup>
+
+                {paymentMethod === "card" && (
+                    <div className="space-y-4 pt-4 border-t">
+                        <div className="space-y-2">
+                            <Label>Name on Card</Label>
+                            <Input name="cardName" placeholder="Name as it appears on card" value={formData.cardName} onChange={handleInputChange} />
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Card Number</Label>
+                            <Input name="cardNumber" placeholder="0000 0000 0000 0000" value={formData.cardNumber} onChange={handleInputChange} />
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <Label>Expiry Date</Label>
+                                <Input name="expiry" placeholder="MM/YY" value={formData.expiry} onChange={handleInputChange} />
                             </div>
-                            <div>
-                                <p className="text-xs text-gray-500 uppercase font-bold mb-1">Travel Date</p>
-                                <p className="font-semibold text-gray-900">{displayDate}</p>
-                            </div>
-                            <div>
-                                <p className="text-xs text-gray-500 uppercase font-bold mb-1">Travelers</p>
-                                <p className="font-semibold text-gray-900">
-                                    {displayTravelers} {parseInt(displayTravelers) === 1 ? "Person" : "People"}
-                                </p>
-                            </div>
-                            <div>
-                                <p className="text-xs text-gray-500 uppercase font-bold mb-1">Booking Date</p>
-                                <p className="font-semibold text-gray-900">{new Date().toLocaleDateString()}</p>
+                            <div className="space-y-2">
+                                <Label>CVC</Label>
+                                <Input name="cvc" placeholder="123" maxLength={3} value={formData.cvc} onChange={handleInputChange} />
                             </div>
                         </div>
+                    </div>
+                )}
+              </CardContent>
+              <CardFooter className="bg-gray-50 px-6 py-4 rounded-b-xl flex items-center justify-center text-sm text-gray-500 gap-2">
+                <Lock className="w-4 h-4" /> SSL Encrypted Payment
+              </CardFooter>
+            </Card>
+          </div>
 
-                        {/* ITINERARY BREAKDOWN */}
+          {/* RIGHT COLUMN: ORDER SUMMARY */}
+          <div className="lg:col-span-1">
+            <Card className="sticky top-8 shadow-lg border-t-4 border-t-red-600">
+                <CardHeader>
+                    <CardTitle className="flex justify-between items-center">
+                        Order Summary
+                        {displayData.isCustom && <Layers className="w-4 h-4 text-gray-400" />}
+                    </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                    {/* Basic Info */}
+                    <div className="space-y-2 pb-4 border-b">
+                        <div className="flex items-start justify-between text-sm">
+                            <span className="text-gray-600 flex items-center gap-2">
+                                <MapPin className="w-4 h-4" /> Location
+                            </span>
+                            <span className="font-medium text-right capitalize truncate max-w-[150px]">
+                                {displayData.location}
+                            </span>
+                        </div>
+                        <div className="flex items-start justify-between text-sm">
+                            <span className="text-gray-600 flex items-center gap-2">
+                                <Calendar className="w-4 h-4" /> Date
+                            </span>
+                            <span className="font-medium text-right text-xs max-w-[150px] text-right leading-tight">
+                                {displayData.date}
+                            </span>
+                        </div>
+                        <div className="flex items-start justify-between text-sm">
+                            <span className="text-gray-600 flex items-center gap-2">
+                                <Users className="w-4 h-4" /> Travelers
+                            </span>
+                            <span className="font-medium text-right">{displayData.travelersLabel}</span>
+                        </div>
+                    </div>
+
+                    {/* === CHOSEN TRIPS / ITINERARY === */}
+                    {displayData.isCustom && displayData.details.length > 0 && (
                         <div>
-                            <h4 className="font-bold text-gray-900 mb-3 flex items-center gap-2">
-                                {isCustom ? <Layers className="w-4 h-4 text-red-600"/> : <MapPin className="w-4 h-4 text-red-600"/>}
-                                {isCustom ? "Planned Destinations (Custom)" : "Included Destinations"}
-                            </h4>
-
-                            {isCustom && customItinerary.length > 0 ? (
-                                // --- CUSTOM ITINERARY VIEW ---
-                                <div className="space-y-4">
-                                    {customItinerary.map((day, idx) => (
-                                        <div key={idx} className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
-                                            <div className="flex justify-between items-start mb-3 border-b border-gray-100 pb-2">
-                                                <div className="flex items-center gap-2">
-                                                    <span className="bg-gray-800 text-white text-xs font-bold px-2 py-1 rounded">Day {idx + 1}</span>
-                                                    <span className="font-bold text-gray-800 text-sm">{day.location.toUpperCase()}</span>
-                                                </div>
-                                                <div className="text-xs text-gray-500 flex items-center gap-3">
-                                                    <span className="flex items-center"><Calendar className="w-3 h-3 mr-1"/>{format(new Date(day.date), "MMM dd")}</span>
-                                                    <span className="flex items-center"><Users className="w-3 h-3 mr-1"/>{day.travelers}</span>
+                            <h3 className="font-bold text-gray-900 mb-3 flex items-center gap-2 text-sm">
+                                <Layers className="w-4 h-4 text-red-600"/> Chosen Trips
+                            </h3>
+                            <div className="space-y-4 max-h-[400px] overflow-y-auto pr-1">
+                                {displayData.details.map((day, idx) => (
+                                    <div key={idx} className="bg-gray-50 p-3 rounded-lg border border-gray-100 relative">
+                                        <div className="flex justify-between items-start mb-2">
+                                            <div>
+                                                <span className="text-[10px] font-bold text-white bg-gray-800 px-2 py-0.5 rounded-full uppercase">Day {idx + 1}</span>
+                                                <div className="font-bold text-gray-800 mt-1">{day.location.toUpperCase()}</div>
+                                                
+                                                {/* --- ADDED: SPECIFIC DAY DETAILS --- */}
+                                                <div className="flex items-center gap-2 mt-1">
+                                                    <span className="text-xs text-gray-500">{format(new Date(day.date), "MMM dd")}</span>
+                                                    <span className="text-gray-300">•</span>
+                                                    <span className="text-xs text-gray-500 flex items-center">
+                                                        <Users className="w-3 h-3 mr-1" />
+                                                        {day.travelers}
+                                                    </span>
                                                 </div>
                                             </div>
-                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                                {day.destinations.map((destId: string) => (
-                                                    <div key={destId} className="flex items-center text-sm text-gray-600">
-                                                        <MapPin className="w-3 h-3 mr-2 text-red-500 flex-shrink-0" />
-                                                        {getDestName(destId)}
-                                                    </div>
-                                                ))}
-                                            </div>
+                                            <div className="font-bold text-red-600 text-sm">¥{day.price.toLocaleString()}</div>
                                         </div>
-                                    ))}
-                                </div>
-                            ) : (
-                                // --- STANDARD LIST VIEW ---
-                                <div className="grid grid-cols-2 gap-3">
-                                    {(selectedPackage?.destinations || ["Destinations loading..."]).map(
-                                        (destination: string, index: number) => (
-                                            <div key={index} className="flex items-start text-sm text-gray-600">
-                                                <MapPin className="w-3 h-3 mr-2 text-red-600 mt-0.5" />
-                                                {destination}
-                                            </div>
-                                        ),
-                                    )}
-                                </div>
-                            )}
-                        </div>
-
-                        {/* INCLUSIONS */}
-                        <div className="bg-green-50 p-4 rounded-lg">
-                            <h4 className="font-bold text-green-900 mb-2 text-sm">Included Services</h4>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                                {displayInclusions.map((inclusion: string, index: number) => (
-                                    <div key={index} className="flex items-center text-sm text-green-700">
-                                        <CheckCircle className="w-3 h-3 mr-2 text-green-600" />
-                                        {inclusion}
+                                        
+                                        {/* Destinations List */}
+                                        <div className="text-xs text-gray-600 border-t border-gray-200 pt-2 mt-2">
+                                            <p className="font-semibold mb-1">Destinations:</p>
+                                            <ul className="list-disc pl-4 space-y-0.5">
+                                                {day.destinations.map((destId: string) => (
+                                                    <li key={destId}>{getDestName(destId)}</li>
+                                                ))}
+                                            </ul>
+                                        </div>
                                     </div>
                                 ))}
                             </div>
                         </div>
+                    )}
 
-                    </CardContent>
-                </Card>
+                    <div className="flex justify-between items-center text-xl font-bold text-gray-900 pt-2 border-t">
+                        <span>Total:</span>
+                        <span>¥{displayData.price.toLocaleString()}</span>
+                    </div>
 
-                {/* 2. DRIVER & CUSTOMER INFO (Combined Row) */}
-                <div className="grid md:grid-cols-2 gap-6">
-                    <Card>
-                        <CardHeader className="pb-2">
-                            <CardTitle className="text-base flex items-center gap-2">
-                                <Users className="w-4 h-4 text-blue-600" /> Your Driver
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent className="text-sm space-y-3">
-                            <div className="flex items-center gap-3">
-                                <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-bold">TY</div>
-                                <div>
-                                    <p className="font-bold text-gray-900">{driverDetails.name}</p>
-                                    <p className="text-xs text-gray-500">{driverDetails.licenseNumber}</p>
-                                </div>
-                            </div>
-                            <div className="pt-2 border-t space-y-1">
-                                <p className="flex items-center text-gray-600"><Phone className="w-3 h-3 mr-2"/> {driverDetails.phone}</p>
-                                <p className="text-gray-600">Vehicle: {driverDetails.vehicleType}</p>
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    <Card>
-                        <CardHeader className="pb-2">
-                            <CardTitle className="text-base flex items-center gap-2">
-                                <Users className="w-4 h-4 text-purple-600" /> Customer
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent className="text-sm space-y-2">
-                            <div>
-                                <p className="text-xs text-gray-500 uppercase">Name</p>
-                                <p className="font-medium text-gray-900">{customerName}</p>
-                            </div>
-                            <div>
-                                <p className="text-xs text-gray-500 uppercase">Contact</p>
-                                <p className="text-gray-600">{customerEmail}</p>
-                                <p className="text-gray-600">{customerPhone}</p>
-                            </div>
-                        </CardContent>
-                    </Card>
-                </div>
-            </div>
-
-            {/* RIGHT COLUMN: ACTIONS & SUMMARY */}
-            <div className="lg:col-span-1 space-y-6">
-                <Card className="sticky top-8">
-                    <CardHeader>
-                        <CardTitle>Payment Summary</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        <div className="space-y-2 text-sm text-gray-600">
-                            <div className="flex justify-between">
-                                <span>Package Price</span>
-                                <span>¥{(totalPrice - (hasAirportTransfer ? 8000 : 0)).toLocaleString()}</span>
-                            </div>
-                            <div className="flex justify-between">
-                                <span>Travelers</span>
-                                <span>{displayTravelers}</span>
-                            </div>
-                            {hasAirportTransfer && (
-                                <div className="flex justify-between text-blue-600 bg-blue-50 px-2 py-1 rounded">
-                                    <span>Airport Transfer</span>
-                                    <span>+¥8,000</span>
-                                </div>
-                            )}
-                            <div className="border-t pt-3 flex justify-between items-center font-bold text-lg text-green-700">
-                                <span>Total Paid</span>
-                                <span>¥{totalPrice.toLocaleString()}</span>
-                            </div>
-                        </div>
-
-                        <div className="bg-gray-50 p-3 rounded text-xs text-gray-500">
-                            <p className="mb-1">Payment Method: Credit Card (****1234)</p>
-                            <p>Transaction ID: TXN{bookingId.replace("BK","")}</p>
-                        </div>
-                    </CardContent>
-                </Card>
-
-                <Card>
-                    <CardHeader><CardTitle>Booking Actions</CardTitle></CardHeader>
-                    <CardContent className="space-y-3">
-                        <Button 
-                            onClick={() => setShowItineraryChatbot(true)}
-                            className="w-full bg-blue-600 hover:bg-blue-700 text-white"
-                        >
-                            <Sparkles className="w-4 h-4 mr-2" /> Generate AI Itinerary
-                        </Button>
-                        <Button 
-                            className="w-full" variant="outline"
-                            onClick={() => setShowInvoice(true)}
-                        >
-                            <Download className="w-4 h-4 mr-2" /> Download Receipt
-                        </Button>
-                        <Link to="/offers" className="block">
-                            <Button className="w-full" variant="ghost">Book Another Trip</Button>
-                        </Link>
-                    </CardContent>
-                </Card>
-            </div>
+                    <Button 
+                        onClick={handleSubmit} 
+                        disabled={isProcessing || !formData.firstName || !formData.email}
+                        className="w-full bg-red-600 hover:bg-red-700 text-white py-6 text-lg mt-4"
+                    >
+                        {isProcessing ? (
+                            <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                Processing...
+                            </>
+                        ) : (
+                            <>
+                                Pay & Confirm
+                                <ArrowRight className="ml-2 w-4 h-4" />
+                            </>
+                        )}
+                    </Button>
+                    <p className="text-xs text-center text-gray-500 mt-2">
+                        By clicking pay, you agree to our Terms & Conditions.
+                    </p>
+                </CardContent>
+            </Card>
+          </div>
 
         </div>
       </div>
-      
-      {/* INVOICE MODAL */}
-      <InvoiceModal 
-        isOpen={showInvoice}
-        onClose={() => setShowInvoice(false)}
-        bookingDetails={{
-            id: bookingId,
-            customerName: customerName,
-            email: customerEmail,
-            phone: customerPhone,
-            travelDate: displayDate,
-            status: "confirmed",
-            createdAt: new Date().toISOString().split("T")[0]
-        }}
-        packageDetails={selectedPackage || { title: isCustom ? "Custom Tour Package" : "Standard Package", price: totalPrice }}
-        paymentDetails={{
-            totalPrice: totalPrice,
-            travelers: parseInt(travelersParam), 
-            hasAirportTransfer: hasAirportTransfer
-        }}
-      />
-
-      <ItineraryChatbot
-        selectedDestinations={customItinerary.length > 0 ? customItinerary.flatMap(d => d.destinations) : (selectedPackage?.destinations || [])}
-        isVisible={showItineraryChatbot}
-        onClose={() => setShowItineraryChatbot(false)}
-        travelDate={displayDate}
-        travelers={parseInt(travelersParam)}
-      />
     </div>
   );
 }

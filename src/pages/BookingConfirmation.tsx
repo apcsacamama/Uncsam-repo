@@ -19,19 +19,12 @@ import {
   Mail,
   Download,
   Sparkles,
-  Plane,
   Loader2,
-  Layers // Added for itinerary icon
+  Layers
 } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
-import { useState, useMemo, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { format } from "date-fns";
-
-const TIERED_PRICING: Record<string, { tier1: number; tier2: number }> = {
-  "nara-tour": { tier1: 85000, tier2: 105000 },
-  "tokyo-disney": { tier1: 60000, tier2: 80000 },
-};
-const FIXED_PRICE_IDS = ["fukuoka-tour", "fukui-tour", "hiroshima-tour"];
 
 const STANDARD_INCLUSIONS = [
   "12-Hour Private Tour",
@@ -41,6 +34,7 @@ const STANDARD_INCLUSIONS = [
   "Private Van Transportation"
 ];
 
+// Fallback data prevents crashes if DB is slow
 const DEFAULT_DESTINATIONS = [
   { id: "hasedera", name: "Hasedera Temple" },
   { id: "kotoku-in", name: "Kotoku-in" },
@@ -63,42 +57,44 @@ const DEFAULT_DESTINATIONS = [
 export default function BookingConfirmation() {
   const [searchParams] = useSearchParams();
   
-  // Standard Params
+  // URL Parameters
   const packageId = searchParams.get("package");
   const travelersParam = searchParams.get("travelers") || "1";
   const isCustom = searchParams.get("custom") === "true";
   const urlPrice = searchParams.get("price");
-  const travelDateParam = searchParams.get("date");
   const locationParam = searchParams.get("location");
   const addonsParam = searchParams.get("addons"); 
-  const cartDataRaw = searchParams.get("cartData"); // <--- New Param
+  const cartDataRaw = searchParams.get("cartData");
 
   const hasAirportTransfer = addonsParam && addonsParam.includes("airport-transfer");
-
   const customerName = searchParams.get("name") || "Valued Customer";
   const customerEmail = searchParams.get("email") || "email@example.com";
   const customerPhone = searchParams.get("phone") || "N/A";
 
+  // State
   const [showItineraryChatbot, setShowItineraryChatbot] = useState(false);
   const [showInvoice, setShowInvoice] = useState(false);
-  const [bookingId] = useState(`BK${Math.floor(Date.now() / 1000)}`); // Shorter ID
+  const [bookingId] = useState(`BK${Math.floor(Date.now() / 1000)}`);
 
   const [selectedPackage, setSelectedPackage] = useState<any>(null);
   const [allDestinations, setAllDestinations] = useState<any[]>(DEFAULT_DESTINATIONS);
   const [customItinerary, setCustomItinerary] = useState<any[]>([]);
-  const [displayDate, setDisplayDate] = useState(travelDateParam || "");
-  const [displayTravelers, setDisplayTravelers] = useState(travelersParam);
   
+  // Display State
+  const [displayDate, setDisplayDate] = useState(searchParams.get("date") || "");
+  const [displayTravelers, setDisplayTravelers] = useState(travelersParam);
   const [isLoading, setIsLoading] = useState(!isCustom);
 
   // --- 1. FETCH DESTINATIONS & PACKAGE ---
   useEffect(() => {
     const initData = async () => {
-        // Fetch Destination Names
+        // Fetch Destination Names from Supabase
         const { data: dests } = await supabase.from('tour_destinations').select('*');
-        if (dests && dests.length > 0) setAllDestinations(prev => [...prev, ...dests]);
+        if (dests && dests.length > 0) {
+            setAllDestinations(prev => [...prev, ...dests]);
+        }
 
-        // Fetch Standard Package Info
+        // Fetch Standard Package Info (only if not custom)
         if (packageId && !isCustom) {
             const { data, error } = await supabase.from('tour_packages')
                 .select('*')
@@ -113,20 +109,19 @@ export default function BookingConfirmation() {
     initData();
   }, [packageId, isCustom]);
 
-  // --- 2. PARSE CART DATA ---
+  // --- 2. PARSE CUSTOM CART DATA ---
   useEffect(() => {
     if (isCustom && cartDataRaw) {
         try {
             const cart = JSON.parse(decodeURIComponent(cartDataRaw));
             setCustomItinerary(cart);
 
-            // Calculate Date Range
+            // Logic: Separate Dates (e.g. "Jan 28, Jan 29")
             if (cart.length > 0) {
-                const first = new Date(cart[0].date);
-                const last = new Date(cart[cart.length - 1].date);
-                setDisplayDate(`${format(first, "MMM dd")} - ${format(last, "MMM dd, yyyy")}`);
+                const uniqueDates = Array.from(new Set(cart.map((i: any) => format(new Date(i.date), "MMM dd, yyyy"))));
+                setDisplayDate(uniqueDates.join(" | "));
                 
-                // Calculate Travelers Range
+                // Logic: Traveler Range (e.g. "2 - 3")
                 const counts = cart.map((i: any) => i.travelers);
                 const min = Math.min(...counts);
                 const max = Math.max(...counts);
@@ -138,7 +133,7 @@ export default function BookingConfirmation() {
     }
   }, [isCustom, cartDataRaw]);
 
-  // Helper to find destination name
+  // Helper to get destination name from ID
   const getDestName = (id: string) => {
       const found = allDestinations.find(d => d.id === id);
       return found ? found.name : id;
@@ -148,17 +143,9 @@ export default function BookingConfirmation() {
     ? selectedPackage.inclusions || STANDARD_INCLUSIONS 
     : STANDARD_INCLUSIONS;
 
-  // Calculate Total Price
-  let totalPrice = 0;
-  if (urlPrice) {
-    totalPrice = parseInt(urlPrice);
-  } else if (selectedPackage) {
-    // Fallback calculation for standard tours
-    const t = parseInt(travelersParam);
-    totalPrice = selectedPackage.price * t; 
-  }
+  let totalPrice = urlPrice ? parseInt(urlPrice) : 0;
 
-  // Driver Details (Mock)
+  // Driver Details
   const driverDetails = {
     name: "Takeshi Yamamoto",
     phone: "+81 80-5331-1738",
@@ -176,8 +163,8 @@ export default function BookingConfirmation() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-
+    <div className="min-h-screen bg-gray-50 pb-12">
+      
       {/* Success Header */}
       <div className="bg-gradient-to-r from-green-600 to-green-700 text-white py-12">
         <div className="max-w-4xl mx-auto px-4 text-center">
@@ -193,258 +180,223 @@ export default function BookingConfirmation() {
         </div>
       </div>
 
-      <div className="max-w-4xl mx-auto px-4 py-12">
+      <div className="max-w-4xl mx-auto px-4 -mt-8">
         <div className="grid lg:grid-cols-3 gap-8">
-          
-          {/* LEFT COLUMN: DETAILS */}
-          <div className="lg:col-span-2 space-y-6">
             
-            {/* 1. BOOKING SUMMARY */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Calendar className="w-5 h-5 text-green-600" />
-                  Booking Summary
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex justify-between items-center pb-4 border-b">
-                  <div>
-                    <h3 className="text-lg font-semibold">Booking ID</h3>
-                    <p className="text-gray-600 font-mono">{bookingId}</p>
-                  </div>
-                  <Badge className="bg-green-100 text-green-800 px-3 py-1">
-                    Confirmed
-                  </Badge>
-                </div>
-
-                <div className="grid md:grid-cols-2 gap-6">
-                  <div>
-                    <h4 className="font-medium text-gray-900 mb-1 text-sm uppercase text-gray-500">Package</h4>
-                    <p className="font-semibold text-gray-800">
-                      {isCustom
-                        ? `Custom Tour (${locationParam ? locationParam.toUpperCase() : "Japan Multi-City"})`
-                        : selectedPackage?.title || "Standard Package"}
-                    </p>
-                  </div>
-                  <div>
-                    <h4 className="font-medium text-gray-900 mb-1 text-sm uppercase text-gray-500">
-                      Travel Date
-                    </h4>
-                    <p className="font-semibold text-gray-800">
-                        {displayDate}
-                    </p>
-                  </div>
-                  <div>
-                    <h4 className="font-medium text-gray-900 mb-1 text-sm uppercase text-gray-500">
-                      Travelers
-                    </h4>
-                    <p className="font-semibold text-gray-800">
-                      {displayTravelers} {parseInt(displayTravelers) === 1 ? "" : ""}
-                    </p>
-                  </div>
-                  <div>
-                    <h4 className="font-medium text-gray-900 mb-1 text-sm uppercase text-gray-500">
-                      Booking Date
-                    </h4>
-                    <p className="text-gray-600">{new Date().toLocaleDateString()}</p>
-                  </div>
-                </div>
-
-                {/* DESTINATIONS SECTION */}
-                <div className="border-t pt-4 mt-2">
-                  <h4 className="font-bold text-gray-900 mb-3 flex items-center gap-2">
-                    {isCustom ? <Layers className="w-4 h-4 text-red-600"/> : <MapPin className="w-4 h-4 text-red-600"/>}
-                    {isCustom ? "Your Itinerary" : "Included Destinations"}
-                  </h4>
-                  
-                  {isCustom && customItinerary.length > 0 ? (
-                      // CUSTOM ITINERARY VIEW
-                      <div className="space-y-3">
-                          {customItinerary.map((day, idx) => (
-                              <div key={idx} className="bg-gray-50 p-3 rounded-lg border border-gray-100">
-                                  <div className="flex justify-between items-start mb-2">
-                                      <div className="flex items-center gap-2">
-                                          <Badge className="bg-gray-800 hover:bg-gray-800">Day {idx + 1}</Badge>
-                                          <span className="font-bold text-gray-800">{day.location.toUpperCase()}</span>
-                                      </div>
-                                      <div className="text-xs text-gray-500 flex items-center gap-2">
-                                          <span className="flex items-center"><Calendar className="w-3 h-3 mr-1"/>{format(new Date(day.date), "MMM dd")}</span>
-                                          <span className="flex items-center"><Users className="w-3 h-3 mr-1"/>{day.travelers}</span>
-                                      </div>
-                                  </div>
-                                  <ul className="text-sm text-gray-600 list-disc pl-5 space-y-1">
-                                      {day.destinations.map((destId: string) => (
-                                          <li key={destId}>{getDestName(destId)}</li>
-                                      ))}
-                                  </ul>
-                              </div>
-                          ))}
-                      </div>
-                  ) : (
-                      // STANDARD LIST VIEW
-                      <div className="grid grid-cols-2 gap-2">
-                        {(selectedPackage?.destinations || ["Destinations loading..."]).map(
-                          (destination: string, index: number) => (
-                            <div key={index} className="flex items-center text-sm text-gray-600">
-                              <MapPin className="w-3 h-3 mr-2 text-red-600" />
-                              {destination}
-                            </div>
-                          ),
-                        )}
-                      </div>
-                  )}
-                </div>
-
-                <div>
-                  <h4 className="font-medium text-gray-900 mb-2 mt-4">Inclusions</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-1">
-                    {displayInclusions.map((inclusion: string, index: number) => (
-                      <div key={index} className="flex items-center text-sm text-gray-600">
-                        <CheckCircle className="w-3 h-3 mr-2 text-green-600" />
-                        {inclusion}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* 2. DRIVER INFO */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Users className="w-5 h-5 text-green-600" />
-                  Your Assigned Driver
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
-                  <div className="flex items-center space-x-3 mb-3">
-                    <div className="bg-green-600 rounded-full w-12 h-12 flex items-center justify-center text-white font-bold text-lg">
-                      {driverDetails.name.split(" ").map((n) => n[0]).join("")}
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-green-900">{driverDetails.name}</h3>
-                      <p className="text-green-700 text-sm">Professional Tour Driver</p>
-                    </div>
-                  </div>
-                  <div className="grid md:grid-cols-2 gap-4">
-                    <div>
-                      <h4 className="font-medium text-green-900 mb-1 text-xs uppercase">Contact</h4>
-                      <p className="text-green-800 flex items-center text-sm">
-                        <Phone className="w-3 h-3 mr-2" /> {driverDetails.phone}
-                      </p>
-                    </div>
-                    <div>
-                      <h4 className="font-medium text-green-900 mb-1 text-xs uppercase">Vehicle</h4>
-                      <p className="text-green-800 text-sm">{driverDetails.vehicleType}</p>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* 3. CUSTOMER INFO */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Users className="w-5 h-5 text-blue-600" />
-                  Customer Information
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid md:grid-cols-2 gap-4">
-                  <div>
-                    <h4 className="font-medium text-gray-500 mb-1 text-xs uppercase">Name</h4>
-                    <p className="text-gray-800 font-medium">{customerName}</p>
-                  </div>
-                  <div>
-                    <h4 className="font-medium text-gray-500 mb-1 text-xs uppercase">Email</h4>
-                    <p className="text-gray-800 flex items-center">
-                      <Mail className="w-4 h-4 mr-2 text-gray-400" /> {customerEmail}
-                    </p>
-                  </div>
-                  <div>
-                    <h4 className="font-medium text-gray-500 mb-1 text-xs uppercase">Phone</h4>
-                    <p className="text-gray-800 flex items-center">
-                      <Phone className="w-4 h-4 mr-2 text-gray-400" /> {customerPhone}
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* RIGHT COLUMN: ACTIONS */}
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Payment Summary</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span>Package Price:</span>
-                    <span>¥{(totalPrice - (hasAirportTransfer ? 8000 : 0)).toLocaleString()}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span>Travelers:</span>
-                    <span>{displayTravelers}</span>
-                  </div>
-                  {hasAirportTransfer && (
-                    <div className="flex justify-between text-sm text-blue-700 bg-blue-50 p-2 rounded border border-blue-100 mt-2">
-                        <div className="flex items-center">
-                            <Plane className="w-3 h-3 mr-2" />
-                            <span>Airport Transfer</span>
-                        </div>
-                        <span className="font-medium">+ ¥8,000</span>
-                    </div>
-                  )}
-                  <div className="border-t pt-2 mt-2">
-                    <div className="flex justify-between font-bold text-lg">
-                      <span>Total Paid:</span>
-                      <span className="text-green-600">¥{totalPrice.toLocaleString()}</span>
-                    </div>
-                  </div>
-                </div>
-                <div className="text-xs text-gray-500 bg-gray-50 p-3 rounded">
-                  Payment Method: Credit Card ending in ****1234<br />
-                  Transaction ID: TXN{Date.now()}
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Booking Actions</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <Button 
-                    onClick={() => setShowItineraryChatbot(true)}
-                    className="w-full bg-blue-600 hover:bg-blue-700 text-white mb-2"
-                >
-                    <Sparkles className="w-4 h-4 mr-2" />
-                    Generate AI Itinerary
-                </Button>
+            {/* LEFT COLUMN: BOOKING DETAILS */}
+            <div className="lg:col-span-2 space-y-6">
                 
-                <Button 
-                    className="w-full" 
-                    variant="outline"
-                    onClick={() => setShowInvoice(true)}
-                >
-                  <Download className="w-4 h-4 mr-2" />
-                  Download Receipt
-                </Button>
+                {/* 1. SUMMARY CARD */}
+                <Card className="shadow-lg border-t-4 border-t-[#2eb85c]">
+                    <CardHeader className="border-b bg-gray-50/50 pb-4">
+                        <CardTitle className="flex items-center gap-2 text-xl">
+                            <Calendar className="w-5 h-5 text-gray-500" /> Booking Summary
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-6 pt-6">
+                        
+                        {/* ID & Status */}
+                        <div className="flex justify-between items-center">
+                            <div>
+                                <p className="text-xs text-gray-500 uppercase font-bold tracking-wider">Booking ID</p>
+                                <p className="text-lg font-mono font-bold text-gray-800">{bookingId}</p>
+                            </div>
+                            <Badge className="bg-green-100 text-green-800 px-3 py-1 text-sm border-green-200">
+                                Confirmed
+                            </Badge>
+                        </div>
 
-                <Link to="/offers" className="block">
-                  <Button className="w-full" variant="outline">
-                    Book Another Trip
-                  </Button>
-                </Link>
-              </CardContent>
-            </Card>
-          </div>
+                        {/* Core Details Grid */}
+                        <div className="grid md:grid-cols-2 gap-6 bg-gray-50 p-4 rounded-lg border border-gray-100">
+                            <div>
+                                <p className="text-xs text-gray-500 uppercase font-bold mb-1">Package</p>
+                                <p className="font-semibold text-gray-900">
+                                    {isCustom 
+                                        ? `Custom Tour (${locationParam ? locationParam.toUpperCase() : "Japan"})` 
+                                        : selectedPackage?.title || "Standard Package"}
+                                </p>
+                            </div>
+                            <div>
+                                <p className="text-xs text-gray-500 uppercase font-bold mb-1">Travel Date</p>
+                                <p className="font-semibold text-gray-900">{displayDate}</p>
+                            </div>
+                            <div>
+                                <p className="text-xs text-gray-500 uppercase font-bold mb-1">Travelers</p>
+                                <p className="font-semibold text-gray-900">
+                                    {displayTravelers} {parseInt(displayTravelers) === 1 ? "Person" : "People"}
+                                </p>
+                            </div>
+                            <div>
+                                <p className="text-xs text-gray-500 uppercase font-bold mb-1">Booking Date</p>
+                                <p className="font-semibold text-gray-900">{new Date().toLocaleDateString()}</p>
+                            </div>
+                        </div>
+
+                        {/* ITINERARY BREAKDOWN */}
+                        <div>
+                            <h4 className="font-bold text-gray-900 mb-3 flex items-center gap-2">
+                                {isCustom ? <Layers className="w-4 h-4 text-red-600"/> : <MapPin className="w-4 h-4 text-red-600"/>}
+                                {isCustom ? "Planned Destinations (Custom)" : "Included Destinations"}
+                            </h4>
+
+                            {isCustom && customItinerary.length > 0 ? (
+                                // --- CUSTOM ITINERARY VIEW ---
+                                <div className="space-y-4">
+                                    {customItinerary.map((day, idx) => (
+                                        <div key={idx} className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+                                            <div className="flex justify-between items-start mb-3 border-b border-gray-100 pb-2">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="bg-gray-800 text-white text-xs font-bold px-2 py-1 rounded">Day {idx + 1}</span>
+                                                    <span className="font-bold text-gray-800 text-sm">{day.location.toUpperCase()}</span>
+                                                </div>
+                                                <div className="text-xs text-gray-500 flex items-center gap-3">
+                                                    <span className="flex items-center"><Calendar className="w-3 h-3 mr-1"/>{format(new Date(day.date), "MMM dd")}</span>
+                                                    <span className="flex items-center"><Users className="w-3 h-3 mr-1"/>{day.travelers}</span>
+                                                </div>
+                                            </div>
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                                {day.destinations.map((destId: string) => (
+                                                    <div key={destId} className="flex items-center text-sm text-gray-600">
+                                                        <MapPin className="w-3 h-3 mr-2 text-red-500 flex-shrink-0" />
+                                                        {getDestName(destId)}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                // --- STANDARD LIST VIEW ---
+                                <div className="grid grid-cols-2 gap-3">
+                                    {(selectedPackage?.destinations || ["Destinations loading..."]).map(
+                                        (destination: string, index: number) => (
+                                            <div key={index} className="flex items-start text-sm text-gray-600">
+                                                <MapPin className="w-3 h-3 mr-2 text-red-600 mt-0.5" />
+                                                {destination}
+                                            </div>
+                                        ),
+                                    )}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* INCLUSIONS */}
+                        <div className="bg-green-50 p-4 rounded-lg">
+                            <h4 className="font-bold text-green-900 mb-2 text-sm">Included Services</h4>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                {displayInclusions.map((inclusion: string, index: number) => (
+                                    <div key={index} className="flex items-center text-sm text-green-700">
+                                        <CheckCircle className="w-3 h-3 mr-2 text-green-600" />
+                                        {inclusion}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                    </CardContent>
+                </Card>
+
+                {/* 2. DRIVER & CUSTOMER INFO (Combined Row) */}
+                <div className="grid md:grid-cols-2 gap-6">
+                    <Card>
+                        <CardHeader className="pb-2">
+                            <CardTitle className="text-base flex items-center gap-2">
+                                <Users className="w-4 h-4 text-blue-600" /> Your Driver
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="text-sm space-y-3">
+                            <div className="flex items-center gap-3">
+                                <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-bold">TY</div>
+                                <div>
+                                    <p className="font-bold text-gray-900">{driverDetails.name}</p>
+                                    <p className="text-xs text-gray-500">{driverDetails.licenseNumber}</p>
+                                </div>
+                            </div>
+                            <div className="pt-2 border-t space-y-1">
+                                <p className="flex items-center text-gray-600"><Phone className="w-3 h-3 mr-2"/> {driverDetails.phone}</p>
+                                <p className="text-gray-600">Vehicle: {driverDetails.vehicleType}</p>
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    <Card>
+                        <CardHeader className="pb-2">
+                            <CardTitle className="text-base flex items-center gap-2">
+                                <Users className="w-4 h-4 text-purple-600" /> Customer
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="text-sm space-y-2">
+                            <div>
+                                <p className="text-xs text-gray-500 uppercase">Name</p>
+                                <p className="font-medium text-gray-900">{customerName}</p>
+                            </div>
+                            <div>
+                                <p className="text-xs text-gray-500 uppercase">Contact</p>
+                                <p className="text-gray-600">{customerEmail}</p>
+                                <p className="text-gray-600">{customerPhone}</p>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>
+            </div>
+
+            {/* RIGHT COLUMN: ACTIONS & SUMMARY */}
+            <div className="lg:col-span-1 space-y-6">
+                <Card className="sticky top-8">
+                    <CardHeader>
+                        <CardTitle>Payment Summary</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        <div className="space-y-2 text-sm text-gray-600">
+                            <div className="flex justify-between">
+                                <span>Package Price</span>
+                                <span>¥{(totalPrice - (hasAirportTransfer ? 8000 : 0)).toLocaleString()}</span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span>Travelers</span>
+                                <span>{displayTravelers}</span>
+                            </div>
+                            {hasAirportTransfer && (
+                                <div className="flex justify-between text-blue-600 bg-blue-50 px-2 py-1 rounded">
+                                    <span>Airport Transfer</span>
+                                    <span>+¥8,000</span>
+                                </div>
+                            )}
+                            <div className="border-t pt-3 flex justify-between items-center font-bold text-lg text-green-700">
+                                <span>Total Paid</span>
+                                <span>¥{totalPrice.toLocaleString()}</span>
+                            </div>
+                        </div>
+
+                        <div className="bg-gray-50 p-3 rounded text-xs text-gray-500">
+                            <p className="mb-1">Payment Method: Credit Card (****1234)</p>
+                            <p>Transaction ID: TXN{bookingId.replace("BK","")}</p>
+                        </div>
+                    </CardContent>
+                </Card>
+
+                <Card>
+                    <CardHeader><CardTitle>Booking Actions</CardTitle></CardHeader>
+                    <CardContent className="space-y-3">
+                        <Button 
+                            onClick={() => setShowItineraryChatbot(true)}
+                            className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                        >
+                            <Sparkles className="w-4 h-4 mr-2" /> Generate AI Itinerary
+                        </Button>
+                        <Button 
+                            className="w-full" variant="outline"
+                            onClick={() => setShowInvoice(true)}
+                        >
+                            <Download className="w-4 h-4 mr-2" /> Download Receipt
+                        </Button>
+                        <Link to="/offers" className="block">
+                            <Button className="w-full" variant="ghost">Book Another Trip</Button>
+                        </Link>
+                    </CardContent>
+                </Card>
+            </div>
+
         </div>
       </div>
       
@@ -461,10 +413,10 @@ export default function BookingConfirmation() {
             status: "confirmed",
             createdAt: new Date().toISOString().split("T")[0]
         }}
-        packageDetails={selectedPackage || { title: "Custom Itinerary", price: totalPrice }}
+        packageDetails={selectedPackage || { title: isCustom ? "Custom Tour Package" : "Standard Package", price: totalPrice }}
         paymentDetails={{
             totalPrice: totalPrice,
-            travelers: parseInt(travelersParam), // Rough estimate for invoice logic
+            travelers: parseInt(travelersParam), 
             hasAirportTransfer: hasAirportTransfer
         }}
       />
