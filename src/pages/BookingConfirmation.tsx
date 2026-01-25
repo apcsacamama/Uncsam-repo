@@ -20,7 +20,8 @@ import {
   Download,
   Sparkles,
   Loader2,
-  Layers
+  Layers,
+  Plane // Ensure Plane is imported
 } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useState, useEffect } from "react";
@@ -261,6 +262,13 @@ export default function BookingConfirmation() {
                                                         {getDestName(destId)}
                                                     </div>
                                                 ))}
+                                                {/* --- ADDED: AIRPORT TRANSFER CHECK --- */}
+                                                {day.transportation && day.transportation.includes("airport-transfer") && (
+                                                    <div className="flex items-center text-sm text-blue-600 font-medium sm:col-span-2 mt-1 bg-blue-50 p-2 rounded border border-blue-100">
+                                                        <Plane className="w-4 h-4 mr-2" />
+                                                        Airport Transfer Included
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
                                     ))}
