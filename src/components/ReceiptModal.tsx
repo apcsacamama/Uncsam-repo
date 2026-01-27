@@ -1,11 +1,11 @@
 import { Dialog, DialogContent } from "./ui/dialog";
 import { Button } from "./ui/button";
-import { X, Download } from "lucide-react";
+import { X, Download, Printer } from "lucide-react";
 import { useRef, useState } from "react";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 
-interface ReceiptModalProps {
+interface InvoiceModalProps {
   isOpen: boolean;
   onClose: () => void;
   bookingDetails: any;
@@ -17,13 +17,13 @@ interface ReceiptModalProps {
   };
 }
 
-export default function ReceiptModal({
+export default function InvoiceModal({
   isOpen,
   onClose,
   bookingDetails,
   packageDetails,
   paymentDetails,
-}: ReceiptModalProps) {
+}: InvoiceModalProps) {
   const invoiceRef = useRef<HTMLDivElement>(null);
   const [isDownloading, setIsDownloading] = useState(false);
 
@@ -34,8 +34,8 @@ export default function ReceiptModal({
 
     try {
       const canvas = await html2canvas(invoiceRef.current, {
-        scale: 2, 
-        useCORS: true, 
+        scale: 2,
+        useCORS: true,
         backgroundColor: "#ffffff",
       });
 
@@ -45,9 +45,7 @@ export default function ReceiptModal({
       const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
 
       pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, pdfHeight);
-      
-      // Filename is set to Receipt-[ID].pdf
-      pdf.save(`Receipt-${bookingDetails.id}.pdf`);
+      pdf.save(`Invoice-${bookingDetails.id}.pdf`);
     } catch (error) {
       console.error("Error generating PDF:", error);
     } finally {
@@ -55,20 +53,61 @@ export default function ReceiptModal({
     }
   };
 
+  const handlePrint = () => {
+    window.print();
+  };
+
   if (!isOpen) return null;
 
+  // --- CALCULATE LINE ITEMS ---
   const airportTransferPrice = 8000;
-  const basePrice = paymentDetails.totalPrice - (paymentDetails.hasAirportTransfer ? airportTransferPrice : 0);
-  const unitPrice = basePrice / paymentDetails.travelers;
+  // Calculate base price (Total - Addons)
+  const basePriceTotal = paymentDetails.totalPrice - (paymentDetails.hasAirportTransfer ? airportTransferPrice : 0);
+  
+  // Prepare Invoice Items
+  const invoiceItems = [];
+
+  // 1. Tour Package / Itinerary Item
+  if (bookingDetails.details && bookingDetails.details.length > 0) {
+      // If it's a custom tour with multiple days, we can list them or bundle them
+      // For a cleaner invoice, we often bundle "Custom Tour Package (X Days)"
+      invoiceItems.push({
+          description: `Custom Tour Package (${bookingDetails.details.length} Days) - ${paymentDetails.travelers} Travelers`,
+          qty: 1,
+          unitPrice: basePriceTotal,
+          amount: basePriceTotal
+      });
+  } else {
+      // Standard Package
+      invoiceItems.push({
+          description: `${packageDetails?.title || "Tour Package"} - ${paymentDetails.travelers} Travelers`,
+          qty: 1, // We treat the whole group package as 1 unit usually, or you can split by person
+          unitPrice: basePriceTotal,
+          amount: basePriceTotal
+      });
+  }
+
+  // 2. Add-ons
+  if (paymentDetails.hasAirportTransfer) {
+      invoiceItems.push({
+          description: "Optional Add-on: Private Airport Transfer",
+          qty: 1,
+          unitPrice: airportTransferPrice,
+          amount: airportTransferPrice
+      });
+  }
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-3xl p-0 overflow-hidden bg-gray-100">
+      <DialogContent className="max-w-4xl p-0 overflow-hidden bg-gray-100 h-[90vh] flex flex-col">
         
-        {/* Actions Header */}
-        <div className="bg-white p-4 border-b flex justify-between items-center">
-            <h3 className="font-semibold text-gray-700">Receipt Preview</h3>
+        {/* HEADER ACTIONS */}
+        <div className="bg-white p-4 border-b flex justify-between items-center shrink-0">
+            <h3 className="font-semibold text-gray-700">Invoice Preview</h3>
             <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={handlePrint} className="hidden sm:flex">
+                    <Printer className="w-4 h-4 mr-2" /> Print
+                </Button>
                 <Button variant="outline" size="sm" onClick={onClose}>
                     <X className="w-4 h-4 mr-2" /> Close
                 </Button>
@@ -78,109 +117,118 @@ export default function ReceiptModal({
                     onClick={handleDownloadPDF}
                     disabled={isDownloading}
                 >
-                    {isDownloading ? (
-                        "Generating..."
-                    ) : (
-                        <>
-                            <Download className="w-4 h-4 mr-2" /> Export to PDF
-                        </>
-                    )}
+                    {isDownloading ? "Generating..." : <><Download className="w-4 h-4 mr-2" /> Download PDF</>}
                 </Button>
             </div>
         </div>
 
-        {/* --- ACTUAL RECEIPT CONTENT --- */}
-        <div className="overflow-y-auto max-h-[80vh] p-8 flex justify-center">
+        {/* --- INVOICE CANVAS (Scrollable) --- */}
+        <div className="flex-1 overflow-y-auto p-4 md:p-8 flex justify-center bg-gray-100">
           <div 
-            id="receipt-content" 
+            id="invoice-content" 
             ref={invoiceRef} 
-            className="bg-white shadow-lg p-10 w-full max-w-2xl min-h-[800px] text-gray-800"
-            style={{ fontFamily: 'Arial, sans-serif' }}
+            className="bg-white shadow-xl w-full max-w-[210mm] min-h-[297mm] p-12 text-gray-800 flex flex-col"
+            style={{ fontFamily: 'Inter, sans-serif' }}
           >
-            {/* Header */}
-            <div className="flex justify-between items-start mb-10 border-b pb-6">
+            {/* 1. INVOICE HEADER */}
+            <div className="flex justify-between items-start mb-12">
                 <div>
-                    <h1 className="text-3xl font-bold text-red-600 mb-2">UNCLE SAM TOURS</h1>
-                    <p className="text-sm text-gray-500">123 Travel Road, Tokyo, Japan</p>
-                    <p className="text-sm text-gray-500">support@unclesam-travel.com</p>
-                    <p className="text-sm text-gray-500">+81-3-1234-5678</p>
+                    <div className="flex items-center gap-3 mb-4">
+                        <div className="w-10 h-10 bg-red-600 rounded-lg flex items-center justify-center text-white font-bold text-xl">U</div>
+                        <h1 className="text-2xl font-bold text-gray-900 tracking-tight">UNCLE SAM TOURS</h1>
+                    </div>
+                    <div className="text-sm text-gray-500 space-y-1">
+                        <p>123 Travel Road, Shinjuku</p>
+                        <p>Tokyo, Japan 160-0022</p>
+                        <p>support@unclesam-travel.com</p>
+                        <p>+81 3-1234-5678</p>
+                    </div>
                 </div>
                 <div className="text-right">
-                    <h2 className="text-2xl font-bold text-gray-400 uppercase tracking-widest">Receipt</h2>
-                    <p className="font-semibold mt-2"># {bookingDetails.id}</p>
-                    <p className="text-sm text-gray-500">Date: {new Date().toLocaleDateString()}</p>
-                    <p className="text-xs text-green-600 font-bold mt-1 uppercase border border-green-600 px-2 py-0.5 inline-block rounded">Paid</p>
+                    <h2 className="text-5xl font-extrabold text-gray-100 tracking-widest uppercase mb-4">INVOICE</h2>
+                    <div className="text-sm space-y-1">
+                        <div className="flex justify-end gap-4">
+                            <span className="text-gray-500 font-medium">Invoice #:</span>
+                            <span className="font-bold text-gray-900">{bookingDetails.id}</span>
+                        </div>
+                        <div className="flex justify-end gap-4">
+                            <span className="text-gray-500 font-medium">Date:</span>
+                            <span className="text-gray-900">{new Date().toLocaleDateString()}</span>
+                        </div>
+                        <div className="flex justify-end gap-4">
+                            <span className="text-gray-500 font-medium">Status:</span>
+                            <span className="text-green-600 font-bold bg-green-50 px-2 rounded">PAID</span>
+                        </div>
+                    </div>
                 </div>
             </div>
 
-            {/* Bill To */}
-            <div className="mb-10">
-                <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Billed To</h3>
-                <p className="font-bold text-lg">{bookingDetails.customerName}</p>
-                <p className="text-gray-600">{bookingDetails.email}</p>
-                <p className="text-gray-600">{bookingDetails.phone}</p>
+            {/* 2. BILL TO SECTION */}
+            <div className="border-t border-b border-gray-100 py-8 mb-8 flex justify-between items-start">
+                <div className="w-1/2">
+                    <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Bill To</h3>
+                    <p className="font-bold text-xl text-gray-900 mb-1">{bookingDetails.customerName}</p>
+                    <p className="text-sm text-gray-600">{bookingDetails.email}</p>
+                    <p className="text-sm text-gray-600">{bookingDetails.phone}</p>
+                </div>
+                <div className="w-1/2 text-right">
+                    <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Trip Details</h3>
+                    <p className="text-sm text-gray-600"><span className="font-medium">Travel Date:</span> {bookingDetails.travelDate}</p>
+                    <p className="text-sm text-gray-600"><span className="font-medium">Travelers:</span> {paymentDetails.travelers}</p>
+                </div>
             </div>
 
-            {/* Line Items Table */}
-            <table className="w-full mb-10 collapse">
-                <thead>
-                    <tr className="bg-gray-50 text-left border-b border-gray-200">
-                        <th className="py-3 px-4 font-semibold text-sm text-gray-600">Description</th>
-                        <th className="py-3 px-4 font-semibold text-sm text-gray-600 text-center">Qty</th>
-                        <th className="py-3 px-4 font-semibold text-sm text-gray-600 text-right">Unit Price</th>
-                        <th className="py-3 px-4 font-semibold text-sm text-gray-600 text-right">Amount</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {/* Main Package */}
-                    <tr className="border-b border-gray-100">
-                        <td className="py-4 px-4">
-                            <p className="font-bold text-gray-800">{packageDetails?.title || "Tour Package"}</p>
-                            <p className="text-xs text-gray-500">Travel Date: {bookingDetails.travelDate}</p>
-                        </td>
-                        <td className="py-4 px-4 text-center">{paymentDetails.travelers}</td>
-                        <td className="py-4 px-4 text-right">¥{unitPrice.toLocaleString()}</td>
-                        <td className="py-4 px-4 text-right font-medium">¥{basePrice.toLocaleString()}</td>
-                    </tr>
-
-                    {/* Airport Transfer Add-on */}
-                    {paymentDetails.hasAirportTransfer && (
-                         <tr className="border-b border-gray-100 bg-blue-50/30">
-                            <td className="py-4 px-4">
-                                <p className="font-bold text-gray-800">Airport Transfer (Add-on)</p>
-                                <p className="text-xs text-gray-500">Private pickup service</p>
-                            </td>
-                            <td className="py-4 px-4 text-center">1</td>
-                            <td className="py-4 px-4 text-right">¥{airportTransferPrice.toLocaleString()}</td>
-                            <td className="py-4 px-4 text-right font-medium">¥{airportTransferPrice.toLocaleString()}</td>
+            {/* 3. LINE ITEMS TABLE */}
+            <div className="mb-12">
+                <table className="w-full">
+                    <thead>
+                        <tr className="bg-gray-50 border-b border-gray-200">
+                            <th className="py-3 px-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider w-[50%]">Description</th>
+                            <th className="py-3 px-4 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">Qty</th>
+                            <th className="py-3 px-4 text-right text-xs font-bold text-gray-500 uppercase tracking-wider">Unit Price</th>
+                            <th className="py-3 px-4 text-right text-xs font-bold text-gray-500 uppercase tracking-wider">Amount</th>
                         </tr>
-                    )}
-                </tbody>
-            </table>
+                    </thead>
+                    <tbody>
+                        {invoiceItems.map((item, index) => (
+                            <tr key={index} className="border-b border-gray-50 last:border-none">
+                                <td className="py-4 px-4 text-sm font-medium text-gray-900">{item.description}</td>
+                                <td className="py-4 px-4 text-sm text-gray-600 text-center">{item.qty}</td>
+                                <td className="py-4 px-4 text-sm text-gray-600 text-right">¥{item.unitPrice.toLocaleString()}</td>
+                                <td className="py-4 px-4 text-sm font-bold text-gray-900 text-right">¥{item.amount.toLocaleString()}</td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
 
-            {/* Totals */}
-            <div className="flex justify-end mb-12">
-                <div className="w-1/2 space-y-3">
-                    <div className="flex justify-between text-gray-600">
+            {/* 4. TOTALS */}
+            <div className="flex justify-end mb-16">
+                <div className="w-5/12 space-y-3">
+                    <div className="flex justify-between text-sm text-gray-600">
                         <span>Subtotal</span>
                         <span>¥{paymentDetails.totalPrice.toLocaleString()}</span>
                     </div>
-                    <div className="flex justify-between text-gray-600">
+                    <div className="flex justify-between text-sm text-gray-600">
                         <span>Tax (Included)</span>
                         <span>¥0</span>
                     </div>
-                    <div className="flex justify-between font-bold text-xl text-gray-900 border-t pt-3 mt-3">
-                        <span>Total Paid</span>
-                        <span className="text-red-600">¥{paymentDetails.totalPrice.toLocaleString()}</span>
+                    <div className="border-t border-gray-200 pt-3 flex justify-between items-center">
+                        <span className="font-bold text-lg text-gray-900">Total Paid</span>
+                        <span className="font-bold text-2xl text-red-600">¥{paymentDetails.totalPrice.toLocaleString()}</span>
                     </div>
                 </div>
             </div>
 
-            {/* Footer */}
-            <div className="text-center border-t pt-8 text-gray-500 text-sm">
-                <p className="mb-2 font-semibold">Thank you for traveling with us!</p>
-                <p>If you have any questions about this receipt, please contact support@unclesam-travel.com</p>
+            {/* 5. FOOTER */}
+            <div className="mt-auto border-t border-gray-100 pt-8 text-center">
+                <p className="font-bold text-gray-900 mb-2">Thank you for choosing Uncle Sam Tours!</p>
+                <p className="text-xs text-gray-500 max-w-md mx-auto leading-relaxed">
+                    This document serves as your official proof of payment. For any questions regarding this invoice, please contact support@unclesam-travel.com quoting your invoice number.
+                </p>
+                <p className="text-xs text-gray-400 mt-4">Registered Travel Agency No. 123456 • Tokyo, Japan</p>
             </div>
+
           </div>
         </div>
       </DialogContent>
