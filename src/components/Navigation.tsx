@@ -32,7 +32,6 @@ export default function Navigation() {
   // --- HELPER: Check Admin Role ---
   const checkAdminStatus = async (userId: string) => {
     try {
-      // CHANGED: 'profiles' -> 'user'
       const { data: profile, error } = await supabase
         .from('user') 
         .select('role')
@@ -138,10 +137,11 @@ export default function Navigation() {
     supabase.auth.signOut();
   };
 
+  // --- UPDATED NAVIGATION LINKS (Removed Custom Tours) ---
   const navLinks = [
     { path: "/", label: "HOME" },
     { path: "/offers", label: "TOUR OFFERS" },
-    { path: "/custom", label: "CUSTOM TOURS" },
+    // { path: "/custom", label: "CUSTOM TOURS" }, <--- REMOVED
     { path: "/about", label: "ABOUT" },
     { path: "/contact", label: "CONTACT" },
   ];
