@@ -172,14 +172,13 @@ export default function ItineraryChatbot({
     // 5. Build Itinerary Items
     const generatedItems: ItineraryItem[] = [];
     
-    // UPDATED: Default start is 09:00. 
-    // Logic: Only change if user specifically asks. No "start later" AI suggestion.
+    // --- UPDATED DEFAULT START TIME TO 06:00 AM ---
     let currentTime = customInstruction.toLowerCase().includes("start at") 
-        ? customInstruction.split("start at")[1].trim().split(" ")[0] // Very naive parsing for demo
-        : "09:00"; 
+        ? customInstruction.split("start at")[1].trim().split(" ")[0] 
+        : "06:00"; 
     
-    // Fallback if parsing failed
-    if (!currentTime.includes(":")) currentTime = "09:00"; 
+    // Fallback check
+    if (!currentTime.includes(":")) currentTime = "06:00"; 
 
     let hasHadLunch = false;
 
@@ -226,9 +225,10 @@ export default function ItineraryChatbot({
         });
         currentTime = addTime(currentTime, 90);
 
-        // Lunch
+        // Lunch Logic
         const currentHour = parseInt(currentTime.split(':')[0]);
-        if (currentHour >= 12 && !hasHadLunch) {
+        // Simple logic: Lunch between 11:00 and 14:00 (11am - 2pm)
+        if (currentHour >= 11 && currentHour <= 14 && !hasHadLunch) {
             generatedItems.push({
                 id: "lunch-1",
                 time: currentTime,
