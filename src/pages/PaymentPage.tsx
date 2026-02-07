@@ -22,12 +22,16 @@ import {
   ArrowRight,
   Loader2,
   Layers,
-  Plane // Ensure Plane is imported
+  Plane,
+  Banknote // Added icon for cash/payment
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { format } from "date-fns";
 import { supabase } from "../lib/supabaseClient";
+
+// --- CONSTANTS ---
+const DOWN_PAYMENT_AMOUNT_JPY = 26000; // Approx 10,000 PHP
 
 // Fallback if Supabase is empty/loading
 const DEFAULT_DESTINATIONS = [
@@ -77,6 +81,9 @@ export default function PaymentPage() {
     details: [] as any[], 
     isCustom: false
   });
+
+  // Payment Option State (Full vs Downpayment)
+  const [paymentOption, setPaymentOption] = useState<'full' | 'downpayment'>('full');
 
   // --- 3. FETCH DESTINATIONS ---
   useEffect(() => {
@@ -150,6 +157,11 @@ export default function PaymentPage() {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
+  // --- CALCULATE TOTALS ---
+  const totalAmount = displayData.price;
+  const amountToPay = paymentOption === 'full' ? totalAmount : DOWN_PAYMENT_AMOUNT_JPY;
+  const balanceAmount = paymentOption === 'full' ? 0 : totalAmount - DOWN_PAYMENT_AMOUNT_JPY;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsProcessing(true);
@@ -166,7 +178,12 @@ export default function PaymentPage() {
       email: formData.email,
       phone: formData.phone,
       paymentMethod: paymentMethod,
-      cartData: cartDataRaw || "" 
+      cartData: cartDataRaw || "",
+      
+      // --- NEW PARAMS FOR DOWN PAYMENT ---
+      paymentType: paymentOption,
+      amountPaid: amountToPay.toString(),
+      balance: balanceAmount.toString()
     });
 
     navigate(`/booking-confirmation?${params.toString()}`);
@@ -194,6 +211,8 @@ export default function PaymentPage() {
           
           {/* LEFT COLUMN: FORMS */}
           <div className="lg:col-span-2 space-y-8">
+            
+            {/* 1. Contact Information */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -231,6 +250,40 @@ export default function PaymentPage() {
               </CardContent>
             </Card>
 
+            {/* 2. Payment Options (Moved here) */}
+            <Card className="border-l-4 border-l-blue-600">
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                        <Banknote className="w-5 h-5 text-blue-600" /> Payment Options
+                    </CardTitle>
+                    <CardDescription>Choose how you would like to pay today.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <RadioGroup defaultValue="full" onValueChange={(v) => setPaymentOption(v as 'full' | 'downpayment')} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <RadioGroupItem value="full" id="opt-full" className="peer sr-only" />
+                            <Label htmlFor="opt-full" className="flex flex-col justify-between h-full rounded-md border-2 border-muted bg-white p-4 hover:bg-gray-50 peer-data-[state=checked]:border-blue-600 peer-data-[state=checked]:bg-blue-50 cursor-pointer">
+                                <div className="font-bold text-gray-900 mb-1">Full Payment</div>
+                                <div className="text-sm text-gray-500 mb-2">Pay the entire amount now.</div>
+                                <div className="text-lg font-bold text-blue-700">¥{totalAmount.toLocaleString()}</div>
+                            </Label>
+                        </div>
+                        <div>
+                            <RadioGroupItem value="downpayment" id="opt-down" className="peer sr-only" />
+                            <Label htmlFor="opt-down" className="flex flex-col justify-between h-full rounded-md border-2 border-muted bg-white p-4 hover:bg-gray-50 peer-data-[state=checked]:border-blue-600 peer-data-[state=checked]:bg-blue-50 cursor-pointer">
+                                <div className="flex justify-between">
+                                    <div className="font-bold text-gray-900 mb-1">Down Payment</div>
+                                    <div className="bg-green-100 text-green-700 text-[10px] font-bold px-2 py-0.5 rounded h-fit">INSTALLMENT</div>
+                                </div>
+                                <div className="text-sm text-gray-500 mb-2">Reserve now, pay the rest later.</div>
+                                <div className="text-lg font-bold text-blue-700">¥{DOWN_PAYMENT_AMOUNT_JPY.toLocaleString()}</div>
+                            </Label>
+                        </div>
+                    </RadioGroup>
+                </CardContent>
+            </Card>
+
+            {/* 3. Payment Method */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -325,7 +378,7 @@ export default function PaymentPage() {
                             <h3 className="font-bold text-gray-900 mb-3 flex items-center gap-2 text-sm">
                                 <Layers className="w-4 h-4 text-red-600"/> Chosen Trips
                             </h3>
-                            <div className="space-y-4 max-h-[400px] overflow-y-auto pr-1">
+                            <div className="space-y-4 max-h-[300px] overflow-y-auto pr-1">
                                 {displayData.details.map((day, idx) => (
                                     <div key={idx} className="bg-gray-50 p-3 rounded-lg border border-gray-100 relative">
                                         <div className="flex justify-between items-start mb-2">
@@ -333,7 +386,6 @@ export default function PaymentPage() {
                                                 <span className="text-[10px] font-bold text-white bg-gray-800 px-2 py-0.5 rounded-full uppercase">Day {idx + 1}</span>
                                                 <div className="font-bold text-gray-800 mt-1">{day.location.toUpperCase()}</div>
                                                 
-                                                {/* --- ADDED: SPECIFIC DAY DETAILS --- */}
                                                 <div className="flex items-center gap-2 mt-1">
                                                     <span className="text-xs text-gray-500">{format(new Date(day.date), "MMM dd")}</span>
                                                     <span className="text-gray-300">•</span>
@@ -346,14 +398,12 @@ export default function PaymentPage() {
                                             <div className="font-bold text-red-600 text-sm">¥{day.price.toLocaleString()}</div>
                                         </div>
                                         
-                                        {/* Destinations List */}
                                         <div className="text-xs text-gray-600 border-t border-gray-200 pt-2 mt-2">
                                             <p className="font-semibold mb-1">Destinations:</p>
                                             <ul className="list-disc pl-4 space-y-0.5">
                                                 {day.destinations.map((destId: string) => (
                                                     <li key={destId}>{getDestName(destId)}</li>
                                                 ))}
-                                                {/* --- RENDER AIRPORT TRANSFER ADD-ON --- */}
                                                 {day.transportation && day.transportation.includes("airport-transfer") && (
                                                     <li className="text-blue-600 font-medium flex items-center -ml-1">
                                                         <Plane className="w-3 h-3 mr-1" /> Airport Transfer (+¥8,000)
@@ -367,9 +417,24 @@ export default function PaymentPage() {
                         </div>
                     )}
 
-                    <div className="flex justify-between items-center text-xl font-bold text-gray-900 pt-2 border-t">
-                        <span>Total:</span>
-                        <span>¥{displayData.price.toLocaleString()}</span>
+                    {/* --- TOTALS SECTION (DYNAMIC) --- */}
+                    <div className="border-t pt-4 space-y-2">
+                        <div className="flex justify-between items-center text-sm text-gray-600">
+                            <span>Package Total:</span>
+                            <span>¥{totalAmount.toLocaleString()}</span>
+                        </div>
+                        
+                        {paymentOption === 'downpayment' && (
+                            <div className="flex justify-between items-center text-sm text-gray-600">
+                                <span>Remaining Balance:</span>
+                                <span className="font-bold text-orange-600">¥{balanceAmount.toLocaleString()}</span>
+                            </div>
+                        )}
+
+                        <div className="flex justify-between items-center text-xl font-bold text-gray-900 pt-2 border-t mt-2">
+                            <span>Total Due Now:</span>
+                            <span>¥{amountToPay.toLocaleString()}</span>
+                        </div>
                     </div>
 
                     <Button 
