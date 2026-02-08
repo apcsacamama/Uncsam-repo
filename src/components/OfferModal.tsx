@@ -70,19 +70,6 @@ export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) 
   const [offerTravelers, setOfferTravelers] = useState(1);
   const [offerCalculatedPrice, setOfferCalculatedPrice] = useState(offer?.price || 0);
 
-  // Common State (Lifted for access)
-  const [allDestinations, setAllDestinations] = useState<any[]>(DEFAULT_DESTINATIONS);
-  const [cart, setCart] = useState<CartItem[]>([]);
-
-  useEffect(() => {
-    // Load destinations initially for ID mapping
-    const initDests = async () => {
-        const { data } = await supabase.from('tour_destinations').select('*');
-        if (data && data.length > 0) setAllDestinations(data);
-    };
-    initDests();
-  }, []);
-
   useEffect(() => {
     if (isOpen && offer) {
       setViewMode('offer'); 
@@ -112,45 +99,26 @@ export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) 
     setOfferCalculatedPrice(price);
   }, [offerTravelers, offer]);
 
-  // --- UPDATED: HANDLE OFFER PROCEED ---
-  // Instead of redirecting immediately, this adds the item to the cart and switches view
   const handleOfferProceed = () => {
     if (!offer || !offerDate) {
       if (!offerDate) alert("Please select a travel date first.");
       return;
     }
-
-    // 1. Try to map standard destinations to IDs, or use strings if not found
-    const mappedDestinations = offer.destinations.map(name => {
-        const found = allDestinations.find(d => d.name === name);
-        return found ? found.id : name; // Use ID if found, else keep name
-    });
-
-    // 2. Create Cart Item
-    const newItem: CartItem = {
-        id: Math.random().toString(36).substr(2, 9),
-        location: (offer as any).slug?.split("-")[0] || "Japan", // Heuristic for location name
-        date: new Date(offerDate),
-        travelers: offerTravelers,
-        destinations: mappedDestinations,
-        transportation: ["private-van"],
-        price: offerCalculatedPrice
-    };
-
-    // 3. Update State & Switch View
-    setCart([newItem]);
-    setViewMode('custom');
+    const pkgId = (offer as any).slug || offer.id;
+    navigate(`/payment?package=${pkgId}&date=${offerDate}&travelers=${offerTravelers}&price=${offerCalculatedPrice}&name=Guest`);
   };
 
   // ==========================================
   // 2. CUSTOM TOUR MODE LOGIC
   // ==========================================
   
+  const [cart, setCart] = useState<CartItem[]>([]);
   const [customDate, setCustomDate] = useState<Date>();
   const [location, setLocation] = useState("");
   const [selectedDestinations, setSelectedDestinations] = useState<string[]>([]);
   const [selectedTransportation, setSelectedTransportation] = useState<string[]>(["private-van"]); 
   const [customTravelers, setCustomTravelers] = useState(1);
+  const [allDestinations, setAllDestinations] = useState<any[]>(DEFAULT_DESTINATIONS);
 
   // -- ADMIN STATE --
   const [isDestModalOpen, setIsDestModalOpen] = useState(false);
@@ -515,7 +483,7 @@ export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) 
                                 )}
                              </CardContent>
 
-                             {/* --- ADD-ONS SECTION --- */}
+                             {/* --- ADD-ONS SECTION (Moved to Bottom) --- */}
                              {location && (
                                  <div className="px-6 py-4 bg-gray-50 border-t border-b">
                                      <h4 className="text-sm font-bold text-gray-700 mb-3 flex items-center">
@@ -582,6 +550,7 @@ export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) 
                                                                 <CalendarIcon className="w-3 h-3 mr-1" />
                                                                 {format(item.date, "MMM dd, yyyy")}
                                                             </div>
+                                                            {/* --- TRAVELER COUNT --- */}
                                                             <div className="flex items-center text-xs text-gray-500 font-medium">
                                                                 <Users className="w-3 h-3 mr-1" />
                                                                 {item.travelers} Traveler{item.travelers > 1 ? 's' : ''}
