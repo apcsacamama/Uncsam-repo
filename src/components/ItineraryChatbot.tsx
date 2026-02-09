@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Button } from "./ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
+import { Card, CardContent, CardHeader } from "./ui/card";
 import { Input } from "./ui/input";
 import { Badge } from "./ui/badge";
 import { format } from "date-fns";
@@ -208,7 +208,7 @@ export default function ItineraryChatbot({
             day: i + 1,
             date: dateDisplay || `Day ${i + 1}`,
             items: dayItems,
-            weather: { condition: "Sunny", temp: "24°C", summary: "Great weather" }
+            weather: { condition: "Sunny", temp: "24°C", summary: "Perfect for sightseeing" }
         });
     }
 
@@ -238,7 +238,6 @@ export default function ItineraryChatbot({
           // Update item directly without touching revisionCount
           newItinerary[dayIndex].items[itemIndex].activity = editValue;
           setCurrentItinerary(newItinerary);
-          // Optional: Add log to chat
           setChatMessages(prev => [...prev, { role: 'ai', text: "Manual edit saved. No revision points used.", timestamp: new Date() }]);
       }
       setEditingItemId(null);
@@ -250,7 +249,6 @@ export default function ItineraryChatbot({
       const newItinerary = [...currentItinerary];
       newItinerary[dayIndex].items = newItinerary[dayIndex].items.filter(i => i.id !== itemId);
       setCurrentItinerary(newItinerary);
-      // Optional: Add log to chat
       setChatMessages(prev => [...prev, { role: 'ai', text: "Item removed manually. No revision points used.", timestamp: new Date() }]);
   };
 
@@ -258,8 +256,6 @@ export default function ItineraryChatbot({
     if (history.length === 0) return;
     setCurrentItinerary(history[history.length - 1]);
     setHistory(prev => prev.slice(0, -1));
-    // If undoing an AI action, credit back the point? Usually undo is "free" or just reverts state.
-    // For simplicity, we just revert state.
     setChatMessages(prev => [...prev, { role: 'ai', text: "Undo successful.", timestamp: new Date() }]);
   };
 
@@ -275,6 +271,10 @@ export default function ItineraryChatbot({
       case "sightseeing": return <Camera className="w-3 h-3 text-purple-600" />;
       default: return <Clock className="w-3 h-3 text-gray-600" />;
     }
+  };
+
+  const getWeatherIcon = (condition: string) => {
+    return condition.toLowerCase().includes("rain") ? <CloudRain className="w-5 h-5 text-blue-200" /> : <Sun className="w-5 h-5 text-yellow-300" />;
   };
 
   if (!isVisible) return null;
@@ -321,77 +321,93 @@ export default function ItineraryChatbot({
           {/* LEFT: ITINERARY VIEW */}
           <div className="flex-1 md:w-[65%] bg-gray-50/50 overflow-y-auto p-4 md:p-6 space-y-6 border-r border-gray-200">
               {currentItinerary.map((day, dayIndex) => (
-                  <Card key={day.day} className="border-none shadow-sm ring-1 ring-gray-200/50">
-                      <CardHeader className="bg-white border-b py-3 px-5 sticky top-0 z-10">
-                          <div className="flex justify-between items-center">
+                  <div key={day.day} className="space-y-4">
+                      
+                      {/* --- WEATHER FORECAST PANEL (Restored) --- */}
+                      <div className="bg-gradient-to-r from-blue-600 to-blue-500 rounded-lg p-4 text-white shadow-md relative overflow-hidden">
+                          <div className="absolute -top-6 -right-6 w-24 h-24 bg-white/10 rounded-full blur-xl"></div>
+                          <div className="flex justify-between items-center relative z-10">
+                              <div>
+                                  <h3 className="font-bold text-base flex items-center gap-2">
+                                      {getWeatherIcon(day.weather.condition)}
+                                      {day.date} Forecast
+                                  </h3>
+                                  <p className="text-blue-100 text-xs mt-1">{day.weather.summary}</p>
+                              </div>
+                              <div className="text-right">
+                                  <span className="text-2xl font-bold">{day.weather.temp}</span>
+                                  <p className="text-[10px] text-blue-100 uppercase font-semibold tracking-wider">{day.weather.condition}</p>
+                              </div>
+                          </div>
+                      </div>
+
+                      {/* --- TIMELINE CARD --- */}
+                      <Card className="border-none shadow-sm ring-1 ring-gray-200/50">
+                          <CardHeader className="bg-white border-b py-3 px-5">
                               <div className="flex items-center gap-2">
                                   <div className="bg-red-100 text-red-700 font-bold px-2 py-1 rounded text-xs">DAY {day.day}</div>
-                                  <span className="font-bold text-gray-700 text-sm">{day.date}</span>
+                                  <span className="font-bold text-gray-700 text-sm">Itinerary Timeline</span>
                               </div>
-                              <div className="flex items-center text-xs text-gray-500 gap-1">
-                                  <Sun className="w-3 h-3 text-orange-400"/> {day.weather.temp}
-                              </div>
-                          </div>
-                      </CardHeader>
-                      <CardContent className="p-0">
-                          <div className="relative">
-                              <div className="absolute left-[3.25rem] top-4 bottom-4 w-0.5 bg-gray-100"></div>
-                              <div className="space-y-0">
-                                  {day.items.map((item) => (
-                                      <div key={item.id} className="flex group hover:bg-gray-50 transition-colors py-3 px-4 relative">
-                                          <div className="w-10 text-right text-xs font-medium text-gray-400 pt-1 mr-4 flex-shrink-0">{item.time}</div>
-                                          <div className="relative z-10 mr-4">
-                                              <div className={`w-6 h-6 rounded-full flex items-center justify-center border bg-white ${
-                                                  item.type === 'travel' ? 'border-blue-200 text-blue-500' :
-                                                  item.type === 'meal' ? 'border-green-200 text-green-500' :
-                                                  'border-purple-200 text-purple-500'
-                                              }`}>
-                                                  {getActivityIcon(item.type)}
-                                              </div>
-                                          </div>
-                                          <div className="flex-1 pt-0.5">
-                                              
-                                              {/* EDIT MODE */}
-                                              {editingItemId === item.id ? (
-                                                  <div className="flex gap-2 mb-2 w-full">
-                                                      <Input 
-                                                          value={editValue} 
-                                                          onChange={(e) => setEditValue(e.target.value)} 
-                                                          className="h-8 text-sm bg-white"
-                                                          autoFocus
-                                                      />
-                                                      <Button size="sm" onClick={() => handleManualEditSave(dayIndex)} className="h-8 bg-green-600">Save</Button>
-                                                      <Button size="sm" variant="ghost" onClick={() => setEditingItemId(null)} className="h-8">Cancel</Button>
+                          </CardHeader>
+                          <CardContent className="p-0">
+                              <div className="relative">
+                                  <div className="absolute left-[3.25rem] top-4 bottom-4 w-0.5 bg-gray-100"></div>
+                                  <div className="space-y-0">
+                                      {day.items.map((item) => (
+                                          <div key={item.id} className="flex group hover:bg-gray-50 transition-colors py-3 px-4 relative">
+                                              <div className="w-10 text-right text-xs font-medium text-gray-400 pt-1 mr-4 flex-shrink-0">{item.time}</div>
+                                              <div className="relative z-10 mr-4">
+                                                  <div className={`w-6 h-6 rounded-full flex items-center justify-center border bg-white ${
+                                                      item.type === 'travel' ? 'border-blue-200 text-blue-500' :
+                                                      item.type === 'meal' ? 'border-green-200 text-green-500' :
+                                                      'border-purple-200 text-purple-500'
+                                                  }`}>
+                                                      {getActivityIcon(item.type)}
                                                   </div>
-                                              ) : (
-                                                  <>
-                                                      <h4 className="text-sm font-semibold text-gray-800 leading-tight">{item.activity}</h4>
-                                                      <div className="flex items-center gap-3 mt-1 text-xs text-gray-500">
-                                                          <span className="flex items-center gap-1"><Clock className="w-3 h-3"/> {item.duration}</span>
-                                                          {item.location !== "Private Van" && <span className="flex items-center gap-1"><MapPin className="w-3 h-3"/> {item.location}</span>}
+                                              </div>
+                                              <div className="flex-1 pt-0.5">
+                                                  {/* EDIT MODE */}
+                                                  {editingItemId === item.id ? (
+                                                      <div className="flex gap-2 mb-2 w-full">
+                                                          <Input 
+                                                              value={editValue} 
+                                                              onChange={(e) => setEditValue(e.target.value)} 
+                                                              className="h-8 text-sm bg-white"
+                                                              autoFocus
+                                                          />
+                                                          <Button size="sm" onClick={() => handleManualEditSave(dayIndex)} className="h-8 bg-green-600">Save</Button>
+                                                          <Button size="sm" variant="ghost" onClick={() => setEditingItemId(null)} className="h-8">Cancel</Button>
                                                       </div>
-                                                  </>
+                                                  ) : (
+                                                      <>
+                                                          <h4 className="text-sm font-semibold text-gray-800 leading-tight">{item.activity}</h4>
+                                                          <div className="flex items-center gap-3 mt-1 text-xs text-gray-500">
+                                                              <span className="flex items-center gap-1"><Clock className="w-3 h-3"/> {item.duration}</span>
+                                                              {item.location !== "Private Van" && <span className="flex items-center gap-1"><MapPin className="w-3 h-3"/> {item.location}</span>}
+                                                          </div>
+                                                      </>
+                                                  )}
+                                              </div>
+
+                                              {/* MANUAL CONTROLS */}
+                                              {editingItemId !== item.id && (
+                                                  <div className="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity bg-white shadow-sm border rounded flex">
+                                                      <button onClick={() => { setEditingItemId(item.id); setEditValue(item.activity); }} className="p-1.5 hover:bg-blue-50 text-blue-600 rounded-l" title="Edit (Free)">
+                                                          <Pencil className="w-3 h-3" />
+                                                      </button>
+                                                      <div className="w-px bg-gray-200"></div>
+                                                      <button onClick={() => handleManualDelete(dayIndex, item.id)} className="p-1.5 hover:bg-red-50 text-red-600 rounded-r" title="Delete (Free)">
+                                                          <Trash2 className="w-3 h-3" />
+                                                      </button>
+                                                  </div>
                                               )}
                                           </div>
-
-                                          {/* MANUAL CONTROLS (Only visible on hover) */}
-                                          {editingItemId !== item.id && (
-                                              <div className="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity bg-white shadow-sm border rounded flex">
-                                                  <button onClick={() => { setEditingItemId(item.id); setEditValue(item.activity); }} className="p-1.5 hover:bg-blue-50 text-blue-600 rounded-l" title="Edit (Free)">
-                                                      <Pencil className="w-3 h-3" />
-                                                  </button>
-                                                  <div className="w-px bg-gray-200"></div>
-                                                  <button onClick={() => handleManualDelete(dayIndex, item.id)} className="p-1.5 hover:bg-red-50 text-red-600 rounded-r" title="Delete (Free)">
-                                                      <Trash2 className="w-3 h-3" />
-                                                  </button>
-                                              </div>
-                                          )}
-                                      </div>
-                                  ))}
+                                      ))}
+                                  </div>
                               </div>
-                          </div>
-                      </CardContent>
-                  </Card>
+                          </CardContent>
+                      </Card>
+                  </div>
               ))}
               <div className="h-12"></div>
           </div>
