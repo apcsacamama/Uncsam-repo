@@ -32,12 +32,12 @@ import { supabase } from "../lib/supabaseClient";
 
 // --- CONSTANTS ---
 const DOWN_PAYMENT_AMOUNT_JPY = 26000; 
+const AIRPORT_TRANSFER_PRICE = 8000; 
 
 // Fallback if Supabase is empty/loading
 const DEFAULT_DESTINATIONS = [
   { id: "hasedera", name: "Hasedera Temple" },
   { id: "kotoku-in", name: "Kotoku-in" },
-  // ... rest of your defaults
 ];
 
 export default function PaymentPage() {
@@ -136,33 +136,23 @@ export default function PaymentPage() {
     cardName: "", cardNumber: "", expiry: "", cvc: ""
   });
 
-  // --- UPDATED: HANDLE INPUT CHANGE WITH FORMATTING ---
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     let formattedValue = value;
 
     if (name === "cardNumber") {
-        // 1. Remove all non-digits
         const raw = value.replace(/\D/g, "");
-        // 2. Limit to 16 digits
         const truncated = raw.slice(0, 16);
-        // 3. Add space every 4 digits
         formattedValue = truncated.replace(/(\d{4})(?=\d)/g, "$1 ");
-    } 
-    else if (name === "expiry") {
-        // 1. Remove non-digits
+    } else if (name === "expiry") {
         const raw = value.replace(/\D/g, "");
-        // 2. Limit to 4 digits (MMYY)
         const truncated = raw.slice(0, 4);
-        // 3. Insert slash after MM
         if (truncated.length >= 3) {
             formattedValue = `${truncated.slice(0, 2)}/${truncated.slice(2)}`;
         } else {
             formattedValue = truncated;
         }
-    } 
-    else if (name === "cvc") {
-        // Only allow numbers, max 4 digits
+    } else if (name === "cvc") {
         formattedValue = value.replace(/\D/g, "").slice(0, 4);
     }
 
@@ -221,8 +211,6 @@ export default function PaymentPage() {
           
           {/* LEFT COLUMN: FORMS */}
           <div className="lg:col-span-2 space-y-8">
-            
-            {/* 1. Contact Information */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -260,7 +248,6 @@ export default function PaymentPage() {
               </CardContent>
             </Card>
 
-            {/* 2. Payment Options */}
             <Card className="border-l-4 border-l-blue-600">
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2">
@@ -293,7 +280,6 @@ export default function PaymentPage() {
                 </CardContent>
             </Card>
 
-            {/* 3. Payment Method */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -325,37 +311,16 @@ export default function PaymentPage() {
                         </div>
                         <div className="space-y-2">
                             <Label>Card Number</Label>
-                            <Input 
-                                name="cardNumber" 
-                                placeholder="0000 0000 0000 0000" 
-                                value={formData.cardNumber} 
-                                onChange={handleInputChange} 
-                                maxLength={19} // 16 digits + 3 spaces
-                                inputMode="numeric"
-                            />
+                            <Input name="cardNumber" placeholder="0000 0000 0000 0000" value={formData.cardNumber} onChange={handleInputChange} maxLength={19} inputMode="numeric"/>
                         </div>
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
                                 <Label>Expiry Date</Label>
-                                <Input 
-                                    name="expiry" 
-                                    placeholder="MM/YY" 
-                                    value={formData.expiry} 
-                                    onChange={handleInputChange}
-                                    maxLength={5}
-                                    inputMode="numeric"
-                                />
+                                <Input name="expiry" placeholder="MM/YY" value={formData.expiry} onChange={handleInputChange} maxLength={5} inputMode="numeric"/>
                             </div>
                             <div className="space-y-2">
                                 <Label>CVC</Label>
-                                <Input 
-                                    name="cvc" 
-                                    placeholder="123" 
-                                    maxLength={4} 
-                                    value={formData.cvc} 
-                                    onChange={handleInputChange} 
-                                    inputMode="numeric"
-                                />
+                                <Input name="cvc" placeholder="123" maxLength={4} value={formData.cvc} onChange={handleInputChange} inputMode="numeric"/>
                             </div>
                         </div>
                     </div>
@@ -410,40 +375,50 @@ export default function PaymentPage() {
                                 <Layers className="w-4 h-4 text-red-600"/> Chosen Trips
                             </h3>
                             <div className="space-y-4 max-h-[300px] overflow-y-auto pr-1">
-                                {displayData.details.map((day, idx) => (
-                                    <div key={idx} className="bg-gray-50 p-3 rounded-lg border border-gray-100 relative">
-                                        <div className="flex justify-between items-start mb-2">
-                                            <div>
-                                                <span className="text-[10px] font-bold text-white bg-gray-800 px-2 py-0.5 rounded-full uppercase">Day {idx + 1}</span>
-                                                <div className="font-bold text-gray-800 mt-1">{day.location.toUpperCase()}</div>
-                                                
-                                                <div className="flex items-center gap-2 mt-1">
-                                                    <span className="text-xs text-gray-500">{format(new Date(day.date), "MMM dd")}</span>
-                                                    <span className="text-gray-300">•</span>
-                                                    <span className="text-xs text-gray-500 flex items-center">
-                                                        <Users className="w-3 h-3 mr-1" />
-                                                        {day.travelers}
-                                                    </span>
+                                {displayData.details.map((day, idx) => {
+                                    // --- 1. DETECT TRANSFER ---
+                                    const hasTransfer = day.transportation && day.transportation.includes("airport-transfer");
+                                    
+                                    // --- 2. CALCULATE BASE LISTING PRICE ---
+                                    const listingPrice = day.price - (hasTransfer ? AIRPORT_TRANSFER_PRICE : 0);
+
+                                    return (
+                                        <div key={idx} className="bg-gray-50 p-3 rounded-lg border border-gray-100 relative">
+                                            <div className="flex justify-between items-start mb-2">
+                                                <div>
+                                                    <span className="text-[10px] font-bold text-white bg-gray-800 px-2 py-0.5 rounded-full uppercase">Day {idx + 1}</span>
+                                                    <div className="font-bold text-gray-800 mt-1">{day.location.toUpperCase()}</div>
+                                                    
+                                                    <div className="flex items-center gap-2 mt-1">
+                                                        <span className="text-xs text-gray-500">{format(new Date(day.date), "MMM dd")}</span>
+                                                        <span className="text-gray-300">•</span>
+                                                        <span className="text-xs text-gray-500 flex items-center">
+                                                            <Users className="w-3 h-3 mr-1" />
+                                                            {day.travelers}
+                                                        </span>
+                                                    </div>
                                                 </div>
+                                                {/* --- 3. SHOW ONLY BASE LISTING PRICE IN RED --- */}
+                                                <div className="font-bold text-red-600 text-sm">¥{listingPrice.toLocaleString()}</div>
                                             </div>
-                                            <div className="font-bold text-red-600 text-sm">¥{day.price.toLocaleString()}</div>
+                                            
+                                            <div className="text-xs text-gray-600 border-t border-gray-200 pt-2 mt-2">
+                                                <p className="font-semibold mb-1">Destinations:</p>
+                                                <ul className="list-disc pl-4 space-y-0.5">
+                                                    {day.destinations.map((destId: string) => (
+                                                        <li key={destId}>{getDestName(destId)}</li>
+                                                    ))}
+                                                    {/* --- 4. SHOW ADD-ON SEPARATELY --- */}
+                                                    {hasTransfer && (
+                                                        <li className="text-blue-600 font-medium flex items-center -ml-1">
+                                                            <Plane className="w-3 h-3 mr-1" /> Airport Transfer (+¥{AIRPORT_TRANSFER_PRICE.toLocaleString()})
+                                                        </li>
+                                                    )}
+                                                </ul>
+                                            </div>
                                         </div>
-                                        
-                                        <div className="text-xs text-gray-600 border-t border-gray-200 pt-2 mt-2">
-                                            <p className="font-semibold mb-1">Destinations:</p>
-                                            <ul className="list-disc pl-4 space-y-0.5">
-                                                {day.destinations.map((destId: string) => (
-                                                    <li key={destId}>{getDestName(destId)}</li>
-                                                ))}
-                                                {day.transportation && day.transportation.includes("airport-transfer") && (
-                                                    <li className="text-blue-600 font-medium flex items-center -ml-1">
-                                                        <Plane className="w-3 h-3 mr-1" /> Airport Transfer (+¥8,000)
-                                                    </li>
-                                                )}
-                                            </ul>
-                                        </div>
-                                    </div>
-                                ))}
+                                    );
+                                })}
                             </div>
                         </div>
                     )}
