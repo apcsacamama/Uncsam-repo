@@ -6,8 +6,7 @@ import { Badge } from "./ui/badge";
 import { format } from "date-fns";
 import {
   MapPin, X, Bot, Calendar, Clock, Download, CloudRain, Sun,
-  AlertTriangle, Camera, Utensils, Sparkles, Car,
-  RotateCcw, Send, User
+  Camera, Utensils, Sparkles, Car, RotateCcw, Send, User, Pencil, Trash2
 } from "lucide-react";
 
 // --- TYPES ---
@@ -48,14 +47,7 @@ interface ItineraryChatbotProps {
   travelers: number;
 }
 
-// --- MOCK DATA ---
-const MOCK_WEATHER_DB: Record<string, { condition: string; temp: string; icon: 'sun' | 'rain' | 'cloud' }> = {
-  "Tokyo Tower": { condition: "Sunny", temp: "24°C", icon: 'sun' },
-  "Nagoya Castle": { condition: "Sunny", temp: "25°C", icon: 'sun' },
-  "Legoland Japan": { condition: "Cloudy", temp: "22°C", icon: 'cloud' },
-};
-
-// --- HELPER: Time Calculator ---
+// --- HELPER ---
 const addTime = (startTime: string, minutesToAdd: number): string => {
   const [hours, mins] = startTime.split(':').map(Number);
   const date = new Date();
@@ -79,10 +71,14 @@ export default function ItineraryChatbot({
   const [currentItinerary, setCurrentItinerary] = useState<DayItinerary[]>([]);
   const [history, setHistory] = useState<DayItinerary[][]>([]); 
   
-  // Revisions Logic: 5 revisions per booked day
-  const totalDays = customItinerary ? customItinerary.length : 1;
-  const MAX_REVISIONS = totalDays * 5;
+  // --- REVISION LOGIC ---
+  const totalDays = customItinerary && customItinerary.length > 0 ? customItinerary.length : 1;
+  const MAX_AI_REVISIONS = totalDays * 5; 
   const [revisionCount, setRevisionCount] = useState(0);
+
+  // Manual Edit State
+  const [editingItemId, setEditingItemId] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState("");
 
   // Chat State
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
@@ -91,30 +87,28 @@ export default function ItineraryChatbot({
   // Initial Load
   useEffect(() => {
     if (isVisible && currentItinerary.length === 0) {
-      // Add initial greeting
       setChatMessages([{
         role: 'ai',
-        text: `Hello! I see you have a ${totalDays}-day trip planned. I'm generating your initial itinerary now...`,
+        text: `Hello! I've prepared a ${totalDays}-day itinerary. You have ${MAX_AI_REVISIONS} AI revisions available. Note: Manual edits using the pencil icon are unlimited and free!`,
         timestamp: new Date()
       }]);
       generateItinerary(false); 
     }
   }, [isVisible]);
 
-  // Auto-scroll chat
+  // Auto-scroll
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [chatMessages]);
 
-  // --- GENERATOR LOGIC ---
+  // --- 1. AI GENERATOR (COSTS REVISIONS) ---
   const generateItinerary = async (isRevision: boolean = false, customInstruction: string = "") => {
-    if (isRevision && revisionCount >= MAX_REVISIONS) return;
+    if (isRevision && revisionCount >= MAX_AI_REVISIONS) return;
 
     setIsGenerating(true);
     
-    // Add User Message
     if (isRevision && customInstruction) {
         setChatMessages(prev => [...prev, { role: 'user', text: customInstruction, timestamp: new Date() }]);
     }
@@ -146,11 +140,10 @@ export default function ItineraryChatbot({
         const dayItems: ItineraryItem[] = [];
         let currentTime = "09:00"; 
 
-        // Apply Custom Instruction Logic (Basic NLP Simulation)
         if (customInstruction.toLowerCase().includes("start earlier")) currentTime = "08:00";
         if (customInstruction.toLowerCase().includes("start later")) currentTime = "10:00";
 
-        // 1. Start
+        // Start
         dayItems.push({
             id: `day${i}-start`,
             time: currentTime,
@@ -161,13 +154,12 @@ export default function ItineraryChatbot({
         });
         currentTime = addTime(currentTime, 30);
 
-        // 2. Destinations
+        // Destinations
         const reorderedDestinations = (isRevision && customInstruction.includes("reverse")) 
             ? [...dayDestinations].reverse() 
             : dayDestinations;
 
         reorderedDestinations.forEach((dest: string, idx: number) => {
-            // Travel Leg
             dayItems.push({
                 id: `day${i}-travel-${idx}`,
                 time: currentTime,
@@ -178,7 +170,6 @@ export default function ItineraryChatbot({
             });
             currentTime = addTime(currentTime, 30);
 
-            // Visit Leg
             dayItems.push({
                 id: `day${i}-visit-${idx}`,
                 time: currentTime,
@@ -189,7 +180,6 @@ export default function ItineraryChatbot({
             });
             currentTime = addTime(currentTime, 90);
 
-            // Lunch Leg
             const hour = parseInt(currentTime.split(':')[0]);
             if (hour >= 12 && hour <= 13 && !dayItems.some(item => item.type === 'meal')) {
                 dayItems.push({
@@ -204,7 +194,7 @@ export default function ItineraryChatbot({
             }
         });
 
-        // 3. End
+        // End
         dayItems.push({
             id: `day${i}-end`,
             time: currentTime,
@@ -224,24 +214,53 @@ export default function ItineraryChatbot({
 
     setCurrentItinerary(generatedDays);
     
-    // Add AI Response
-    const aiResponseText = isRevision 
-        ? `I've updated your itinerary! You have ${MAX_REVISIONS - (revisionCount + 1)} revisions left.` 
-        : "Here is your suggested plan. You can ask me to swap locations, change times, or add breaks!";
-    
-    setChatMessages(prev => [...prev, { role: 'ai', text: aiResponseText, timestamp: new Date() }]);
+    // Increment Count ONLY if AI Action
+    if (isRevision) {
+        setRevisionCount(prev => prev + 1);
+        const left = MAX_AI_REVISIONS - (revisionCount + 1);
+        setChatMessages(prev => [...prev, { role: 'ai', text: `Itinerary updated! You have ${left} AI revisions remaining.`, timestamp: new Date() }]);
+    } else {
+        setChatMessages(prev => [...prev, { role: 'ai', text: "Here is your plan. Manual edits are free!", timestamp: new Date() }]);
+    }
 
-    if (isRevision) setRevisionCount(prev => prev + 1);
     setIsGenerating(false);
     setPrompt(""); 
+  };
+
+  // --- 2. MANUAL ACTIONS (FREE) ---
+  const handleManualEditSave = (dayIndex: number) => {
+      if (!editingItemId) return;
+      
+      const newItinerary = [...currentItinerary];
+      const itemIndex = newItinerary[dayIndex].items.findIndex(i => i.id === editingItemId);
+      
+      if (itemIndex > -1) {
+          // Update item directly without touching revisionCount
+          newItinerary[dayIndex].items[itemIndex].activity = editValue;
+          setCurrentItinerary(newItinerary);
+          // Optional: Add log to chat
+          setChatMessages(prev => [...prev, { role: 'ai', text: "Manual edit saved. No revision points used.", timestamp: new Date() }]);
+      }
+      setEditingItemId(null);
+  };
+
+  const handleManualDelete = (dayIndex: number, itemId: string) => {
+      if(!confirm("Remove this item?")) return;
+      
+      const newItinerary = [...currentItinerary];
+      newItinerary[dayIndex].items = newItinerary[dayIndex].items.filter(i => i.id !== itemId);
+      setCurrentItinerary(newItinerary);
+      // Optional: Add log to chat
+      setChatMessages(prev => [...prev, { role: 'ai', text: "Item removed manually. No revision points used.", timestamp: new Date() }]);
   };
 
   const handleUndo = () => {
     if (history.length === 0) return;
     setCurrentItinerary(history[history.length - 1]);
     setHistory(prev => prev.slice(0, -1));
-    setRevisionCount(prev => Math.max(0, prev - 1));
-    setChatMessages(prev => [...prev, { role: 'ai', text: "I've undone the last change.", timestamp: new Date() }]);
+    // If undoing an AI action, credit back the point? Usually undo is "free" or just reverts state.
+    // For simplicity, we just revert state.
+    setChatMessages(prev => [...prev, { role: 'ai', text: "Undo successful.", timestamp: new Date() }]);
   };
 
   const handleSubmitPrompt = (e: React.FormEvent) => {
@@ -270,9 +289,17 @@ export default function ItineraryChatbot({
             <div className="bg-white/20 p-2 rounded-full backdrop-blur-sm"><Bot className="w-6 h-6 text-white" /></div>
             <div>
               <h2 className="text-xl font-bold tracking-tight">AI Itinerary Planner</h2>
-              <div className="flex items-center gap-2 text-xs text-red-100">
-                 <span>{totalDays} Day Trip</span>
-                 <span className="bg-white/20 px-2 py-0.5 rounded-full">{MAX_REVISIONS - revisionCount} Revisions Left</span>
+              <div className="flex items-center gap-3 text-xs text-red-100">
+                 <Badge variant="outline" className="text-white border-white/40 bg-white/10 font-normal">
+                    {totalDays} Day Trip
+                 </Badge>
+                 <span className="bg-white/20 px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
+                    <Sparkles className="w-3 h-3 text-yellow-300" />
+                    {MAX_AI_REVISIONS - revisionCount} AI Revisions Left
+                 </span>
+                 <span className="bg-green-500/20 px-2 py-0.5 rounded-full border border-green-400/30 text-green-100">
+                    Manual Edits: Free
+                 </span>
               </div>
             </div>
           </div>
@@ -288,12 +315,12 @@ export default function ItineraryChatbot({
           </div>
         </div>
 
-        {/* --- MAIN BODY (SPLIT VIEW) --- */}
+        {/* --- MAIN BODY --- */}
         <div className="flex-1 overflow-hidden flex flex-col md:flex-row">
           
-          {/* LEFT PANEL: ITINERARY VISUALIZER (65%) */}
+          {/* LEFT: ITINERARY VIEW */}
           <div className="flex-1 md:w-[65%] bg-gray-50/50 overflow-y-auto p-4 md:p-6 space-y-6 border-r border-gray-200">
-              {currentItinerary.map((day) => (
+              {currentItinerary.map((day, dayIndex) => (
                   <Card key={day.day} className="border-none shadow-sm ring-1 ring-gray-200/50">
                       <CardHeader className="bg-white border-b py-3 px-5 sticky top-0 z-10">
                           <div className="flex justify-between items-center">
@@ -308,18 +335,11 @@ export default function ItineraryChatbot({
                       </CardHeader>
                       <CardContent className="p-0">
                           <div className="relative">
-                              {/* Connector Line */}
                               <div className="absolute left-[3.25rem] top-4 bottom-4 w-0.5 bg-gray-100"></div>
-                              
                               <div className="space-y-0">
                                   {day.items.map((item) => (
                                       <div key={item.id} className="flex group hover:bg-gray-50 transition-colors py-3 px-4 relative">
-                                          {/* Time Column */}
-                                          <div className="w-10 text-right text-xs font-medium text-gray-400 pt-1 mr-4 flex-shrink-0">
-                                              {item.time}
-                                          </div>
-                                          
-                                          {/* Icon Node */}
+                                          <div className="w-10 text-right text-xs font-medium text-gray-400 pt-1 mr-4 flex-shrink-0">{item.time}</div>
                                           <div className="relative z-10 mr-4">
                                               <div className={`w-6 h-6 rounded-full flex items-center justify-center border bg-white ${
                                                   item.type === 'travel' ? 'border-blue-200 text-blue-500' :
@@ -329,15 +349,43 @@ export default function ItineraryChatbot({
                                                   {getActivityIcon(item.type)}
                                               </div>
                                           </div>
-
-                                          {/* Content */}
                                           <div className="flex-1 pt-0.5">
-                                              <h4 className="text-sm font-semibold text-gray-800 leading-tight">{item.activity}</h4>
-                                              <div className="flex items-center gap-3 mt-1 text-xs text-gray-500">
-                                                  <span className="flex items-center gap-1"><Clock className="w-3 h-3"/> {item.duration}</span>
-                                                  {item.location !== "Private Van" && <span className="flex items-center gap-1"><MapPin className="w-3 h-3"/> {item.location}</span>}
-                                              </div>
+                                              
+                                              {/* EDIT MODE */}
+                                              {editingItemId === item.id ? (
+                                                  <div className="flex gap-2 mb-2 w-full">
+                                                      <Input 
+                                                          value={editValue} 
+                                                          onChange={(e) => setEditValue(e.target.value)} 
+                                                          className="h-8 text-sm bg-white"
+                                                          autoFocus
+                                                      />
+                                                      <Button size="sm" onClick={() => handleManualEditSave(dayIndex)} className="h-8 bg-green-600">Save</Button>
+                                                      <Button size="sm" variant="ghost" onClick={() => setEditingItemId(null)} className="h-8">Cancel</Button>
+                                                  </div>
+                                              ) : (
+                                                  <>
+                                                      <h4 className="text-sm font-semibold text-gray-800 leading-tight">{item.activity}</h4>
+                                                      <div className="flex items-center gap-3 mt-1 text-xs text-gray-500">
+                                                          <span className="flex items-center gap-1"><Clock className="w-3 h-3"/> {item.duration}</span>
+                                                          {item.location !== "Private Van" && <span className="flex items-center gap-1"><MapPin className="w-3 h-3"/> {item.location}</span>}
+                                                      </div>
+                                                  </>
+                                              )}
                                           </div>
+
+                                          {/* MANUAL CONTROLS (Only visible on hover) */}
+                                          {editingItemId !== item.id && (
+                                              <div className="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity bg-white shadow-sm border rounded flex">
+                                                  <button onClick={() => { setEditingItemId(item.id); setEditValue(item.activity); }} className="p-1.5 hover:bg-blue-50 text-blue-600 rounded-l" title="Edit (Free)">
+                                                      <Pencil className="w-3 h-3" />
+                                                  </button>
+                                                  <div className="w-px bg-gray-200"></div>
+                                                  <button onClick={() => handleManualDelete(dayIndex, item.id)} className="p-1.5 hover:bg-red-50 text-red-600 rounded-r" title="Delete (Free)">
+                                                      <Trash2 className="w-3 h-3" />
+                                                  </button>
+                                              </div>
+                                          )}
                                       </div>
                                   ))}
                               </div>
@@ -345,14 +393,11 @@ export default function ItineraryChatbot({
                       </CardContent>
                   </Card>
               ))}
-              
-              <div className="h-12"></div> {/* Spacer */}
+              <div className="h-12"></div>
           </div>
 
-          {/* RIGHT PANEL: CHAT INTERFACE (35%) */}
+          {/* RIGHT: CHAT */}
           <div className="md:w-[35%] bg-white flex flex-col h-[40vh] md:h-auto border-t md:border-t-0 shadow-[-10px_0_30px_-10px_rgba(0,0,0,0.05)]">
-              
-              {/* Chat History */}
               <div className="flex-1 overflow-y-auto p-4 space-y-4" ref={scrollRef}>
                   {chatMessages.map((msg, idx) => (
                       <div key={idx} className={`flex gap-3 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
@@ -383,27 +428,26 @@ export default function ItineraryChatbot({
                   )}
               </div>
 
-              {/* Chat Input */}
               <div className="p-4 border-t bg-gray-50/50">
                   <form onSubmit={handleSubmitPrompt} className="relative">
                       <Input 
                           value={prompt} 
                           onChange={(e) => setPrompt(e.target.value)} 
-                          placeholder={revisionCount >= MAX_REVISIONS ? "Max revisions reached" : "Ex: Swap Day 1 lunch, Start later..."}
+                          placeholder={revisionCount >= MAX_AI_REVISIONS ? "Max AI revisions reached. Use manual tools." : "Ex: Swap Day 1 lunch..."}
                           className="pr-12 py-6 bg-white border-gray-200 focus-visible:ring-red-500 rounded-full shadow-sm"
-                          disabled={isGenerating || revisionCount >= MAX_REVISIONS}
+                          disabled={isGenerating || revisionCount >= MAX_AI_REVISIONS}
                       />
                       <Button 
                           type="submit" 
                           size="icon" 
-                          disabled={isGenerating || !prompt.trim() || revisionCount >= MAX_REVISIONS} 
+                          disabled={isGenerating || !prompt.trim() || revisionCount >= MAX_AI_REVISIONS} 
                           className="absolute right-1.5 top-1.5 h-9 w-9 rounded-full bg-red-600 hover:bg-red-700 text-white"
                       >
                           {isGenerating ? <Sparkles className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                       </Button>
                   </form>
                   <p className="text-[10px] text-center text-gray-400 mt-2">
-                      AI can make mistakes. Please review your itinerary carefully.
+                      <strong>Note:</strong> Chat requests use AI Revisions. Manual edits (pencil/trash) are free.
                   </p>
               </div>
           </div>
