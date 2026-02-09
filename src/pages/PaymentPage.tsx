@@ -31,10 +31,9 @@ import { format } from "date-fns";
 import { supabase } from "../lib/supabaseClient";
 
 // --- CONSTANTS ---
-const DOWN_PAYMENT_AMOUNT_JPY = 26000; 
+const DOWN_PAYMENT_PER_TRIP_JPY = 26000; 
 const AIRPORT_TRANSFER_PRICE = 8000; 
 
-// Fallback if Supabase is empty/loading
 const DEFAULT_DESTINATIONS = [
   { id: "hasedera", name: "Hasedera Temple" },
   { id: "kotoku-in", name: "Kotoku-in" },
@@ -82,13 +81,16 @@ export default function PaymentPage() {
     fetchDestinations();
   }, []);
 
-  // --- 4. PARSE DATA ---
+  // --- 4. PARSE DATA & RECALCULATE TOTALS ---
   useEffect(() => {
     if (isCustom && cartDataRaw) {
       try {
         const cart = JSON.parse(decodeURIComponent(cartDataRaw));
-        const total = parseInt(totalPriceParam || "0");
         
+        // Recalculate total from cart items
+        const calculatedTotal = cart.reduce((sum: number, item: any) => sum + (item.price || 0), 0);
+        const finalTotal = calculatedTotal > 0 ? calculatedTotal : parseInt(totalPriceParam || "0");
+
         let travelersDisplay = "1";
         if (cart.length > 0) {
             const counts = cart.map((item: any) => item.travelers);
@@ -107,7 +109,7 @@ export default function PaymentPage() {
           title: `Custom Itinerary (${cart.length} Days)`,
           date: dateStr,
           travelersLabel: travelersDisplay,
-          price: total,
+          price: finalTotal, 
           location: "Japan (Multi-City)",
           details: cart,
           isCustom: true
@@ -116,6 +118,7 @@ export default function PaymentPage() {
         console.error("Error parsing cart data", err);
       }
     } else {
+      // Standard flow
       setDisplayData({
         title: "Standard Tour",
         date: dateParam || "Date not selected",
@@ -159,10 +162,16 @@ export default function PaymentPage() {
     setFormData(prev => ({ ...prev, [name]: formattedValue }));
   };
 
-  // --- CALCULATE TOTALS ---
+  // --- CALCULATE DYNAMIC DOWN PAYMENT ---
+  // 1. Determine number of trips
+  const tripCount = displayData.isCustom && displayData.details.length > 0 ? displayData.details.length : 1;
+  
+  // 2. Calculate Total Down Payment (26k * Count)
+  const totalDownPayment = tripCount * DOWN_PAYMENT_PER_TRIP_JPY;
+
   const totalAmount = displayData.price;
-  const amountToPay = paymentOption === 'full' ? totalAmount : DOWN_PAYMENT_AMOUNT_JPY;
-  const balanceAmount = paymentOption === 'full' ? 0 : totalAmount - DOWN_PAYMENT_AMOUNT_JPY;
+  const amountToPay = paymentOption === 'full' ? totalAmount : totalDownPayment;
+  const balanceAmount = paymentOption === 'full' ? 0 : totalAmount - totalDownPayment;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -211,6 +220,8 @@ export default function PaymentPage() {
           
           {/* LEFT COLUMN: FORMS */}
           <div className="lg:col-span-2 space-y-8">
+            
+            {/* 1. Contact Information */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -248,6 +259,7 @@ export default function PaymentPage() {
               </CardContent>
             </Card>
 
+            {/* 2. Payment Options */}
             <Card className="border-l-4 border-l-blue-600">
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2">
@@ -273,13 +285,23 @@ export default function PaymentPage() {
                                     <div className="bg-green-100 text-green-700 text-[10px] font-bold px-2 py-0.5 rounded h-fit">INSTALLMENT</div>
                                 </div>
                                 <div className="text-sm text-gray-500 mb-2">Reserve now, pay the rest later.</div>
-                                <div className="text-lg font-bold text-blue-700">¥{DOWN_PAYMENT_AMOUNT_JPY.toLocaleString()}</div>
+                                
+                                {/* VISUAL BREAKDOWN OF DOWN PAYMENT */}
+                                <div className="flex items-baseline gap-2">
+                                    <div className="text-lg font-bold text-blue-700">¥{totalDownPayment.toLocaleString()}</div>
+                                    {tripCount > 1 && (
+                                        <div className="text-xs text-gray-400 font-medium">
+                                            (¥{DOWN_PAYMENT_PER_TRIP_JPY.toLocaleString()} × {tripCount} trips)
+                                        </div>
+                                    )}
+                                </div>
                             </Label>
                         </div>
                     </RadioGroup>
                 </CardContent>
             </Card>
 
+            {/* 3. Payment Method */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -311,16 +333,37 @@ export default function PaymentPage() {
                         </div>
                         <div className="space-y-2">
                             <Label>Card Number</Label>
-                            <Input name="cardNumber" placeholder="0000 0000 0000 0000" value={formData.cardNumber} onChange={handleInputChange} maxLength={19} inputMode="numeric"/>
+                            <Input 
+                                name="cardNumber" 
+                                placeholder="0000 0000 0000 0000" 
+                                value={formData.cardNumber} 
+                                onChange={handleInputChange} 
+                                maxLength={19} 
+                                inputMode="numeric"
+                            />
                         </div>
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
                                 <Label>Expiry Date</Label>
-                                <Input name="expiry" placeholder="MM/YY" value={formData.expiry} onChange={handleInputChange} maxLength={5} inputMode="numeric"/>
+                                <Input 
+                                    name="expiry" 
+                                    placeholder="MM/YY" 
+                                    value={formData.expiry} 
+                                    onChange={handleInputChange}
+                                    maxLength={5}
+                                    inputMode="numeric"
+                                />
                             </div>
                             <div className="space-y-2">
                                 <Label>CVC</Label>
-                                <Input name="cvc" placeholder="123" maxLength={4} value={formData.cvc} onChange={handleInputChange} inputMode="numeric"/>
+                                <Input 
+                                    name="cvc" 
+                                    placeholder="123" 
+                                    maxLength={4} 
+                                    value={formData.cvc} 
+                                    onChange={handleInputChange} 
+                                    inputMode="numeric"
+                                />
                             </div>
                         </div>
                     </div>
@@ -376,10 +419,10 @@ export default function PaymentPage() {
                             </h3>
                             <div className="space-y-4 max-h-[300px] overflow-y-auto pr-1">
                                 {displayData.details.map((day, idx) => {
-                                    // --- 1. DETECT TRANSFER ---
+                                    // LOGIC: Check for add-ons inside this day
                                     const hasTransfer = day.transportation && day.transportation.includes("airport-transfer");
                                     
-                                    // --- 2. CALCULATE BASE LISTING PRICE ---
+                                    // CALCULATE: Base listing price = Total Day Price - Add-ons
                                     const listingPrice = day.price - (hasTransfer ? AIRPORT_TRANSFER_PRICE : 0);
 
                                     return (
@@ -398,7 +441,7 @@ export default function PaymentPage() {
                                                         </span>
                                                     </div>
                                                 </div>
-                                                {/* --- 3. SHOW ONLY BASE LISTING PRICE IN RED --- */}
+                                                {/* DISPLAY ONLY BASE LISTING PRICE IN RED */}
                                                 <div className="font-bold text-red-600 text-sm">¥{listingPrice.toLocaleString()}</div>
                                             </div>
                                             
@@ -408,7 +451,7 @@ export default function PaymentPage() {
                                                     {day.destinations.map((destId: string) => (
                                                         <li key={destId}>{getDestName(destId)}</li>
                                                     ))}
-                                                    {/* --- 4. SHOW ADD-ON SEPARATELY --- */}
+                                                    {/* Display Add-on clearly with its price */}
                                                     {hasTransfer && (
                                                         <li className="text-blue-600 font-medium flex items-center -ml-1">
                                                             <Plane className="w-3 h-3 mr-1" /> Airport Transfer (+¥{AIRPORT_TRANSFER_PRICE.toLocaleString()})
