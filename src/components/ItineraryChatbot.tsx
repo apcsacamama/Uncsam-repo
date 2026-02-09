@@ -16,8 +16,6 @@ import {
   Navigation,
   Camera,
   Utensils,
-  Maximize2,
-  Minimize2,
   Sparkles,
   Car,
   RotateCcw, 
@@ -97,7 +95,6 @@ export default function ItineraryChatbot({
   travelers,
 }: ItineraryChatbotProps) {
   // UI States
-  const [isMinimized, setIsMinimized] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [prompt, setPrompt] = useState("");
   
@@ -106,7 +103,7 @@ export default function ItineraryChatbot({
   const [history, setHistory] = useState<DayItinerary[][]>([]); 
   const [revisionCount, setRevisionCount] = useState(0);
   
-  // UPDATED: Limit to 5 revisions
+  // Limit to 5 revisions
   const MAX_REVISIONS = 5;
 
   const [weatherWarnings, setWeatherWarnings] = useState<string[]>([]);
@@ -139,8 +136,7 @@ export default function ItineraryChatbot({
         setHistory(prev => [...prev, currentItinerary]);
     }
 
-    // 2. Feasibility Logic (Strict 12-Hour inclusive of Travel)
-    // Assumption: 1.5h per spot + 45min travel per spot + 1h lunch
+    // 2. Feasibility Logic
     const estTime = (selectedDestinations.length * 1.5) + (selectedDestinations.length * 0.75) + 1;
     if (estTime > 12) {
         setFeasibilityIssue(`⚠️ Time Warning: You selected ${selectedDestinations.length} spots. Since travel time is included in your 12-hour booking, this might be rushed.`);
@@ -172,12 +168,11 @@ export default function ItineraryChatbot({
     // 5. Build Itinerary Items
     const generatedItems: ItineraryItem[] = [];
     
-    // --- UPDATED DEFAULT START TIME TO 06:00 AM ---
+    // Default start is 06:00 AM
     let currentTime = customInstruction.toLowerCase().includes("start at") 
         ? customInstruction.split("start at")[1].trim().split(" ")[0] 
         : "06:00"; 
     
-    // Fallback check
     if (!currentTime.includes(":")) currentTime = "06:00"; 
 
     let hasHadLunch = false;
@@ -225,9 +220,8 @@ export default function ItineraryChatbot({
         });
         currentTime = addTime(currentTime, 90);
 
-        // Lunch Logic
+        // Lunch Logic (11am - 2pm)
         const currentHour = parseInt(currentTime.split(':')[0]);
-        // Simple logic: Lunch between 11:00 and 14:00 (11am - 2pm)
         if (currentHour >= 11 && currentHour <= 14 && !hasHadLunch) {
             generatedItems.push({
                 id: "lunch-1",
@@ -352,7 +346,7 @@ export default function ItineraryChatbot({
 
   return (
     <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 animate-in fade-in duration-200">
-      <div className={`bg-white rounded-lg shadow-2xl transition-all duration-300 ${isMinimized ? "w-96 h-16" : "w-[95%] h-[95%] sm:w-[90%] sm:h-[90%] lg:w-[80%] lg:h-[90%]"} max-w-6xl max-h-screen overflow-hidden flex flex-col`}>
+      <div className="bg-white rounded-lg shadow-2xl w-[95%] h-[95%] sm:w-[90%] sm:h-[90%] lg:w-[80%] lg:h-[90%] max-w-6xl max-h-screen overflow-hidden flex flex-col">
         
         {/* Header */}
         <div className="bg-gradient-to-r from-red-600 to-red-700 text-white p-4 sm:p-6 flex-shrink-0">
@@ -364,10 +358,8 @@ export default function ItineraryChatbot({
                 <p className="text-red-100 text-sm">Interactive Assistant (12-Hour Exclusive)</p>
               </div>
             </div>
+            {/* Removed Minimize Button */}
             <div className="flex items-center space-x-2">
-              <Button variant="ghost" size="sm" onClick={() => setIsMinimized(!isMinimized)} className="text-white hover:bg-white/20">
-                {isMinimized ? <Maximize2 className="w-5 h-5" /> : <Minimize2 className="w-5 h-5" />}
-              </Button>
               <Button variant="ghost" size="sm" onClick={onClose} className="text-white hover:bg-white/20">
                 <X className="w-5 h-5" />
               </Button>
@@ -376,8 +368,7 @@ export default function ItineraryChatbot({
         </div>
 
         {/* Main Content Area */}
-        {!isMinimized && (
-          <div className="flex-1 overflow-hidden bg-gray-50 flex flex-col">
+        <div className="flex-1 overflow-hidden bg-gray-50 flex flex-col">
             
             {/* Toolbar */}
             <div className="bg-white border-b px-4 py-3 flex justify-between items-center flex-wrap gap-3">
@@ -421,7 +412,6 @@ export default function ItineraryChatbot({
                         {/* 2. Weather Dashboard */}
                         {currentItinerary.length > 0 && (
                             <div className="bg-gradient-to-r from-blue-600 to-blue-500 rounded-lg p-6 text-white shadow-lg relative overflow-hidden">
-                                {/* Decorative Circles */}
                                 <div className="absolute -top-10 -right-10 w-32 h-32 bg-white/10 rounded-full blur-2xl"></div>
                                 <div className="absolute top-10 left-10 w-16 h-16 bg-white/10 rounded-full blur-xl"></div>
 
@@ -572,8 +562,7 @@ export default function ItineraryChatbot({
                 </div>
             </div>
 
-          </div>
-        )}
+        </div>
       </div>
     </div>
   );
