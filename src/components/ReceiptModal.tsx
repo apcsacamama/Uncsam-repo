@@ -14,9 +14,9 @@ interface InvoiceModalProps {
     totalPrice: number;
     travelers: number;
     hasAirportTransfer: boolean;
-    paymentType?: 'full' | 'downpayment'; // Added
-    amountPaid?: number; // Added
-    balance?: number; // Added
+    paymentType?: 'full' | 'downpayment';
+    amountPaid?: number;
+    balance?: number;
   };
 }
 
@@ -62,35 +62,52 @@ export default function InvoiceModal({
 
   if (!isOpen) return null;
 
-  // --- CALCULATE LINE ITEMS ---
+  // --- SMART DATA EXTRACTION ---
   const airportTransferPrice = 8000;
-  // Calculate base price (Total - Addons)
-  const basePriceTotal = paymentDetails.totalPrice - (paymentDetails.hasAirportTransfer ? airportTransferPrice : 0);
   
-  // Payment Status Logic
+  // 1. Determine Listing Name & Transfer Status directly from details if available
+  let listingName = packageDetails?.title || "Standard Tour Package";
+  let hasTransfer = paymentDetails.hasAirportTransfer;
+
+  // If we have detailed cart info (Custom Tour), verify the data
+  if (bookingDetails.details && bookingDetails.details.length > 0) {
+      const firstItem = bookingDetails.details[0];
+      
+      // Fix Name: Use the specific location (e.g. "NAGOYA")
+      if (firstItem.location) {
+          listingName = firstItem.location.toUpperCase();
+      }
+
+      // Fix Transfer Check: Look inside the transportation array
+      if (firstItem.transportation && firstItem.transportation.includes("airport-transfer")) {
+          hasTransfer = true;
+      }
+  }
+
+  // 2. Calculate Base Price (Total - Addon)
+  // This ensures 93k becomes 85k base + 8k add-on
+  const basePriceTotal = paymentDetails.totalPrice - (hasTransfer ? airportTransferPrice : 0);
+  
+  // 3. Payment Status Logic
   const isDownPayment = paymentDetails.paymentType === 'downpayment';
   const amountPaid = paymentDetails.amountPaid || paymentDetails.totalPrice;
   const balanceDue = paymentDetails.balance || 0;
 
-  // Prepare Invoice Items
+  // 4. Prepare Invoice Items Array
   const invoiceItems = [];
 
-  // 1. Tour Package Item
-  const description = bookingDetails.details && bookingDetails.details.length > 0
-    ? `Custom Tour Package (${bookingDetails.details.length} Days) - Japan`
-    : (packageDetails?.title || "Standard Tour Package");
-
+  // Item 1: The Main Listing (e.g. NAGOYA)
   invoiceItems.push({
-      description: `${description} (${paymentDetails.travelers} Travelers)`,
+      description: listingName,
       qty: 1, 
       unitPrice: basePriceTotal,
       amount: basePriceTotal
   });
 
-  // 2. Add-on Item
-  if (paymentDetails.hasAirportTransfer) {
+  // Item 2: The Add-on
+  if (hasTransfer) {
       invoiceItems.push({
-          description: "Add-on: Private Airport Transfer",
+          description: "Add-on: Airport Transfer",
           qty: 1,
           unitPrice: airportTransferPrice,
           amount: airportTransferPrice
@@ -211,10 +228,9 @@ export default function InvoiceModal({
                 </table>
             </div>
 
-            {/* 4. TOTALS (Updated for Down Payment) */}
+            {/* 4. TOTALS */}
             <div className="flex justify-end mb-16">
                 <div className="w-5/12 space-y-3">
-                    {/* Subtotals */}
                     <div className="flex justify-between text-sm text-gray-600">
                         <span>Total Amount</span>
                         <span>¥{paymentDetails.totalPrice.toLocaleString()}</span>
@@ -224,7 +240,6 @@ export default function InvoiceModal({
                         <span>¥0</span>
                     </div>
 
-                    {/* Logic for Down Payment Display */}
                     <div className="border-t border-gray-200 my-2"></div>
 
                     <div className="flex justify-between text-sm font-bold text-gray-800">
