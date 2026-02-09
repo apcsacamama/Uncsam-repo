@@ -9,7 +9,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { Calendar } from "./ui/calendar";
 import { 
   X, ArrowRight, MapPin, CheckCircle, Calendar as CalendarIcon, 
-  Users, Layers, ArrowLeft, Car, Plane, AlertCircle, 
+  Users, Layers, ArrowLeft, Car, Plane, Info, AlertCircle, 
   Settings, Save, Trash2, Loader2, PlusCircle
 } from "lucide-react";
 import { TourPackage } from "../types/travel";
@@ -21,18 +21,13 @@ import { format, isBefore, startOfToday, isSameDay } from "date-fns";
 import { cn } from "../lib/utils";
 
 // --- CONFIGURATION ---
-// Added more regions to prevent pricing errors
 const PRICING_CONFIG: Record<string, { tier1: number; tier2: number }> = {
   nara: { tier1: 85000, tier2: 105000 },
   hakone: { tier1: 75000, tier2: 95000 },
   nagoya: { tier1: 85000, tier2: 105000 },
-  tokyo: { tier1: 60000, tier2: 80000 },
-  osaka: { tier1: 85000, tier2: 105000 },
-  kyoto: { tier1: 80000, tier2: 100000 },
 };
-
 const MAX_TRAVELERS = 9;
-const MIN_DESTINATIONS = 1; 
+const MIN_DESTINATIONS = 1; // Lowered this so single destination offers don't break
 const MAX_DESTINATIONS = 5;
 const FULLY_BOOKED_DATES = [new Date(2025, 12, 25), new Date(2025, 12, 31)];
 const DEFAULT_DESTINATIONS = [
@@ -126,39 +121,27 @@ export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) 
 
     setIsMultiDay(false); // Single Tour Mode
 
-    // 1. Smart Location Detection
-    const titleLower = offer.title.toLowerCase();
-    let loc = "nagoya"; // Fallback
-    if (titleLower.includes("nara")) loc = "nara";
-    else if (titleLower.includes("hakone")) loc = "hakone";
-    else if (titleLower.includes("tokyo") || titleLower.includes("disney")) loc = "tokyo";
-    else if (titleLower.includes("osaka")) loc = "osaka";
-    else if (titleLower.includes("kyoto")) loc = "kyoto";
-    else if (titleLower.includes("fuji")) loc = "hakone";
-
-    // 2. Map Destinations
+    // Map the offer's destinations to the selection IDs
     const mappedDestinations = offer.destinations.map(name => {
         const found = allDestinations.find(d => d.name === name);
         return found ? found.id : name; 
     });
 
-    // 3. Filter Ghost Destinations (Fixes the "4/5 Selected" bug)
-    // Only keep destinations that actually belong to the detected location
-    const validDestinations = mappedDestinations.filter(id => {
-       const dest = allDestinations.find(d => d.id === id);
-       // If destination exists in DB, check its location. If not (custom string), keep it.
-       return dest ? dest.location === loc : true; 
-    });
+    let loc = "nagoya"; // Default
+    if (offer.title.toLowerCase().includes("nara")) loc = "nara";
+    if (offer.title.toLowerCase().includes("hakone")) loc = "hakone";
+    if (offer.title.toLowerCase().includes("tokyo")) loc = "tokyo"; // Added Tokyo check
 
     const parsedDate = new Date(offerDate);
 
-    // 4. Pre-fill the form
+    // --- CRITICAL CHANGE: PRE-FILL THE BUILDER, DO NOT ADD TO CART YET ---
     setLocation(loc);
     setCustomDate(parsedDate);
     setCustomTravelers(offerTravelers);
-    setSelectedDestinations(validDestinations); // Use filtered list
+    setSelectedDestinations(mappedDestinations);
     setSelectedTransportation(["private-van"]);
     
+    // Switch view so user can see the checkboxes and add airport transfer
     setViewMode('custom');
   };
 
@@ -209,7 +192,6 @@ export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) 
   const handleLocationChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newLocation = e.target.value;
     setLocation(newLocation);
-    // Clear selections when changing region to prevent ghost items
     setSelectedDestinations([]); 
     setDestForm(prev => ({ ...prev, location: newLocation || "nagoya" }));
   };
@@ -247,7 +229,7 @@ export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) 
   const getCurrentPrice = () => {
     if (!location) return 0;
     const config = PRICING_CONFIG[location];
-    // Use offer price as fallback if config missing
+    // If no config found (e.g. standard offer fallback), use offer price if available or default
     const basePrice = config 
         ? (customTravelers <= 6 ? config.tier1 : config.tier2)
         : (offer?.price || 80000); 
@@ -277,27 +259,12 @@ export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) 
 
     setCart([...cart, newItem]);
     
+    // Only reset if Multi-Day. If Single-Day, we don't clear because the user might just want to edit the same day.
     if (isMultiDay) {
         setCustomDate(undefined);
         setSelectedDestinations([]);
         setSelectedTransportation(["private-van"]);
     }
-  };
-
-  const updateSingleCartItem = () => {
-    if (!isCurrentFormValid || !customDate) return;
-
-    const updatedItem: CartItem = {
-        id: cart[0]?.id || Math.random().toString(36).substr(2, 9),
-        location,
-        date: customDate,
-        travelers: customTravelers,
-        destinations: [...selectedDestinations],
-        transportation: [...selectedTransportation],
-        price: currentFormPrice
-    };
-
-    setCart([updatedItem]);
   };
 
   const removeFromCart = (id: string) => {
@@ -307,27 +274,12 @@ export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) 
   const cartTotal = cart.reduce((sum, item) => sum + item.price, 0);
 
   const handleFinalCheckout = () => {
-    // If user clicks Proceed without adding to cart first (in Single Mode), do it now
-    if (cart.length === 0 && !isMultiDay && isCurrentFormValid && customDate) {
-        const tempCartItem: CartItem = {
-            id: Math.random().toString(36).substr(2, 9),
-            location,
-            date: customDate,
-            travelers: customTravelers,
-            destinations: [...selectedDestinations],
-            transportation: [...selectedTransportation],
-            price: currentFormPrice
-        };
-        const cartData = encodeURIComponent(JSON.stringify([tempCartItem]));
-        navigate(`/payment?custom=true&cartData=${cartData}&totalPrice=${currentFormPrice}&name=Valued+Customer`);
-        return;
-    }
-
     const cartData = encodeURIComponent(JSON.stringify(cart));
     navigate(`/payment?custom=true&cartData=${cartData}&totalPrice=${cartTotal}&name=Valued+Customer`);
   };
 
   const handleSaveDestination = async () => {
+    // ... (Admin save logic remains same)
     if (!destForm.name || !destForm.location) { alert("Please provide a name and location."); return; }
     setIsSavingDest(true);
     try {
@@ -363,7 +315,9 @@ export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) 
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
       <div className={cn("bg-white rounded-xl shadow-2xl w-full flex flex-col transition-all duration-300", viewMode === 'custom' ? "max-w-7xl h-[95vh]" : "max-w-2xl max-h-[90vh]")}>
         
-        {/* VIEW MODE: OFFER */}
+        {/* ================================================== */}
+        {/* VIEW MODE: STANDARD OFFER */}
+        {/* ================================================== */}
         {viewMode === 'offer' && (
            <>
             <div className="relative h-48 w-full flex-shrink-0 bg-gray-200">
@@ -381,6 +335,7 @@ export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) 
                <p className="text-gray-600 mb-6">{offer.description}</p>
 
                <div className="grid md:grid-cols-2 gap-8">
+                  {/* Left Column: Details */}
                   <div className="space-y-6">
                      <div>
                         <h3 className="font-semibold text-gray-900 mb-3 flex items-center">
@@ -394,6 +349,7 @@ export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) 
                            ))}
                         </ul>
                      </div>
+
                      <div>
                         <h3 className="font-semibold text-gray-900 mb-3 flex items-center">
                             <CheckCircle className="w-4 h-4 mr-2 text-green-600" />Inclusions
@@ -408,6 +364,7 @@ export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) 
                      </div>
                   </div>
 
+                  {/* Right Column: Booking Form */}
                   <div className="bg-gray-50 p-5 rounded-lg border border-gray-100 h-fit">
                      <h3 className="font-bold text-gray-900 mb-4 border-b pb-2">Plan Your Trip</h3>
                      <div className="space-y-4">
@@ -418,6 +375,7 @@ export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) 
                               <input type="date" className="w-full pl-10 pr-4 py-2 border rounded-md text-sm bg-white" min={new Date().toISOString().split("T")[0]} value={offerDate} onChange={(e) => setOfferDate(e.target.value)} />
                            </div>
                         </div>
+
                         <div>
                            <label className="text-sm font-medium text-gray-700 mb-1 block">Travelers</label>
                            <div className="relative">
@@ -427,6 +385,7 @@ export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) 
                               </select>
                            </div>
                         </div>
+
                         <div className="pt-4 mt-2 border-t">
                            <div className="flex justify-between items-end mb-1">
                               <span className="text-sm text-gray-600">Total Price</span>
@@ -434,6 +393,7 @@ export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) 
                            </div>
                            <p className="text-xs text-gray-400 text-right">Includes taxes & fees</p>
                         </div>
+
                         <div className="flex flex-col gap-2 mt-4">
                           <Button variant="outline" className="w-full border-gray-300 text-gray-700 hover:bg-gray-50 hover:text-red-600" onClick={handleBookMultiple}>
                               <Layers className="w-4 h-4 mr-2" />Book multiple tours or dates
@@ -449,15 +409,19 @@ export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) 
            </>
         )}
 
-        {/* VIEW MODE: CUSTOM TOUR BUILDER */}
+        {/* ================================================== */}
+        {/* VIEW MODE: CUSTOM TOUR BUILDER (CART) */}
+        {/* ================================================== */}
         {viewMode === 'custom' && (
            <div className="flex flex-col h-full overflow-hidden">
+              {/* Header */}
               <div className="flex items-center justify-between p-4 border-b bg-gray-50 flex-shrink-0">
                   <div className="flex items-center gap-2">
                      <Button variant="ghost" size="sm" onClick={() => setViewMode('offer')} className="mr-2">
                         <ArrowLeft className="w-4 h-4 mr-2" /> Back to Offer
                      </Button>
                      <div>
+                        {/* DYNAMIC TITLE */}
                         <h2 className="text-xl font-bold text-gray-900">
                             {isMultiDay ? "Build Your Itinerary" : "Customize Your Tour"}
                         </h2>
@@ -469,10 +433,14 @@ export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) 
                   <Button variant="ghost" size="icon" onClick={onClose}><X className="w-5 h-5" /></Button>
               </div>
 
+              {/* Content Grid */}
               <div className="flex-1 overflow-y-auto p-4 md:p-6 bg-gray-50/50">
                   <div className="grid lg:grid-cols-12 gap-6 h-full">
-                      {/* BUILDER PANEL */}
+                      
+                      {/* LEFT COLUMN: BUILDER (8 cols) */}
                       <div className="lg:col-span-8 space-y-6">
+                        
+                        {/* 1. Location & Date Form */}
                         <Card className="shadow-sm">
                             <CardHeader className="py-4 border-b bg-gray-50/30">
                                 <CardTitle className="text-base font-bold text-gray-800">1. Location & Date</CardTitle>
@@ -480,14 +448,13 @@ export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) 
                             <CardContent className="p-6 grid md:grid-cols-2 gap-6">
                                 <div className="space-y-2">
                                     <Label className="text-xs text-gray-500 uppercase tracking-wide">Region</Label>
+                                    {/* Disable region selection if Single Day mode to prevent confusion */}
                                     <select value={location} onChange={handleLocationChange} disabled={!isMultiDay} className="w-full px-3 py-2 border rounded-md bg-white focus:ring-2 focus:ring-red-500 focus:outline-none disabled:bg-gray-100 disabled:text-gray-500">
                                         <option value="">Select Region...</option>
                                         <option value="nagoya">Nagoya</option>
                                         <option value="hakone">Hakone</option>
                                         <option value="nara">Nara</option>
                                         <option value="tokyo">Tokyo</option>
-                                        <option value="osaka">Osaka</option>
-                                        <option value="kyoto">Kyoto</option>
                                     </select>
                                 </div>
                                 <div className="space-y-2">
@@ -503,7 +470,11 @@ export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) 
                                         </Popover>
                                         <div className="flex items-center border rounded-md px-2 bg-white">
                                              <Users className="w-4 h-4 text-gray-400 mr-2"/>
-                                             <select className="bg-transparent border-none text-sm focus:ring-0 cursor-pointer py-1" value={customTravelers} onChange={(e) => setCustomTravelers(parseInt(e.target.value))}>
+                                             <select 
+                                                className="bg-transparent border-none text-sm focus:ring-0 cursor-pointer py-1"
+                                                value={customTravelers}
+                                                onChange={(e) => setCustomTravelers(parseInt(e.target.value))}
+                                             >
                                                 {[1,2,3,4,5,6,7,8,9].map(n => <option key={n} value={n}>{n}</option>)}
                                              </select>
                                         </div>
@@ -512,6 +483,7 @@ export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) 
                             </CardContent>
                         </Card>
 
+                        {/* 2. Destinations Selection */}
                         <Card className="flex-1 shadow-sm">
                              <CardHeader className="py-4 bg-gray-50/30 border-b flex flex-row justify-between items-center">
                                 <div className="flex items-center gap-3">
@@ -526,11 +498,13 @@ export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) 
                                     </Button>
                                 )}
                              </CardHeader>
+                             
                              <CardContent className="p-6">
                                 {!location ? (
                                     <div className="text-center py-12 bg-gray-50 rounded-lg border-2 border-dashed border-gray-200">
                                         <MapPin className="w-10 h-10 text-gray-300 mx-auto mb-3" />
                                         <p className="text-gray-500 font-medium">Please select a region in Step 1</p>
+                                        <p className="text-xs text-gray-400">Available destinations will appear here</p>
                                     </div>
                                 ) : (
                                     <div className="grid md:grid-cols-2 gap-4">
@@ -549,23 +523,24 @@ export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) 
                                                 </div>
                                             );
                                         })}
-                                        {filteredDestinations.length === 0 && (
-                                            <p className="text-sm text-gray-500 col-span-2">No destinations found for {location}. Admin can add some here.</p>
-                                        )}
                                     </div>
                                 )}
                              </CardContent>
 
+                             {/* --- ADD-ONS SECTION --- */}
                              {location && (
                                  <div className="px-6 py-4 bg-gray-50 border-t border-b">
                                      <h4 className="text-sm font-bold text-gray-700 mb-3 flex items-center">
-                                         <PlusCircle className="w-4 h-4 mr-2 text-gray-400"/> Optional Add-ons
+                                         <PlusCircle className="w-4 h-4 mr-2 text-gray-400"/>
+                                         Optional Add-ons
                                      </h4>
                                      <div className="flex flex-wrap gap-4">
                                         {transportationOptions.map((t) => (
                                             <div key={t.id} className={cn("flex items-center space-x-2 bg-white px-3 py-2 rounded border transition-colors", (t.included || selectedTransportation.includes(t.id)) ? "border-gray-400" : "border-gray-200")}>
                                                 <Checkbox id={t.id} checked={t.included || selectedTransportation.includes(t.id)} disabled={t.included} onCheckedChange={(c) => !t.included && handleTransportationChange(t.id, c as boolean)} />
+                                                
                                                 <t.icon className={cn("w-4 h-4", t.included ? "text-green-600" : "text-gray-500")} />
+                                                
                                                 <Label htmlFor={t.id} className="text-sm cursor-pointer">{t.label}</Label>
                                                 {t.price > 0 && <span className="text-xs font-bold text-gray-500 ml-1">+¥{t.price.toLocaleString()}</span>}
                                             </div>
@@ -574,25 +549,29 @@ export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) 
                                  </div>
                              )}
 
+                             {/* FOOTER ACTIONS (DYNAMIC BUTTON) */}
                              <div className="p-6 bg-white flex justify-between items-center rounded-b-xl border-t-4 border-gray-100">
                                 <div>
-                                    <p className="text-xs text-gray-500 uppercase font-bold">{isMultiDay ? "Estimated Day Price" : "Total Tour Price"}</p>
+                                    <p className="text-xs text-gray-500 uppercase font-bold">Estimated Day Price</p>
                                     <p className="text-2xl font-bold text-red-600">¥{currentFormPrice.toLocaleString()}</p>
                                 </div>
-                                {isMultiDay ? (
-                                    <Button size="lg" onClick={addToCart} disabled={!isCurrentFormValid} className="bg-gray-900 text-white hover:bg-black shadow-lg hover:shadow-xl transition-all">
-                                        <PlusCircle className="w-5 h-5 mr-2" /> Add Day to Trip
-                                    </Button>
-                                ) : (
-                                    <Button size="lg" onClick={handleFinalCheckout} disabled={!isCurrentFormValid} className="bg-red-600 text-white hover:bg-red-700 shadow-md transition-all">
-                                        <CheckCircle className="w-5 h-5 mr-2" /> Confirm & Checkout
-                                    </Button>
-                                )}
+                                <Button 
+                                    size="lg" 
+                                    onClick={addToCart} 
+                                    disabled={!isCurrentFormValid} 
+                                    className="bg-gray-900 text-white hover:bg-black shadow-lg hover:shadow-xl transition-all"
+                                >
+                                    {isMultiDay ? (
+                                        <><PlusCircle className="w-5 h-5 mr-2" /> Add Day to Trip</>
+                                    ) : (
+                                        <><CheckCircle className="w-5 h-5 mr-2" /> Confirm Selection</>
+                                    )}
+                                </Button>
                              </div>
                         </Card>
                       </div>
 
-                      {/* SUMMARY PANEL */}
+                      {/* RIGHT COLUMN: CHOSEN TRIPS (4 cols) */}
                       <div className="lg:col-span-4 flex flex-col h-full">
                          <Card className="sticky top-0 shadow-lg border-t-4 border-t-red-600 flex flex-col h-full max-h-[calc(100vh-120px)]">
                             <CardHeader className="py-4 border-b bg-white z-10">
@@ -603,59 +582,62 @@ export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) 
                             </CardHeader>
                             
                             <CardContent className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
-                                {isMultiDay && cart.length === 0 ? (
+                                {cart.length === 0 ? (
                                     <div className="text-center py-10 text-gray-400 space-y-2">
                                         <div className="bg-white p-4 rounded-full w-16 h-16 mx-auto flex items-center justify-center shadow-sm">
                                             <AlertCircle className="w-8 h-8 opacity-20" />
                                         </div>
-                                        <p className="text-sm font-medium text-gray-600">Your trip is currently empty</p>
-                                        <p className="text-xs">Configure a day on the left and click "Add Day to Trip".</p>
+                                        <p className="text-sm font-medium text-gray-600">
+                                            {isMultiDay ? "Your trip is currently empty" : "Confirm your selection on the left"}
+                                        </p>
+                                        <p className="text-xs">
+                                            {isMultiDay ? "Configure a day on the left and click 'Add Day'." : "Click 'Confirm Selection' when you are ready."}
+                                        </p>
                                     </div>
                                 ) : (
                                     <div className="space-y-3">
-                                        {/* In Single Mode, show LIVE preview of the left form */}
-                                        {!isMultiDay && isCurrentFormValid && (
-                                            <div className="bg-white p-3 rounded-lg border shadow-sm border-blue-200 bg-blue-50/20">
-                                                <div className="flex justify-between items-start mb-2">
-                                                    <div>
-                                                        <h4 className="font-bold text-gray-800 text-lg leading-tight">{location.toUpperCase()}</h4>
-                                                        <div className="flex items-center gap-3 mt-1">
-                                                            <div className="flex items-center text-xs text-gray-500 font-medium"><CalendarIcon className="w-3 h-3 mr-1" />{customDate ? format(customDate, "MMM dd") : "No Date"}</div>
-                                                            <div className="flex items-center text-xs text-gray-500 font-medium"><Users className="w-3 h-3 mr-1" />{customTravelers} Pax</div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                <div className="text-xs text-gray-500 border-t pt-2 mt-2">
-                                                    <p className="font-semibold mb-1 text-gray-700">Selected:</p>
-                                                    <ul className="list-disc pl-4 space-y-0.5">
-                                                        {selectedDestinations.map(id => <li key={id}>{allDestinations.find(d => d.id === id)?.name || id}</li>)}
-                                                        {selectedTransportation.includes("airport-transfer") && <li className="text-blue-600 font-medium">Airport Transfer</li>}
-                                                    </ul>
-                                                </div>
-                                            </div>
-                                        )}
-
-                                        {/* Multi-Day Cart Items */}
                                         {cart.map((item, index) => (
                                             <div key={item.id} className="bg-white p-3 rounded-lg border shadow-sm relative group hover:shadow-md transition-shadow">
                                                 <div className="flex justify-between items-start mb-2">
                                                     <div>
-                                                        <span className="text-[10px] font-bold text-white bg-gray-800 px-2 py-0.5 rounded-full uppercase tracking-wider mb-1 inline-block">Day {index + 1}</span>
+                                                        {isMultiDay && <span className="text-[10px] font-bold text-white bg-gray-800 px-2 py-0.5 rounded-full uppercase tracking-wider mb-1 inline-block">Day {index + 1}</span>}
                                                         <h4 className="font-bold text-gray-800 text-lg leading-tight">{item.location.toUpperCase()}</h4>
+                                                        
                                                         <div className="flex items-center gap-3 mt-1">
-                                                            <div className="flex items-center text-xs text-gray-500 font-medium"><CalendarIcon className="w-3 h-3 mr-1" />{format(item.date, "MMM dd")}</div>
+                                                            <div className="flex items-center text-xs text-gray-500 font-medium">
+                                                                <CalendarIcon className="w-3 h-3 mr-1" />
+                                                                {format(item.date, "MMM dd, yyyy")}
+                                                            </div>
+                                                            <div className="flex items-center text-xs text-gray-500 font-medium">
+                                                                <Users className="w-3 h-3 mr-1" />
+                                                                {item.travelers} Traveler{item.travelers > 1 ? 's' : ''}
+                                                            </div>
                                                         </div>
+
                                                     </div>
-                                                    <Button variant="ghost" size="icon" className="h-6 w-6 text-gray-300 hover:text-red-500 hover:bg-red-50" onClick={() => removeFromCart(item.id)}>
-                                                        <Trash2 className="w-3.5 h-3.5" />
-                                                    </Button>
+                                                    {isMultiDay && (
+                                                        <Button variant="ghost" size="icon" className="h-6 w-6 text-gray-300 hover:text-red-500 hover:bg-red-50" onClick={() => removeFromCart(item.id)}>
+                                                            <Trash2 className="w-3.5 h-3.5" />
+                                                        </Button>
+                                                    )}
                                                 </div>
-                                                <div className="text-xs text-gray-500 border-t pt-2 mt-2 -mx-3 px-3 pb-1">
-                                                    <ul className="list-disc pl-4 space-y-0.5">
-                                                        {item.destinations.map(id => <li key={id}>{allDestinations.find(d => d.id === id)?.name || id}</li>)}
+                                                
+                                                {/* LIST OF DESTINATIONS & ADD-ONS */}
+                                                <div className="text-xs text-gray-500 border-t pt-2 mt-2 bg-gray-50/50 -mx-3 px-3 pb-1">
+                                                    <p className="font-semibold mb-1 text-gray-700">Selected Destinations:</p>
+                                                    <ul className="list-disc pl-4 space-y-0.5 mb-2">
+                                                        {item.destinations.map(destId => {
+                                                            const destName = allDestinations.find(d => d.id === destId)?.name || destId;
+                                                            return <li key={destId}>{destName}</li>
+                                                        })}
+                                                        {item.transportation.includes("airport-transfer") && (
+                                                            <li className="text-blue-600 font-medium flex items-center -ml-1">
+                                                                <Plane className="w-3 h-3 mr-1" /> Airport Transfer (+¥8,000)
+                                                            </li>
+                                                        )}
                                                     </ul>
                                                     <div className="flex justify-between items-end border-t border-dashed pt-2 mt-2">
-                                                        <span className="text-gray-400">Day Total</span>
+                                                        <span className="text-gray-400">Total</span>
                                                         <span className="font-bold text-red-600">¥{item.price.toLocaleString()}</span>
                                                     </div>
                                                 </div>
@@ -665,26 +647,28 @@ export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) 
                                 )}
                             </CardContent>
                             
-                            {isMultiDay && (
-                                <div className="p-4 border-t bg-white shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] z-10">
-                                    <div className="flex justify-between items-end mb-4">
-                                        <span className="text-sm text-gray-600 font-medium">Total Amount Due</span>
-                                        <div className="text-right">
-                                            <span className="text-2xl font-bold text-red-600">¥{cartTotal.toLocaleString()}</span>
-                                            <p className="text-xs text-gray-400">Tax included</p>
-                                        </div>
+                            <div className="p-4 border-t bg-white shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] z-10">
+                                <div className="flex justify-between items-end mb-4">
+                                    <span className="text-sm text-gray-600 font-medium">Total Amount Due</span>
+                                    <div className="text-right">
+                                        <span className="text-2xl font-bold text-red-600">¥{cartTotal.toLocaleString()}</span>
+                                        <p className="text-xs text-gray-400">Tax included</p>
                                     </div>
-                                    <Button className="w-full bg-red-600 hover:bg-red-700 h-12 text-md shadow-md" disabled={cart.length === 0} onClick={handleFinalCheckout}>
-                                        Proceed to Payment <ArrowRight className="w-4 h-4 ml-2" />
-                                    </Button>
                                 </div>
-                            )}
+                                <Button 
+                                    className="w-full bg-red-600 hover:bg-red-700 h-12 text-md shadow-md"
+                                    disabled={cart.length === 0}
+                                    onClick={handleFinalCheckout}
+                                >
+                                    Proceed to Payment <ArrowRight className="w-4 h-4 ml-2" />
+                                </Button>
+                            </div>
                          </Card>
                       </div>
                   </div>
               </div>
 
-               {/* INNER ADMIN MODAL */}
+               {/* INNER ADMIN MODAL FOR LOCATIONS */}
               {isDestModalOpen && (
                 <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
                    <Card className="w-full max-w-3xl max-h-[85vh] flex flex-col shadow-2xl animate-in zoom-in-95">
@@ -693,18 +677,25 @@ export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) 
                          <Button variant="ghost" size="sm" onClick={() => setIsDestModalOpen(false)}><X className="w-4 h-4"/></Button>
                       </CardHeader>
                       <CardContent className="flex flex-1 overflow-hidden p-0">
+                         {/* List */}
                          <div className="w-1/2 border-r overflow-y-auto p-3 space-y-2">
                             {filteredDestinations.map(dest => (
                                 <div key={dest.id} onClick={() => prepareEdit(dest)} className={cn("p-2 border rounded text-sm cursor-pointer hover:bg-gray-50", editingDestId === dest.id && "border-red-500 bg-red-50")}>
-                                    <div className="flex justify-between"><span className="font-bold">{dest.name}</span><Trash2 className="w-3 h-3 text-gray-400 hover:text-red-600" onClick={(e) => {e.stopPropagation(); handleDeleteDestination(dest.id)}}/></div>
+                                    <div className="flex justify-between">
+                                        <span className="font-bold">{dest.name}</span>
+                                        <Trash2 className="w-3 h-3 text-gray-400 hover:text-red-600" onClick={(e) => {e.stopPropagation(); handleDeleteDestination(dest.id)}}/>
+                                    </div>
                                 </div>
                             ))}
                          </div>
+                         {/* Form */}
                          <div className="w-1/2 p-4 bg-gray-50 space-y-3">
                              <h4 className="font-bold text-sm">{editingDestId ? "Edit" : "Add New"}</h4>
                              <Input placeholder="Name" value={destForm.name} onChange={e => setDestForm({...destForm, name: e.target.value})} className="bg-white"/>
                              <Textarea placeholder="Desc" value={destForm.description} onChange={e => setDestForm({...destForm, description: e.target.value})} className="bg-white h-20"/>
-                             <Button size="sm" className="w-full bg-red-600" onClick={handleSaveDestination} disabled={isSavingDest}>{isSavingDest ? <Loader2 className="w-3 h-3 animate-spin"/> : <Save className="w-3 h-3 mr-2"/>} Save</Button>
+                             <Button size="sm" className="w-full bg-red-600" onClick={handleSaveDestination} disabled={isSavingDest}>
+                                {isSavingDest ? <Loader2 className="w-3 h-3 animate-spin"/> : <Save className="w-3 h-3 mr-2"/>} Save
+                             </Button>
                          </div>
                       </CardContent>
                    </Card>
