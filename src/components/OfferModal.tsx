@@ -10,7 +10,7 @@ import { Calendar } from "./ui/calendar";
 import { 
   X, ArrowRight, MapPin, CheckCircle, Calendar as CalendarIcon, 
   Users, Layers, ArrowLeft, Car, Plane, AlertCircle, 
-  Settings, Save, Trash2, Loader2, PlusCircle
+  Settings, Save, Trash2, Loader2, PlusCircle, CreditCard
 } from "lucide-react";
 import { TourPackage } from "../types/travel";
 import { useState, useEffect, useMemo } from "react";
@@ -80,6 +80,14 @@ export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) 
   const [allDestinations, setAllDestinations] = useState<any[]>(DEFAULT_DESTINATIONS);
   const [cart, setCart] = useState<CartItem[]>([]);
 
+  // Check if this offer is a "Transfer" (like Disney)
+  const isTransferOffer = useMemo(() => {
+      if (!offer) return false;
+      const title = offer.title.toLowerCase();
+      // Logic: If it contains "disney" or "transfer", treat as express booking
+      return title.includes("disney") || title.includes("transfer");
+  }, [offer]);
+
   useEffect(() => {
     const initDests = async () => {
         const { data } = await supabase.from('tour_destinations').select('*');
@@ -116,35 +124,50 @@ export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) 
     setOfferCalculatedPrice(price);
   }, [offerTravelers, offer]);
 
-  // --- HANDLE PROCEED TO BOOKING (SINGLE TOUR) ---
+  // --- HANDLE PROCEED TO BOOKING ---
   const handleOfferProceed = () => {
     if (!offer || !offerDate) {
       if (!offerDate) alert("Please select a travel date first.");
       return;
     }
 
+    const parsedDate = new Date(offerDate);
+
+    // === EXPRESS CHECKOUT FOR TRANSFERS (Disney) ===
+    if (isTransferOffer) {
+        // Create the cart item immediately and go to payment
+        const transferItem: CartItem = {
+            id: Math.random().toString(36).substr(2, 9),
+            location: "tokyo", // Usually Disney is Tokyo, or assume from title
+            date: parsedDate,
+            travelers: offerTravelers,
+            destinations: offer.destinations, // Pass existing destinations directly
+            transportation: ["private-van"],
+            price: offerCalculatedPrice
+        };
+
+        const cartData = encodeURIComponent(JSON.stringify([transferItem]));
+        navigate(`/payment?custom=true&cartData=${cartData}&totalPrice=${offerCalculatedPrice}&name=Valued+Customer`);
+        return; // STOP HERE
+    }
+
+    // === STANDARD TOUR LOGIC (Go to Builder) ===
     setIsMultiDay(false); // Single Tour Mode
 
-    // 1. Smart Location Detection (We still detect Region so they see the right list)
     const titleLower = offer.title.toLowerCase();
     let loc = "nagoya"; // Fallback
     if (titleLower.includes("nara")) loc = "nara";
     else if (titleLower.includes("hakone")) loc = "hakone";
-    else if (titleLower.includes("tokyo") || titleLower.includes("disney")) loc = "tokyo";
+    else if (titleLower.includes("tokyo")) loc = "tokyo";
     else if (titleLower.includes("osaka")) loc = "osaka";
     else if (titleLower.includes("kyoto")) loc = "kyoto";
     else if (titleLower.includes("fuji")) loc = "hakone";
 
-    const parsedDate = new Date(offerDate);
-
-    // 2. Pre-fill the form BUT Start with Empty Destinations
+    // Pre-fill the form BUT Start with Empty Destinations
     setLocation(loc);
     setCustomDate(parsedDate);
     setCustomTravelers(offerTravelers);
-    
-    // *** CRITICAL CHANGE: Set to empty array so nothing is pre-selected ***
-    setSelectedDestinations([]); 
-    
+    setSelectedDestinations([]); // Clean slate for manual selection
     setSelectedTransportation(["private-van"]);
     
     setViewMode('custom');
@@ -235,7 +258,6 @@ export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) 
   const getCurrentPrice = () => {
     if (!location) return 0;
     const config = PRICING_CONFIG[location];
-    // Use offer price as fallback if config missing
     const basePrice = config 
         ? (customTravelers <= 6 ? config.tier1 : config.tier2)
         : (offer?.price || 80000); 
@@ -426,8 +448,14 @@ export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) 
                           <Button variant="outline" className="w-full border-gray-300 text-gray-700 hover:bg-gray-50 hover:text-red-600" onClick={handleBookMultiple}>
                               <Layers className="w-4 h-4 mr-2" />Book multiple tours or dates
                           </Button>
+                          
+                          {/* DYNAMIC BUTTON TEXT & ACTION */}
                           <Button className="w-full bg-red-600 hover:bg-red-700 text-white" onClick={handleOfferProceed} disabled={!offerDate}>
-                              Customize & Book <ArrowRight className="w-4 h-4 ml-2" />
+                              {isTransferOffer ? (
+                                  <><CreditCard className="w-4 h-4 mr-2" /> Proceed to Payment</>
+                              ) : (
+                                  <><ArrowRight className="w-4 h-4 mr-2" /> Customize & Book</>
+                              )}
                           </Button>
                         </div>
                      </div>
@@ -437,7 +465,7 @@ export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) 
            </>
         )}
 
-        {/* VIEW MODE: CUSTOM TOUR BUILDER */}
+        {/* VIEW MODE: CUSTOM TOUR BUILDER (Same as before) */}
         {viewMode === 'custom' && (
            <div className="flex flex-col h-full overflow-hidden">
               <div className="flex items-center justify-between p-4 border-b bg-gray-50 flex-shrink-0">
@@ -459,8 +487,9 @@ export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) 
 
               <div className="flex-1 overflow-y-auto p-4 md:p-6 bg-gray-50/50">
                   <div className="grid lg:grid-cols-12 gap-6 h-full">
-                      {/* BUILDER PANEL */}
+                      {/* ... (Existing Builder Panel Code from previous step) ... */}
                       <div className="lg:col-span-8 space-y-6">
+                        {/* 1. Location & Date Form */}
                         <Card className="shadow-sm">
                             <CardHeader className="py-4 border-b bg-gray-50/30">
                                 <CardTitle className="text-base font-bold text-gray-800">1. Location & Date</CardTitle>
@@ -500,6 +529,7 @@ export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) 
                             </CardContent>
                         </Card>
 
+                        {/* 2. Destinations Selection */}
                         <Card className="flex-1 shadow-sm">
                              <CardHeader className="py-4 bg-gray-50/30 border-b flex flex-row justify-between items-center">
                                 <div className="flex items-center gap-3">
@@ -601,7 +631,7 @@ export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) 
                                     </div>
                                 ) : (
                                     <div className="space-y-3">
-                                        {/* In Single Mode, show LIVE preview of the left form */}
+                                        {/* SINGLE MODE PREVIEW */}
                                         {!isMultiDay && isCurrentFormValid && (
                                             <div className="bg-white p-3 rounded-lg border shadow-sm border-blue-200 bg-blue-50/20">
                                                 <div className="flex justify-between items-start mb-2">
@@ -615,37 +645,36 @@ export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) 
                                                 </div>
                                                 <div className="text-xs text-gray-500 border-t pt-2 mt-2">
                                                     <p className="font-semibold mb-1 text-gray-700">Selected:</p>
-                                                    <ul className="list-disc pl-4 space-y-0.5">
-                                                        {selectedDestinations.map(id => <li key={id}>{allDestinations.find(d => d.id === id)?.name || id}</li>)}
-                                                        {selectedTransportation.includes("airport-transfer") && <li className="text-blue-600 font-medium">Airport Transfer</li>}
-                                                    </ul>
+                                                    {selectedDestinations.length === 0 ? (
+                                                        <p className="text-gray-400 italic">No destinations selected yet</p>
+                                                    ) : (
+                                                        <ul className="list-disc pl-4 space-y-0.5">
+                                                            {selectedDestinations.map(id => <li key={id}>{allDestinations.find(d => d.id === id)?.name || id}</li>)}
+                                                        </ul>
+                                                    )}
+                                                    {selectedTransportation.includes("airport-transfer") && <div className="mt-1 text-blue-600 font-medium">+ Airport Transfer</div>}
                                                 </div>
                                             </div>
                                         )}
 
-                                        {/* Multi-Day Cart Items */}
+                                        {/* MULTI MODE PREVIEW */}
                                         {cart.map((item, index) => (
                                             <div key={item.id} className="bg-white p-3 rounded-lg border shadow-sm relative group hover:shadow-md transition-shadow">
                                                 <div className="flex justify-between items-start mb-2">
                                                     <div>
-                                                        <span className="text-[10px] font-bold text-white bg-gray-800 px-2 py-0.5 rounded-full uppercase tracking-wider mb-1 inline-block">Day {index + 1}</span>
+                                                        {isMultiDay && <span className="text-[10px] font-bold text-white bg-gray-800 px-2 py-0.5 rounded-full uppercase tracking-wider mb-1 inline-block">Day {index + 1}</span>}
                                                         <h4 className="font-bold text-gray-800 text-lg leading-tight">{item.location.toUpperCase()}</h4>
                                                         <div className="flex items-center gap-3 mt-1">
                                                             <div className="flex items-center text-xs text-gray-500 font-medium"><CalendarIcon className="w-3 h-3 mr-1" />{format(item.date, "MMM dd")}</div>
                                                         </div>
                                                     </div>
-                                                    <Button variant="ghost" size="icon" className="h-6 w-6 text-gray-300 hover:text-red-500 hover:bg-red-50" onClick={() => removeFromCart(item.id)}>
-                                                        <Trash2 className="w-3.5 h-3.5" />
-                                                    </Button>
+                                                    {isMultiDay && <Button variant="ghost" size="icon" className="h-6 w-6 text-gray-300 hover:text-red-500 hover:bg-red-50" onClick={() => removeFromCart(item.id)}><Trash2 className="w-3.5 h-3.5" /></Button>}
                                                 </div>
                                                 <div className="text-xs text-gray-500 border-t pt-2 mt-2 -mx-3 px-3 pb-1">
                                                     <ul className="list-disc pl-4 space-y-0.5">
                                                         {item.destinations.map(id => <li key={id}>{allDestinations.find(d => d.id === id)?.name || id}</li>)}
                                                     </ul>
-                                                    <div className="flex justify-between items-end border-t border-dashed pt-2 mt-2">
-                                                        <span className="text-gray-400">Day Total</span>
-                                                        <span className="font-bold text-red-600">¥{item.price.toLocaleString()}</span>
-                                                    </div>
+                                                    {isMultiDay && <div className="flex justify-between items-end border-t border-dashed pt-2 mt-2"><span className="text-gray-400">Day Total</span><span className="font-bold text-red-600">¥{item.price.toLocaleString()}</span></div>}
                                                 </div>
                                             </div>
                                         ))}
