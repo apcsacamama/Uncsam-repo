@@ -1,7 +1,7 @@
-import { Dialog, DialogContent } from "./ui/dialog"; // Ensure imports match your file structure
+import { Dialog, DialogContent } from "./ui/dialog";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
-import { X, ArrowRight, MapPin, CheckCircle, Calendar, Users } from "lucide-react"; // Added missing icons
+import { X, ArrowRight, MapPin, CheckCircle, Calendar, Users, Heart } from "lucide-react"; 
 import { TourPackage } from "../types/travel";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
@@ -9,7 +9,7 @@ import { useNavigate } from "react-router-dom";
 interface OfferModalProps {
   isOpen: boolean;
   onClose: () => void;
-  offer: TourPackage | null; // 1. Allow offer to be null to prevent Typescript errors
+  offer: TourPackage | null;
 }
 
 const TIERED_PRICING: Record<string, { tier1: number; tier2: number }> = {
@@ -22,9 +22,18 @@ export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) 
   const navigate = useNavigate();
   const [date, setDate] = useState("");
   const [travelers, setTravelers] = useState(1);
-  
-  // 2. SAFETY FIX: Use 'offer?.price || 0' so it doesn't crash if offer is null
   const [calculatedPrice, setCalculatedPrice] = useState(offer?.price || 0);
+  const [isFavorite, setIsFavorite] = useState(false);
+  
+  // --- New State for Feedback Toast ---
+  const [showFeedback, setShowFeedback] = useState(false);
+
+  useEffect(() => {
+    if (isOpen && offer) {
+      const saved = JSON.parse(localStorage.getItem("tour_favorites") || "[]");
+      setIsFavorite(saved.some((fav: TourPackage) => fav.id === offer.id));
+    }
+  }, [isOpen, offer]);
 
   useEffect(() => {
     if (isOpen && offer) {
@@ -35,7 +44,7 @@ export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) 
   }, [isOpen, offer]);
 
   useEffect(() => {
-    if (!offer) return; // Safety check
+    if (!offer) return; 
 
     const packageId = (offer as any).slug || offer.id;
     let price = 0;
@@ -46,13 +55,33 @@ export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) 
     } else if (FIXED_PRICE_IDS.includes(packageId)) {
       price = offer.price;
     } else {
-      price = offer.price; // Default fallback
+      price = offer.price; 
     }
     setCalculatedPrice(price);
   }, [travelers, offer]);
 
+  const toggleFavorite = () => {
+    if (!offer) return;
+    const favorites = JSON.parse(localStorage.getItem("tour_favorites") || "[]");
+    
+    let updated;
+    if (isFavorite) {
+      updated = favorites.filter((fav: TourPackage) => fav.id !== offer.id);
+    } else {
+      updated = [...favorites, offer];
+      
+      // --- Trigger Feedback Toast ---
+      setShowFeedback(true);
+      setTimeout(() => setShowFeedback(false), 2500);
+    }
+    
+    localStorage.setItem("tour_favorites", JSON.stringify(updated));
+    setIsFavorite(!isFavorite);
+    window.dispatchEvent(new Event("favoritesUpdated"));
+  };
+
   const handleProceed = () => {
-    if (!offer) return; // Safety check
+    if (!offer) return; 
     
     if (!date) {
       alert("Please select a travel date first.");
@@ -66,12 +95,22 @@ export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) 
     );
   };
 
-  // 3. CRITICAL: If offer is null, do not render ANYTHING.
   if (!isOpen || !offer) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+      
+      {/* --- FEEDBACK TOAST OVERLAY --- */}
+      {showFeedback && (
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[60] animate-in zoom-in duration-300">
+          <div className="bg-black/80 backdrop-blur-md text-white px-8 py-5 rounded-3xl flex items-center gap-4 shadow-2xl border border-white/20">
+            <CheckCircle className="w-8 h-8 text-green-400" strokeWidth={2.5} />
+            <span className="text-xl font-medium tracking-tight">Tour added to favorites</span>
+          </div>
+        </div>
+      )}
+
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col relative">
         
         {/* Header Image */}
         <div className="relative h-48 w-full flex-shrink-0 bg-gray-200">
@@ -80,14 +119,28 @@ export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) 
             alt={offer.title} 
             className="w-full h-full object-cover"
           />
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            className="absolute top-3 right-3 bg-white/20 hover:bg-white/40 text-white rounded-full"
-            onClick={onClose}
-          >
-            <X className="w-5 h-5" />
-          </Button>
+          
+          <div className="absolute top-3 right-3 flex gap-2">
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className={`rounded-full backdrop-blur-md transition-colors ${
+                isFavorite ? 'bg-red-500 text-white hover:bg-red-600' : 'bg-white/20 text-white hover:bg-white/40'
+              }`}
+              onClick={toggleFavorite}
+            >
+              <Heart className={`w-5 h-5 ${isFavorite ? 'fill-current' : ''}`} />
+            </Button>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="bg-white/20 hover:bg-white/40 text-white rounded-full"
+              onClick={onClose}
+            >
+              <X className="w-5 h-5" />
+            </Button>
+          </div>
+
           <div className="absolute bottom-3 left-4">
              <Badge className="bg-white/90 text-black hover:bg-white backdrop-blur-sm border-none text-sm px-3 py-1">
                 {offer.duration}
@@ -101,9 +154,8 @@ export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) 
            <p className="text-gray-600 mb-6">{offer.description}</p>
 
            <div className="grid md:grid-cols-2 gap-8">
-              {/* Left Column: Details */}
               <div className="space-y-6">
-                 <div>
+                  <div>
                     <h3 className="font-semibold text-gray-900 mb-3 flex items-center">
                         <MapPin className="w-4 h-4 mr-2 text-red-600" />
                         Destinations
@@ -116,9 +168,9 @@ export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) 
                           </li>
                        ))}
                     </ul>
-                 </div>
+                  </div>
 
-                 <div>
+                  <div>
                     <h3 className="font-semibold text-gray-900 mb-3 flex items-center">
                         <CheckCircle className="w-4 h-4 mr-2 text-green-600" />
                         Inclusions
@@ -131,15 +183,13 @@ export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) 
                           </li>
                        ))}
                     </ul>
-                 </div>
+                  </div>
               </div>
 
-              {/* Right Column: Booking Form */}
               <div className="bg-gray-50 p-5 rounded-lg border border-gray-100 h-fit">
                  <h3 className="font-bold text-gray-900 mb-4 border-b pb-2">Plan Your Trip</h3>
                  
                  <div className="space-y-4">
-                    {/* Date Picker */}
                     <div>
                        <label className="text-sm font-medium text-gray-700 mb-1 block">Travel Date</label>
                        <div className="relative">
@@ -154,7 +204,6 @@ export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) 
                        </div>
                     </div>
 
-                    {/* Travelers Counter */}
                     <div>
                        <label className="text-sm font-medium text-gray-700 mb-1 block">Travelers</label>
                        <div className="relative">
@@ -171,7 +220,6 @@ export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) 
                        </div>
                     </div>
 
-                    {/* Price Summary */}
                     <div className="pt-4 mt-2 border-t">
                        <div className="flex justify-between items-end mb-1">
                           <span className="text-sm text-gray-600">Total Price</span>
