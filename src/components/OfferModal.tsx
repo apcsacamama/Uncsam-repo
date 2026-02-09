@@ -27,7 +27,7 @@ const PRICING_CONFIG: Record<string, { tier1: number; tier2: number }> = {
   nagoya: { tier1: 85000, tier2: 105000 },
 };
 const MAX_TRAVELERS = 9;
-const MIN_DESTINATIONS = 4;
+const MIN_DESTINATIONS = 1; // Lowered this so single destination offers don't break
 const MAX_DESTINATIONS = 5;
 const FULLY_BOOKED_DATES = [new Date(2025, 12, 25), new Date(2025, 12, 31)];
 const DEFAULT_DESTINATIONS = [
@@ -61,7 +61,9 @@ type CartItem = {
 export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) {
   const navigate = useNavigate();
   const { isAdmin } = useIsAdmin();
+  
   const [viewMode, setViewMode] = useState<'offer' | 'custom'>('offer');
+  const [isMultiDay, setIsMultiDay] = useState(false); 
 
   // ==========================================
   // 1. OFFER MODE LOGIC
@@ -70,13 +72,24 @@ export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) 
   const [offerTravelers, setOfferTravelers] = useState(1);
   const [offerCalculatedPrice, setOfferCalculatedPrice] = useState(offer?.price || 0);
 
+  // Common State
+  const [allDestinations, setAllDestinations] = useState<any[]>(DEFAULT_DESTINATIONS);
+  const [cart, setCart] = useState<CartItem[]>([]);
+
+  useEffect(() => {
+    const initDests = async () => {
+        const { data } = await supabase.from('tour_destinations').select('*');
+        if (data && data.length > 0) setAllDestinations(data);
+    };
+    initDests();
+  }, []);
+
   useEffect(() => {
     if (isOpen && offer) {
       setViewMode('offer'); 
       setOfferDate("");
       setOfferTravelers(1);
       setOfferCalculatedPrice(offer.price);
-      // Reset Custom State
       setCart([]);
       setLocation("");
       setCustomDate(undefined);
@@ -99,26 +112,60 @@ export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) 
     setOfferCalculatedPrice(price);
   }, [offerTravelers, offer]);
 
+  // --- HANDLE PROCEED TO BOOKING (SINGLE TOUR) ---
   const handleOfferProceed = () => {
     if (!offer || !offerDate) {
       if (!offerDate) alert("Please select a travel date first.");
       return;
     }
-    const pkgId = (offer as any).slug || offer.id;
-    navigate(`/payment?package=${pkgId}&date=${offerDate}&travelers=${offerTravelers}&price=${offerCalculatedPrice}&name=Guest`);
+
+    setIsMultiDay(false); // Single Tour Mode
+
+    // Map the offer's destinations to the selection IDs
+    const mappedDestinations = offer.destinations.map(name => {
+        const found = allDestinations.find(d => d.name === name);
+        return found ? found.id : name; 
+    });
+
+    let loc = "nagoya"; // Default
+    if (offer.title.toLowerCase().includes("nara")) loc = "nara";
+    if (offer.title.toLowerCase().includes("hakone")) loc = "hakone";
+    if (offer.title.toLowerCase().includes("tokyo")) loc = "tokyo"; // Added Tokyo check
+
+    const parsedDate = new Date(offerDate);
+
+    // --- CRITICAL CHANGE: PRE-FILL THE BUILDER, DO NOT ADD TO CART YET ---
+    setLocation(loc);
+    setCustomDate(parsedDate);
+    setCustomTravelers(offerTravelers);
+    setSelectedDestinations(mappedDestinations);
+    setSelectedTransportation(["private-van"]);
+    
+    // Switch view so user can see the checkboxes and add airport transfer
+    setViewMode('custom');
+  };
+
+  // --- HANDLE BOOK MULTIPLE TOURS (MULTI TOUR) ---
+  const handleBookMultiple = () => {
+    setIsMultiDay(true); // Multi Tour Mode
+    setCart([]);
+    setLocation("");
+    setCustomDate(undefined);
+    setSelectedDestinations([]);
+    setSelectedTransportation(["private-van"]);
+    setCustomTravelers(1);
+    setViewMode('custom');
   };
 
   // ==========================================
   // 2. CUSTOM TOUR MODE LOGIC
   // ==========================================
   
-  const [cart, setCart] = useState<CartItem[]>([]);
   const [customDate, setCustomDate] = useState<Date>();
   const [location, setLocation] = useState("");
   const [selectedDestinations, setSelectedDestinations] = useState<string[]>([]);
   const [selectedTransportation, setSelectedTransportation] = useState<string[]>(["private-van"]); 
   const [customTravelers, setCustomTravelers] = useState(1);
-  const [allDestinations, setAllDestinations] = useState<any[]>(DEFAULT_DESTINATIONS);
 
   // -- ADMIN STATE --
   const [isDestModalOpen, setIsDestModalOpen] = useState(false);
@@ -152,7 +199,7 @@ export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) 
   const isDateDisabled = (date: Date) => {
     if (isBefore(date, startOfToday())) return true; 
     const inCart = cart.some(item => isSameDay(item.date, date));
-    if (inCart) return true;
+    if (inCart && isMultiDay) return true; 
     return FULLY_BOOKED_DATES.some(blockedDate => isSameDay(date, blockedDate));
   };
 
@@ -182,13 +229,16 @@ export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) 
   const getCurrentPrice = () => {
     if (!location) return 0;
     const config = PRICING_CONFIG[location];
-    if (!config) return 0;
-    const base = customTravelers <= 6 ? config.tier1 : config.tier2;
+    // If no config found (e.g. standard offer fallback), use offer price if available or default
+    const basePrice = config 
+        ? (customTravelers <= 6 ? config.tier1 : config.tier2)
+        : (offer?.price || 80000); 
+
     const transport = selectedTransportation.reduce((total, id) => {
       const t = transportationOptions.find((opt) => opt.id === id);
       return total + (t ? t.price : 0);
     }, 0);
-    return base + transport;
+    return basePrice + transport;
   };
   
   const currentFormPrice = getCurrentPrice();
@@ -208,9 +258,13 @@ export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) 
     };
 
     setCart([...cart, newItem]);
-    setCustomDate(undefined);
-    setSelectedDestinations([]);
-    setSelectedTransportation(["private-van"]);
+    
+    // Only reset if Multi-Day. If Single-Day, we don't clear because the user might just want to edit the same day.
+    if (isMultiDay) {
+        setCustomDate(undefined);
+        setSelectedDestinations([]);
+        setSelectedTransportation(["private-van"]);
+    }
   };
 
   const removeFromCart = (id: string) => {
@@ -225,46 +279,29 @@ export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) 
   };
 
   const handleSaveDestination = async () => {
-    if (!destForm.name || !destForm.location) {
-        alert("Please provide a name and location.");
-        return;
-    }
+    // ... (Admin save logic remains same)
+    if (!destForm.name || !destForm.location) { alert("Please provide a name and location."); return; }
     setIsSavingDest(true);
     try {
         if (editingDestId) {
-            const { error } = await supabase.from('tour_destinations')
-                .update({ name: destForm.name, description: destForm.description, location: destForm.location })
-                .eq('id', editingDestId);
+            const { error } = await supabase.from('tour_destinations').update({ name: destForm.name, description: destForm.description, location: destForm.location }).eq('id', editingDestId);
             if (error) throw error;
             alert("Destination updated!");
         } else {
             const id = destForm.name.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-');
-            const { error } = await supabase.from('tour_destinations')
-                .insert([{ id: id, name: destForm.name, description: destForm.description, location: destForm.location }]);
+            const { error } = await supabase.from('tour_destinations').insert([{ id: id, name: destForm.name, description: destForm.description, location: destForm.location }]);
             if (error) throw error;
             alert("New destination added!");
         }
         fetchDestinations();
         setEditingDestId(null);
         setDestForm({ name: "", description: "", location: location || "nagoya" });
-    } catch (error) {
-        console.error("Error saving destination:", error);
-        alert("Failed to save.");
-    } finally {
-        setIsSavingDest(false);
-    }
+    } catch (error) { console.error("Error saving:", error); alert("Failed to save."); } finally { setIsSavingDest(false); }
   };
 
   const handleDeleteDestination = async (id: string) => {
-      if(!confirm("Are you sure? This cannot be undone.")) return;
-      try {
-          const { error } = await supabase.from('tour_destinations').delete().eq('id', id);
-          if (error) throw error;
-          fetchDestinations();
-      } catch (err) {
-          console.error(err);
-          alert("Failed to delete.");
-      }
+      if(!confirm("Are you sure?")) return;
+      try { const { error } = await supabase.from('tour_destinations').delete().eq('id', id); if (error) throw error; fetchDestinations(); } catch (err) { console.error(err); alert("Failed to delete."); }
   };
 
   const prepareEdit = (dest: any) => {
@@ -358,11 +395,11 @@ export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) 
                         </div>
 
                         <div className="flex flex-col gap-2 mt-4">
-                          <Button variant="outline" className="w-full border-gray-300 text-gray-700 hover:bg-gray-50 hover:text-red-600" onClick={() => setViewMode('custom')}>
+                          <Button variant="outline" className="w-full border-gray-300 text-gray-700 hover:bg-gray-50 hover:text-red-600" onClick={handleBookMultiple}>
                               <Layers className="w-4 h-4 mr-2" />Book multiple tours or dates
                           </Button>
                           <Button className="w-full bg-red-600 hover:bg-red-700 text-white" onClick={handleOfferProceed} disabled={!offerDate}>
-                              Proceed to Booking <ArrowRight className="w-4 h-4 ml-2" />
+                              Customize & Book <ArrowRight className="w-4 h-4 ml-2" />
                           </Button>
                         </div>
                      </div>
@@ -384,8 +421,13 @@ export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) 
                         <ArrowLeft className="w-4 h-4 mr-2" /> Back to Offer
                      </Button>
                      <div>
-                        <h2 className="text-xl font-bold text-gray-900">Build Your Itinerary</h2>
-                        <p className="text-xs text-gray-500">Add multiple days to create a full trip package</p>
+                        {/* DYNAMIC TITLE */}
+                        <h2 className="text-xl font-bold text-gray-900">
+                            {isMultiDay ? "Build Your Itinerary" : "Customize Your Tour"}
+                        </h2>
+                        <p className="text-xs text-gray-500">
+                            {isMultiDay ? "Add multiple days to create a full trip package" : "Review your destinations and add options"}
+                        </p>
                      </div>
                   </div>
                   <Button variant="ghost" size="icon" onClick={onClose}><X className="w-5 h-5" /></Button>
@@ -406,11 +448,13 @@ export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) 
                             <CardContent className="p-6 grid md:grid-cols-2 gap-6">
                                 <div className="space-y-2">
                                     <Label className="text-xs text-gray-500 uppercase tracking-wide">Region</Label>
-                                    <select value={location} onChange={handleLocationChange} className="w-full px-3 py-2 border rounded-md bg-white focus:ring-2 focus:ring-red-500 focus:outline-none">
+                                    {/* Disable region selection if Single Day mode to prevent confusion */}
+                                    <select value={location} onChange={handleLocationChange} disabled={!isMultiDay} className="w-full px-3 py-2 border rounded-md bg-white focus:ring-2 focus:ring-red-500 focus:outline-none disabled:bg-gray-100 disabled:text-gray-500">
                                         <option value="">Select Region...</option>
                                         <option value="nagoya">Nagoya</option>
                                         <option value="hakone">Hakone</option>
                                         <option value="nara">Nara</option>
+                                        <option value="tokyo">Tokyo</option>
                                     </select>
                                 </div>
                                 <div className="space-y-2">
@@ -483,7 +527,7 @@ export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) 
                                 )}
                              </CardContent>
 
-                             {/* --- ADD-ONS SECTION (Moved to Bottom) --- */}
+                             {/* --- ADD-ONS SECTION --- */}
                              {location && (
                                  <div className="px-6 py-4 bg-gray-50 border-t border-b">
                                      <h4 className="text-sm font-bold text-gray-700 mb-3 flex items-center">
@@ -505,14 +549,23 @@ export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) 
                                  </div>
                              )}
 
-                             {/* FOOTER ACTIONS */}
-                             <div className="p-6 bg-white flex justify-between items-center rounded-b-xl">
+                             {/* FOOTER ACTIONS (DYNAMIC BUTTON) */}
+                             <div className="p-6 bg-white flex justify-between items-center rounded-b-xl border-t-4 border-gray-100">
                                 <div>
                                     <p className="text-xs text-gray-500 uppercase font-bold">Estimated Day Price</p>
                                     <p className="text-2xl font-bold text-red-600">¥{currentFormPrice.toLocaleString()}</p>
                                 </div>
-                                <Button size="lg" onClick={addToCart} disabled={!isCurrentFormValid} className="bg-gray-900 text-white hover:bg-black shadow-lg hover:shadow-xl transition-all">
-                                    <PlusCircle className="w-5 h-5 mr-2" /> Add Day to Trip
+                                <Button 
+                                    size="lg" 
+                                    onClick={addToCart} 
+                                    disabled={!isCurrentFormValid} 
+                                    className="bg-gray-900 text-white hover:bg-black shadow-lg hover:shadow-xl transition-all"
+                                >
+                                    {isMultiDay ? (
+                                        <><PlusCircle className="w-5 h-5 mr-2" /> Add Day to Trip</>
+                                    ) : (
+                                        <><CheckCircle className="w-5 h-5 mr-2" /> Confirm Selection</>
+                                    )}
                                 </Button>
                              </div>
                         </Card>
@@ -523,7 +576,8 @@ export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) 
                          <Card className="sticky top-0 shadow-lg border-t-4 border-t-red-600 flex flex-col h-full max-h-[calc(100vh-120px)]">
                             <CardHeader className="py-4 border-b bg-white z-10">
                                 <CardTitle className="text-lg flex items-center gap-2">
-                                    <Layers className="w-5 h-5 text-red-600"/> Chosen Trips
+                                    <Layers className="w-5 h-5 text-red-600"/> 
+                                    {isMultiDay ? "Chosen Trips" : "Your Itinerary"}
                                 </CardTitle>
                             </CardHeader>
                             
@@ -533,8 +587,12 @@ export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) 
                                         <div className="bg-white p-4 rounded-full w-16 h-16 mx-auto flex items-center justify-center shadow-sm">
                                             <AlertCircle className="w-8 h-8 opacity-20" />
                                         </div>
-                                        <p className="text-sm font-medium text-gray-600">Your trip is currently empty</p>
-                                        <p className="text-xs">Configure a day on the left and click "Add Day to Trip".</p>
+                                        <p className="text-sm font-medium text-gray-600">
+                                            {isMultiDay ? "Your trip is currently empty" : "Confirm your selection on the left"}
+                                        </p>
+                                        <p className="text-xs">
+                                            {isMultiDay ? "Configure a day on the left and click 'Add Day'." : "Click 'Confirm Selection' when you are ready."}
+                                        </p>
                                     </div>
                                 ) : (
                                     <div className="space-y-3">
@@ -542,15 +600,14 @@ export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) 
                                             <div key={item.id} className="bg-white p-3 rounded-lg border shadow-sm relative group hover:shadow-md transition-shadow">
                                                 <div className="flex justify-between items-start mb-2">
                                                     <div>
-                                                        <span className="text-[10px] font-bold text-white bg-gray-800 px-2 py-0.5 rounded-full uppercase tracking-wider">Day {index + 1}</span>
-                                                        <h4 className="font-bold text-gray-800 mt-2 text-lg leading-tight">{item.location.toUpperCase()}</h4>
+                                                        {isMultiDay && <span className="text-[10px] font-bold text-white bg-gray-800 px-2 py-0.5 rounded-full uppercase tracking-wider mb-1 inline-block">Day {index + 1}</span>}
+                                                        <h4 className="font-bold text-gray-800 text-lg leading-tight">{item.location.toUpperCase()}</h4>
                                                         
                                                         <div className="flex items-center gap-3 mt-1">
                                                             <div className="flex items-center text-xs text-gray-500 font-medium">
                                                                 <CalendarIcon className="w-3 h-3 mr-1" />
                                                                 {format(item.date, "MMM dd, yyyy")}
                                                             </div>
-                                                            {/* --- TRAVELER COUNT --- */}
                                                             <div className="flex items-center text-xs text-gray-500 font-medium">
                                                                 <Users className="w-3 h-3 mr-1" />
                                                                 {item.travelers} Traveler{item.travelers > 1 ? 's' : ''}
@@ -558,9 +615,11 @@ export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) 
                                                         </div>
 
                                                     </div>
-                                                    <Button variant="ghost" size="icon" className="h-6 w-6 text-gray-300 hover:text-red-500 hover:bg-red-50" onClick={() => removeFromCart(item.id)}>
-                                                        <Trash2 className="w-3.5 h-3.5" />
-                                                    </Button>
+                                                    {isMultiDay && (
+                                                        <Button variant="ghost" size="icon" className="h-6 w-6 text-gray-300 hover:text-red-500 hover:bg-red-50" onClick={() => removeFromCart(item.id)}>
+                                                            <Trash2 className="w-3.5 h-3.5" />
+                                                        </Button>
+                                                    )}
                                                 </div>
                                                 
                                                 {/* LIST OF DESTINATIONS & ADD-ONS */}
@@ -578,11 +637,10 @@ export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) 
                                                         )}
                                                     </ul>
                                                     <div className="flex justify-between items-end border-t border-dashed pt-2 mt-2">
-                                                        <span className="text-gray-400">Day Total</span>
+                                                        <span className="text-gray-400">Total</span>
                                                         <span className="font-bold text-red-600">¥{item.price.toLocaleString()}</span>
                                                     </div>
                                                 </div>
-
                                             </div>
                                         ))}
                                     </div>
@@ -591,7 +649,7 @@ export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) 
                             
                             <div className="p-4 border-t bg-white shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] z-10">
                                 <div className="flex justify-between items-end mb-4">
-                                    <span className="text-sm text-gray-600 font-medium">Total Trip Price</span>
+                                    <span className="text-sm text-gray-600 font-medium">Total Amount Due</span>
                                     <div className="text-right">
                                         <span className="text-2xl font-bold text-red-600">¥{cartTotal.toLocaleString()}</span>
                                         <p className="text-xs text-gray-400">Tax included</p>
