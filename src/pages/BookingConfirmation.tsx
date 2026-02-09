@@ -39,7 +39,6 @@ const STANDARD_INCLUSIONS = [
 const DEFAULT_DESTINATIONS = [
   { id: "hasedera", name: "Hasedera Temple" },
   { id: "kotoku-in", name: "Kotoku-in" },
-  // ... (rest of your default list)
 ];
 
 export default function BookingConfirmation() {
@@ -54,7 +53,7 @@ export default function BookingConfirmation() {
   const addonsParam = searchParams.get("addons"); 
   const cartDataRaw = searchParams.get("cartData");
 
-  // --- NEW PAYMENT PARAMS ---
+  // --- PAYMENT PARAMS ---
   const paymentTypeParam = searchParams.get("paymentType"); // 'full' or 'downpayment'
   const amountPaidParam = searchParams.get("amountPaid");
   const balanceParam = searchParams.get("balance");
@@ -359,7 +358,12 @@ export default function BookingConfirmation() {
       />
 
       <ItineraryChatbot
+        // Standard destinations fallback
         selectedDestinations={customItinerary.length > 0 ? customItinerary.flatMap(d => d.destinations) : (selectedPackage?.destinations || [])}
+        
+        // --- THIS IS THE FIX: PASS MULTI-DAY DATA HERE ---
+        customItinerary={customItinerary.length > 0 ? customItinerary : undefined}
+        
         isVisible={showItineraryChatbot}
         onClose={() => setShowItineraryChatbot(false)}
         travelDate={displayDate}
