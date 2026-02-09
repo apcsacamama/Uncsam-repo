@@ -23,7 +23,7 @@ import {
   Loader2,
   Layers,
   Plane,
-  Banknote 
+  Banknote // Added icon for cash/payment
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -31,13 +31,26 @@ import { format } from "date-fns";
 import { supabase } from "../lib/supabaseClient";
 
 // --- CONSTANTS ---
-const DOWN_PAYMENT_AMOUNT_JPY = 26000; 
+const DOWN_PAYMENT_AMOUNT_JPY = 26000; // Approx 10,000 PHP
 
 // Fallback if Supabase is empty/loading
 const DEFAULT_DESTINATIONS = [
   { id: "hasedera", name: "Hasedera Temple" },
   { id: "kotoku-in", name: "Kotoku-in" },
-  // ... rest of your defaults
+  { id: "hokokuji", name: "Hokokuji Temple" },
+  { id: "kenchoji", name: "Kenchoji Temple" },
+  { id: "tsurugaoka", name: "Tsurugaoka Hachimangu" },
+  { id: "enraku-ji", name: "Enraku-ji Temple" },
+  { id: "komachi", name: "Komachi Dori Street" },
+  { id: "kokomae", name: "Kokomae Station" },
+  { id: "nagoya-castle", name: "Nagoya Castle" },
+  { id: "legoland", name: "Legoland Japan" },
+  { id: "nagoya-science", name: "Nagoya City Science Museum" },
+  { id: "oasis21", name: "Oasis 21" },
+  { id: "hakone-open-air", name: "The Hakone Open Air Museum" },
+  { id: "hakone-pirate", name: "Hakone Pirate Ship" },
+  { id: "owakudani", name: "Owakudani Black Egg" },
+  { id: "hakone-yunessun", name: "Hakone Kowakien Yunessun" },
 ];
 
 export default function PaymentPage() {
@@ -69,6 +82,7 @@ export default function PaymentPage() {
     isCustom: false
   });
 
+  // Payment Option State (Full vs Downpayment)
   const [paymentOption, setPaymentOption] = useState<'full' | 'downpayment'>('full');
 
   // --- 3. FETCH DESTINATIONS ---
@@ -89,6 +103,7 @@ export default function PaymentPage() {
         const cart = JSON.parse(decodeURIComponent(cartDataRaw));
         const total = parseInt(totalPriceParam || "0");
         
+        // --- LOGIC: Handle Variable Travelers ---
         let travelersDisplay = "1";
         if (cart.length > 0) {
             const counts = cart.map((item: any) => item.travelers);
@@ -97,6 +112,7 @@ export default function PaymentPage() {
             travelersDisplay = min === max ? min.toString() : `${min} - ${max}`;
         }
         
+        // --- LOGIC: Handle Separate Dates ---
         let dateStr = "Multiple Dates";
         if (cart.length > 0) {
             const uniqueDates = Array.from(new Set(cart.map((i: any) => format(new Date(i.date), "MMM dd, yyyy"))));
@@ -136,37 +152,9 @@ export default function PaymentPage() {
     cardName: "", cardNumber: "", expiry: "", cvc: ""
   });
 
-  // --- UPDATED: HANDLE INPUT CHANGE WITH FORMATTING ---
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    let formattedValue = value;
-
-    if (name === "cardNumber") {
-        // 1. Remove all non-digits
-        const raw = value.replace(/\D/g, "");
-        // 2. Limit to 16 digits
-        const truncated = raw.slice(0, 16);
-        // 3. Add space every 4 digits
-        formattedValue = truncated.replace(/(\d{4})(?=\d)/g, "$1 ");
-    } 
-    else if (name === "expiry") {
-        // 1. Remove non-digits
-        const raw = value.replace(/\D/g, "");
-        // 2. Limit to 4 digits (MMYY)
-        const truncated = raw.slice(0, 4);
-        // 3. Insert slash after MM
-        if (truncated.length >= 3) {
-            formattedValue = `${truncated.slice(0, 2)}/${truncated.slice(2)}`;
-        } else {
-            formattedValue = truncated;
-        }
-    } 
-    else if (name === "cvc") {
-        // Only allow numbers, max 4 digits
-        formattedValue = value.replace(/\D/g, "").slice(0, 4);
-    }
-
-    setFormData(prev => ({ ...prev, [name]: formattedValue }));
+    setFormData(prev => ({ ...prev, [name]: value }));
   };
 
   // --- CALCULATE TOTALS ---
@@ -191,6 +179,8 @@ export default function PaymentPage() {
       phone: formData.phone,
       paymentMethod: paymentMethod,
       cartData: cartDataRaw || "",
+      
+      // --- NEW PARAMS FOR DOWN PAYMENT ---
       paymentType: paymentOption,
       amountPaid: amountToPay.toString(),
       balance: balanceAmount.toString()
@@ -260,7 +250,7 @@ export default function PaymentPage() {
               </CardContent>
             </Card>
 
-            {/* 2. Payment Options */}
+            {/* 2. Payment Options (Moved here) */}
             <Card className="border-l-4 border-l-blue-600">
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2">
@@ -325,37 +315,16 @@ export default function PaymentPage() {
                         </div>
                         <div className="space-y-2">
                             <Label>Card Number</Label>
-                            <Input 
-                                name="cardNumber" 
-                                placeholder="0000 0000 0000 0000" 
-                                value={formData.cardNumber} 
-                                onChange={handleInputChange} 
-                                maxLength={19} // 16 digits + 3 spaces
-                                inputMode="numeric"
-                            />
+                            <Input name="cardNumber" placeholder="0000 0000 0000 0000" value={formData.cardNumber} onChange={handleInputChange} />
                         </div>
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
                                 <Label>Expiry Date</Label>
-                                <Input 
-                                    name="expiry" 
-                                    placeholder="MM/YY" 
-                                    value={formData.expiry} 
-                                    onChange={handleInputChange}
-                                    maxLength={5}
-                                    inputMode="numeric"
-                                />
+                                <Input name="expiry" placeholder="MM/YY" value={formData.expiry} onChange={handleInputChange} />
                             </div>
                             <div className="space-y-2">
                                 <Label>CVC</Label>
-                                <Input 
-                                    name="cvc" 
-                                    placeholder="123" 
-                                    maxLength={4} 
-                                    value={formData.cvc} 
-                                    onChange={handleInputChange} 
-                                    inputMode="numeric"
-                                />
+                                <Input name="cvc" placeholder="123" maxLength={3} value={formData.cvc} onChange={handleInputChange} />
                             </div>
                         </div>
                     </div>
