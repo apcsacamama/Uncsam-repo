@@ -10,6 +10,13 @@ import {
   CardDescription,
   CardFooter
 } from "../components/ui/card";
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogHeader, 
+  DialogTitle, 
+  DialogFooter 
+} from "../components/ui/dialog"; 
 import { RadioGroup, RadioGroupItem } from "../components/ui/radio-group";
 import { 
   CreditCard, 
@@ -38,6 +45,7 @@ export default function PaymentPage() {
   
   // State for form
   const [isProcessing, setIsProcessing] = useState(false);
+  const [showWaiver, setShowWaiver] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState("card");
   const [formData, setFormData] = useState({
     firstName: "",
@@ -57,6 +65,11 @@ export default function PaymentPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setShowWaiver(true); // Open waiver instead of processing immediately
+  };
+
+  const handleFinalConfirm = async () => {
+    setShowWaiver(false);
     setIsProcessing(true);
 
     // Simulate API Payment Processing
@@ -313,6 +326,80 @@ export default function PaymentPage() {
 
         </div>
       </div>
+
+      {/* --- WAIVER MODAL --- */}
+      <Dialog open={showWaiver} onOpenChange={setShowWaiver}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold text-center border-b pb-4">
+              ACCIDENT WAIVER AND RELEASE OF LIABILITY FORM
+            </DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-4 text-sm text-gray-700 leading-relaxed py-4">
+            <p className="font-semibold italic">Please read carefully before signing:</p>
+            
+            <p>
+              I hereby assume all risks of participating in any and all activities associated with this tour event. 
+              I certify that I am physically fit and have sufficiently prepared for participation in this activity.
+            </p>
+
+            <div className="bg-red-50 p-4 rounded-md border border-red-100">
+              <p className="text-red-900 font-medium">
+                <strong>Liability Limitation:</strong> I acknowledge and agree that the liability of 
+                <span className="font-bold"> Uncle Sam (UncleSam Japan Tour)</span> is strictly limited to 
+                occurrences and activities within the scheduled tours. Uncle Sam shall not be held liable 
+                for any incidents, injuries, or losses occurring outside of the official tour itinerary.
+              </p>
+            </div>
+
+            <p>
+              (A) I WAIVE, RELEASE, AND DISCHARGE from any and all liability, including but not 
+              limited to, liability arising from the negligence or fault of the entities or persons released, 
+              for my death, disability, personal injury, property damage, or actions of any kind.
+            </p>
+
+            <p>
+              (B) I INDEMNIFY AND HOLD HARMLESS the entities or persons mentioned in this 
+              paragraph from any and all liabilities or claims made as a result of participation in this 
+              activity, whether caused by negligence or otherwise.
+            </p>
+
+            {/* Signature Section */}
+            <div className="mt-12 pt-8 border-t flex flex-col items-center">
+              <div className="w-full max-w-md space-y-2">
+                {/* Blank space for signature */}
+                <div className="h-16" /> 
+                
+                {/* The Signature Line */}
+                <div className="border-b-2 border-black w-full" />
+                
+                {/* Name BELOW the line */}
+                <div className="flex flex-col items-center pt-1">
+                  <span className="font-serif italic text-lg text-gray-900 uppercase tracking-wide">
+                    {formData.firstName} {formData.lastName}
+                  </span>
+                  <p className="text-[10px] uppercase tracking-[0.2em] text-gray-500 font-bold mt-1 text-center">
+                    Electronic Signature of Participant
+                  </p>
+                </div>
+              </div>
+
+              <div className="w-full max-w-md flex justify-between text-[11px] font-bold text-gray-500 mt-8 uppercase">
+                <p>PRINTED NAME: {formData.firstName} {formData.lastName}</p>
+                <p>DATE: {new Date().toLocaleDateString()}</p>
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter className="sm:justify-center gap-2 border-t pt-4">
+            <Button variant="outline" onClick={() => setShowWaiver(false)}>Cancel</Button>
+            <Button className="bg-red-600 hover:bg-red-700 text-white px-8" onClick={handleFinalConfirm}>
+              I Agree & Authorize Payment
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
