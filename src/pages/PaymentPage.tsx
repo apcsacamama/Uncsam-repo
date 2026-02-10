@@ -28,7 +28,9 @@ import {
   Users, 
   Lock, 
   ArrowRight,
-  Loader2
+  Loader2,
+  Info,    // Added for the notice
+  XCircle  // Added for the notice
 } from "lucide-react";
 import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -271,7 +273,7 @@ export default function PaymentPage() {
           <div className="lg:col-span-1">
             <Card className="sticky top-8 shadow-lg border-t-4 border-t-red-600">
                 <CardHeader>
-                    <CardTitle>Order Summary</CardTitle>
+                    <CardTitle>Payment Summary</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                     <div className="space-y-2 pb-4 border-b">
@@ -295,7 +297,26 @@ export default function PaymentPage() {
                         </div>
                     </div>
 
-                    <div className="flex justify-between items-center text-xl font-bold text-gray-900">
+                    {/* TRAVEL INCLUSION NOTICE ADDED HERE */}
+                    <div className="bg-orange-50 border border-orange-100 rounded-lg p-3">
+                        <div className="flex items-center gap-2 text-orange-800 font-semibold text-xs mb-2">
+                            <Info className="w-3.5 h-3.5" />
+                            <span>Travel Inclusion Notice</span>
+                        </div>
+                        <p className="text-[11px] text-gray-700 leading-tight mb-2">
+                            This tour package covers *optional* <strong>private transportation and guide services only</strong>.
+                        </p>
+                        <div className="space-y-1">
+                            <div className="flex items-center text-[10px] text-red-600 gap-1.5 font-medium">
+                                <XCircle className="w-3 h-3" /> Roundtrip Airfare
+                            </div>
+                            <div className="flex items-center text-[10px] text-red-600 gap-1.5 font-medium">
+                                <XCircle className="w-3 h-3" /> Hotel Accommodations
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="flex justify-between items-center text-xl font-bold text-gray-900 pt-2">
                         <span>Total:</span>
                         <span>¥{parseInt(price).toLocaleString()}</span>
                     </div>
