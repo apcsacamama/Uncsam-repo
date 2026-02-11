@@ -21,7 +21,8 @@ import {
   Sparkles,
   Loader2,
   Layers,
-  Plane // Ensure Plane is imported
+  Plane,
+  AlertCircle 
 } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useState, useEffect } from "react";
@@ -35,7 +36,6 @@ const STANDARD_INCLUSIONS = [
   "Private Van Transportation"
 ];
 
-// Fallback data prevents crashes if DB is slow
 const DEFAULT_DESTINATIONS = [
   { id: "hasedera", name: "Hasedera Temple" },
   { id: "kotoku-in", name: "Kotoku-in" },
@@ -58,7 +58,7 @@ const DEFAULT_DESTINATIONS = [
 export default function BookingConfirmation() {
   const [searchParams] = useSearchParams();
   
-  // URL Parameters
+  // --- URL PARAMETERS ---
   const packageId = searchParams.get("package");
   const travelersParam = searchParams.get("travelers") || "1";
   const isCustom = searchParams.get("custom") === "true";
@@ -66,16 +66,24 @@ export default function BookingConfirmation() {
   const locationParam = searchParams.get("location");
   const addonsParam = searchParams.get("addons"); 
   const cartDataRaw = searchParams.get("cartData");
+  
+  // Database Booking ID (Passed from PaymentPage)
+  const dbBookingId = searchParams.get("bookingId");
+  const bookingId = dbBookingId || `BK-TEMP-${Math.floor(Date.now() / 1000)}`;
+
+  // Payment Details (New!)
+  const amountPaidParam = searchParams.get("amountPaid");
+  const balanceParam = searchParams.get("balance");
+  const paymentType = searchParams.get("paymentType") || "full";
 
   const hasAirportTransfer = addonsParam && addonsParam.includes("airport-transfer");
   const customerName = searchParams.get("name") || "Valued Customer";
   const customerEmail = searchParams.get("email") || "email@example.com";
   const customerPhone = searchParams.get("phone") || "N/A";
 
-  // State
+  // --- STATE ---
   const [showItineraryChatbot, setShowItineraryChatbot] = useState(false);
   const [showInvoice, setShowInvoice] = useState(false);
-  const [bookingId] = useState(`BK${Math.floor(Date.now() / 1000)}`);
 
   const [selectedPackage, setSelectedPackage] = useState<any>(null);
   const [allDestinations, setAllDestinations] = useState<any[]>(DEFAULT_DESTINATIONS);
@@ -86,16 +94,19 @@ export default function BookingConfirmation() {
   const [displayTravelers, setDisplayTravelers] = useState(travelersParam);
   const [isLoading, setIsLoading] = useState(!isCustom);
 
+  // --- CALCULATE TOTALS ---
+  const totalPrice = urlPrice ? parseInt(urlPrice) : 0;
+  const amountPaid = amountPaidParam ? parseInt(amountPaidParam) : totalPrice;
+  const balance = balanceParam ? parseInt(balanceParam) : 0;
+
   // --- 1. FETCH DESTINATIONS & PACKAGE ---
   useEffect(() => {
     const initData = async () => {
-        // Fetch Destination Names from Supabase
         const { data: dests } = await supabase.from('tour_destinations').select('*');
         if (dests && dests.length > 0) {
             setAllDestinations(prev => [...prev, ...dests]);
         }
 
-        // Fetch Standard Package Info (only if not custom)
         if (packageId && !isCustom) {
             const { data, error } = await supabase.from('tour_packages')
                 .select('*')
@@ -117,12 +128,12 @@ export default function BookingConfirmation() {
             const cart = JSON.parse(decodeURIComponent(cartDataRaw));
             setCustomItinerary(cart);
 
-            // Logic: Separate Dates (e.g. "Jan 28, Jan 29")
             if (cart.length > 0) {
+                // Determine Date Display
                 const uniqueDates = Array.from(new Set(cart.map((i: any) => format(new Date(i.date), "MMM dd, yyyy"))));
                 setDisplayDate(uniqueDates.join(" | "));
                 
-                // Logic: Traveler Range (e.g. "2 - 3")
+                // Determine Travelers Display
                 const counts = cart.map((i: any) => i.travelers);
                 const min = Math.min(...counts);
                 const max = Math.max(...counts);
@@ -144,9 +155,7 @@ export default function BookingConfirmation() {
     ? selectedPackage.inclusions || STANDARD_INCLUSIONS 
     : STANDARD_INCLUSIONS;
 
-  let totalPrice = urlPrice ? parseInt(urlPrice) : 0;
-
-  // Driver Details
+  // Driver Details (Mock)
   const driverDetails = {
     name: "Takeshi Yamamoto",
     phone: "+81 80-5331-1738",
@@ -170,13 +179,13 @@ export default function BookingConfirmation() {
       <div className="bg-gradient-to-r from-green-600 to-green-700 text-white py-12">
         <div className="max-w-4xl mx-auto px-4 text-center">
           <div className="flex justify-center mb-4">
-            <div className="bg-white rounded-full p-3">
+            <div className="bg-white rounded-full p-3 shadow-lg">
               <CheckCircle className="w-12 h-12 text-green-600" />
             </div>
           </div>
-          <h1 className="text-4xl font-bold mb-2">Booking Confirmed!</h1>
+          <h1 className="text-4xl font-bold mb-2">Booking Paid!</h1>
           <p className="text-xl text-green-100">
-            Thank you for your booking. Your Japanese adventure awaits!
+            Thank you, {customerName}. Please wait for staff or admin for the confirmation!
           </p>
         </div>
       </div>
@@ -191,7 +200,7 @@ export default function BookingConfirmation() {
                 <Card className="shadow-lg border-t-4 border-t-[#2eb85c]">
                     <CardHeader className="border-b bg-gray-50/50 pb-4">
                         <CardTitle className="flex items-center gap-2 text-xl">
-                            <Calendar className="w-5 h-5 text-gray-500" /> Booking Summary
+                            <Calendar className="w-5 h-5 text-gray-500" /> Booking Details
                         </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-6 pt-6">
@@ -203,7 +212,7 @@ export default function BookingConfirmation() {
                                 <p className="text-lg font-mono font-bold text-gray-800">{bookingId}</p>
                             </div>
                             <Badge className="bg-green-100 text-green-800 px-3 py-1 text-sm border-green-200">
-                                Confirmed
+                                Paid
                             </Badge>
                         </div>
 
@@ -241,7 +250,6 @@ export default function BookingConfirmation() {
                             </h4>
 
                             {isCustom && customItinerary.length > 0 ? (
-                                // --- CUSTOM ITINERARY VIEW ---
                                 <div className="space-y-4">
                                     {customItinerary.map((day, idx) => (
                                         <div key={idx} className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
@@ -262,7 +270,6 @@ export default function BookingConfirmation() {
                                                         {getDestName(destId)}
                                                     </div>
                                                 ))}
-                                                {/* --- ADDED: AIRPORT TRANSFER CHECK --- */}
                                                 {day.transportation && day.transportation.includes("airport-transfer") && (
                                                     <div className="flex items-center text-sm text-blue-600 font-medium sm:col-span-2 mt-1 bg-blue-50 p-2 rounded border border-blue-100">
                                                         <Plane className="w-4 h-4 mr-2" />
@@ -274,7 +281,6 @@ export default function BookingConfirmation() {
                                     ))}
                                 </div>
                             ) : (
-                                // --- STANDARD LIST VIEW ---
                                 <div className="grid grid-cols-2 gap-3">
                                     {(selectedPackage?.destinations || ["Destinations loading..."]).map(
                                         (destination: string, index: number) => (
@@ -304,7 +310,7 @@ export default function BookingConfirmation() {
                     </CardContent>
                 </Card>
 
-                {/* 2. DRIVER & CUSTOMER INFO (Combined Row) */}
+                {/* 2. DRIVER & CUSTOMER INFO */}
                 <div className="grid md:grid-cols-2 gap-6">
                     <Card>
                         <CardHeader className="pb-2">
@@ -350,7 +356,7 @@ export default function BookingConfirmation() {
 
             {/* RIGHT COLUMN: ACTIONS & SUMMARY */}
             <div className="lg:col-span-1 space-y-6">
-                <Card className="sticky top-8">
+                <Card className="sticky top-8 shadow-md">
                     <CardHeader>
                         <CardTitle>Payment Summary</CardTitle>
                     </CardHeader>
@@ -370,15 +376,31 @@ export default function BookingConfirmation() {
                                     <span>+¥8,000</span>
                                 </div>
                             )}
+                            
+                            {/* NEW: Total Paid Section */}
                             <div className="border-t pt-3 flex justify-between items-center font-bold text-lg text-green-700">
-                                <span>Total Paid</span>
-                                <span>¥{totalPrice.toLocaleString()}</span>
+                                <span>Total Paid Now</span>
+                                <span>¥{amountPaid.toLocaleString()}</span>
                             </div>
+
+                            {/* NEW: Balance Section */}
+                            {balance > 0 && (
+                                <div className="mt-2 bg-orange-50 border border-orange-100 p-3 rounded-lg">
+                                    <div className="flex justify-between items-center text-orange-800 text-sm font-bold">
+                                        <div className="flex items-center gap-1">
+                                            <AlertCircle className="w-4 h-4"/> Remaining Balance
+                                        </div>
+                                        <span>¥{balance.toLocaleString()}</span>
+                                    </div>
+                                    <p className="text-[10px] text-orange-600 mt-1">Due before trip start date.</p>
+                                </div>
+                            )}
                         </div>
 
                         <div className="bg-gray-50 p-3 rounded text-xs text-gray-500">
                             <p className="mb-1">Payment Method: Credit Card (****1234)</p>
-                            <p>Transaction ID: TXN{bookingId.replace("BK","")}</p>
+                            {/* Display real numeric booking ID if available */}
+                            <p>Transaction ID: TXN{bookingId.toString().replace(/[^0-9]/g, "")}</p>
                         </div>
                     </CardContent>
                 </Card>
@@ -398,8 +420,8 @@ export default function BookingConfirmation() {
                         >
                             <Download className="w-4 h-4 mr-2" /> Download Receipt
                         </Button>
-                        <Link to="/offers" className="block">
-                            <Button className="w-full" variant="ghost">Book Another Trip</Button>
+                        <Link to="/profile" className="block text-center text-sm font-medium text-blue-600 hover:underline">
+                            View this trip in your Profile Dashboard →
                         </Link>
                     </CardContent>
                 </Card>
@@ -418,14 +440,20 @@ export default function BookingConfirmation() {
             email: customerEmail,
             phone: customerPhone,
             travelDate: displayDate,
-            status: "confirmed",
+            // Status depends on balance
+            status: balance > 0 ? "partial" : "paid",
+            details: customItinerary, // Pass details for custom listing
             createdAt: new Date().toISOString().split("T")[0]
         }}
         packageDetails={selectedPackage || { title: isCustom ? "Custom Tour Package" : "Standard Package", price: totalPrice }}
         paymentDetails={{
             totalPrice: totalPrice,
             travelers: parseInt(travelersParam), 
-            hasAirportTransfer: hasAirportTransfer
+            hasAirportTransfer: hasAirportTransfer,
+            // Pass split payment info to Invoice
+            amountPaid: amountPaid,
+            balance: balance,
+            paymentType: paymentType as 'full' | 'downpayment'
         }}
       />
 

@@ -22,14 +22,14 @@ import {
   ArrowRight,
   Loader2,
   Layers,
-  Plane // Ensure Plane is imported
+  Plane,
+  Banknote // Added Banknote icon
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { format } from "date-fns";
 import { supabase } from "../lib/supabaseClient";
 
-// Fallback if Supabase is empty/loading
 const DEFAULT_DESTINATIONS = [
   { id: "hasedera", name: "Hasedera Temple" },
   { id: "kotoku-in", name: "Kotoku-in" },
@@ -49,25 +49,31 @@ const DEFAULT_DESTINATIONS = [
   { id: "hakone-yunessun", name: "Hakone Kowakien Yunessun" },
 ];
 
+const DOWN_PAYMENT_AMOUNT_JPY = 26000;
+
 export default function PaymentPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
 
   // --- 1. GET URL PARAMETERS ---
   const isCustom = searchParams.get("custom") === "true";
-  
-  // Standard Params
   const locationParam = searchParams.get("location");
   const dateParam = searchParams.get("date");
   const travelersParam = searchParams.get("travelers");
   const priceParam = searchParams.get("price");
-
-  // Custom Cart Params
   const cartDataRaw = searchParams.get("cartData");
   const totalPriceParam = searchParams.get("totalPrice");
+  const packageId = searchParams.get("packageId");
 
   // --- 2. STATE ---
   const [allDestinations, setAllDestinations] = useState<any[]>(DEFAULT_DESTINATIONS);
+  
+  // DB Date State
+  const [dbDate, setDbDate] = useState<string | null>(null);
+
+  // Payment Option State
+  const [paymentOption, setPaymentOption] = useState<'full' | 'downpayment'>('full');
+
   const [displayData, setDisplayData] = useState({
     title: "Tour Package",
     date: "",
@@ -76,6 +82,13 @@ export default function PaymentPage() {
     location: "",
     details: [] as any[], 
     isCustom: false
+  });
+
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState("card");
+  const [formData, setFormData] = useState({
+    firstName: "", lastName: "", email: "", phone: "",
+    cardName: "", cardNumber: "", expiry: "", cvc: ""
   });
 
   // --- 3. FETCH DESTINATIONS ---
@@ -96,7 +109,6 @@ export default function PaymentPage() {
         const cart = JSON.parse(decodeURIComponent(cartDataRaw));
         const total = parseInt(totalPriceParam || "0");
         
-        // --- LOGIC: Handle Variable Travelers ---
         let travelersDisplay = "1";
         if (cart.length > 0) {
             const counts = cart.map((item: any) => item.travelers);
@@ -105,12 +117,25 @@ export default function PaymentPage() {
             travelersDisplay = min === max ? min.toString() : `${min} - ${max}`;
         }
         
-        // --- LOGIC: Handle Separate Dates ---
         let dateStr = "Multiple Dates";
+        let validStartDate = new Date().toISOString(); 
+
         if (cart.length > 0) {
+            // UI Date String
             const uniqueDates = Array.from(new Set(cart.map((i: any) => format(new Date(i.date), "MMM dd, yyyy"))));
             dateStr = uniqueDates.join(" | ");
+
+            // DB Date (Earliest)
+            const sortedDates = cart
+              .map((item: any) => new Date(item.date))
+              .sort((a: Date, b: Date) => a.getTime() - b.getTime());
+            
+            if (sortedDates.length > 0) {
+                validStartDate = sortedDates[0].toISOString();
+            }
         }
+        
+        setDbDate(validStartDate);
 
         setDisplayData({
           title: `Custom Itinerary (${cart.length} Days)`,
@@ -125,6 +150,8 @@ export default function PaymentPage() {
         console.error("Error parsing cart data", err);
       }
     } else {
+      setDbDate(dateParam);
+      
       setDisplayData({
         title: "Standard Tour",
         date: dateParam || "Date not selected",
@@ -137,39 +164,73 @@ export default function PaymentPage() {
     }
   }, [searchParams, isCustom, cartDataRaw, totalPriceParam, dateParam, travelersParam, priceParam, locationParam]);
 
-  // Form State
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState("card");
-  const [formData, setFormData] = useState({
-    firstName: "", lastName: "", email: "", phone: "",
-    cardName: "", cardNumber: "", expiry: "", cvc: ""
-  });
-
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
+  // --- CALCULATE TOTALS ---
+  const totalAmount = displayData.price;
+  const amountToPay = paymentOption === 'full' ? totalAmount : DOWN_PAYMENT_AMOUNT_JPY;
+  const balanceAmount = paymentOption === 'full' ? 0 : totalAmount - DOWN_PAYMENT_AMOUNT_JPY;
+
+  // --- 5. SUBMIT TO SUPABASE ---
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsProcessing(true);
-    await new Promise(resolve => setTimeout(resolve, 2000));
 
-    const params = new URLSearchParams({
-      package: displayData.isCustom ? "custom-itinerary" : "standard",
-      custom: displayData.isCustom ? "true" : "false",
-      price: displayData.price.toString(),
-      travelers: displayData.travelersLabel,
-      location: displayData.location,
-      date: displayData.date,
-      name: `${formData.firstName} ${formData.lastName}`,
-      email: formData.email,
-      phone: formData.phone,
-      paymentMethod: paymentMethod,
-      cartData: cartDataRaw || "" 
-    });
+    try {
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      
+      if (authError || !user) {
+        alert("Session expired. Please sign in again.");
+        navigate("/signin");
+        return;
+      }
 
-    navigate(`/booking-confirmation?${params.toString()}`);
+      const bookingPayload = {
+          user_id: user.id,
+          itinerary_id: isCustom ? null : (searchParams.get("packageId") || null), 
+          pax_count: parseInt(displayData.travelersLabel) || 1,
+          total_price: displayData.price, // Store the FULL price in DB so owner knows value
+          status: "Paid", // Keeps dashboard logic simple
+          travel_date: dbDate,
+          created_by: formData.email,
+          updated_by: formData.email
+      };
+
+      const { data, error } = await supabase
+        .from('bookings')
+        .insert([bookingPayload])
+        .select();
+
+      if (error) throw error;
+
+      // Pass payment details to confirmation page via URL
+      const queryParams = new URLSearchParams({
+        bookingId: data[0].booking_id,
+        price: displayData.price.toString(),
+        date: displayData.date,
+        travelers: displayData.travelersLabel,
+        location: displayData.location,
+        custom: isCustom ? "true" : "false",
+        cartData: cartDataRaw || "",
+        name: `${formData.firstName} ${formData.lastName}`,
+        email: formData.email,
+        phone: formData.phone,
+        paymentType: paymentOption,
+        amountPaid: amountToPay.toString(),
+        balance: balanceAmount.toString()
+        });
+
+        navigate(`/booking-confirmation?${queryParams.toString()}`);
+
+    } catch (err: any) {
+      console.error("Booking Error:", err.message);
+      alert("Could not save booking: " + err.message);
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const getDestName = (id: string) => {
@@ -194,6 +255,8 @@ export default function PaymentPage() {
           
           {/* LEFT COLUMN: FORMS */}
           <div className="lg:col-span-2 space-y-8">
+            
+            {/* 1. CONTACT CARD */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -231,6 +294,40 @@ export default function PaymentPage() {
               </CardContent>
             </Card>
 
+            {/* 2. PAYMENT OPTIONS CARD (NEW) */}
+            <Card className="border-l-4 border-l-blue-600">
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                        <Banknote className="w-5 h-5 text-blue-600" /> Payment Options
+                    </CardTitle>
+                    <CardDescription>Choose how you would like to pay today.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <RadioGroup defaultValue="full" onValueChange={(v) => setPaymentOption(v as 'full' | 'downpayment')} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <RadioGroupItem value="full" id="opt-full" className="peer sr-only" />
+                            <Label htmlFor="opt-full" className="flex flex-col justify-between h-full rounded-md border-2 border-muted bg-white p-4 hover:bg-gray-50 peer-data-[state=checked]:border-blue-600 peer-data-[state=checked]:bg-blue-50 cursor-pointer">
+                                <div className="font-bold text-gray-900 mb-1">Full Payment</div>
+                                <div className="text-sm text-gray-500 mb-2">Pay the entire amount now.</div>
+                                <div className="text-lg font-bold text-blue-700">¥{totalAmount.toLocaleString()}</div>
+                            </Label>
+                        </div>
+                        <div>
+                            <RadioGroupItem value="downpayment" id="opt-down" className="peer sr-only" />
+                            <Label htmlFor="opt-down" className="flex flex-col justify-between h-full rounded-md border-2 border-muted bg-white p-4 hover:bg-gray-50 peer-data-[state=checked]:border-blue-600 peer-data-[state=checked]:bg-blue-50 cursor-pointer">
+                                <div className="flex justify-between">
+                                    <div className="font-bold text-gray-900 mb-1">Down Payment</div>
+                                    <div className="bg-green-100 text-green-700 text-[10px] font-bold px-2 py-0.5 rounded h-fit">INSTALLMENT</div>
+                                </div>
+                                <div className="text-sm text-gray-500 mb-2">Reserve now, pay the rest later.</div>
+                                <div className="text-lg font-bold text-blue-700">¥{DOWN_PAYMENT_AMOUNT_JPY.toLocaleString()}</div>
+                            </Label>
+                        </div>
+                    </RadioGroup>
+                </CardContent>
+            </Card>
+
+            {/* 3. PAYMENT METHOD CARD */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -249,7 +346,7 @@ export default function PaymentPage() {
                     <div>
                         <RadioGroupItem value="paypal" id="paypal" className="peer sr-only" />
                         <Label htmlFor="paypal" className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-blue-600 peer-data-[state=checked]:text-blue-600 cursor-pointer">
-                            <svg className="mb-3 h-6 w-6" viewBox="0 0 24 24" fill="currentColor"><path d="M7.076 21.337H2.47a.641.641 0 0 1-.633-.74L4.944.901C5.026.382 5.474 0 5.998 0h7.46c2.57 0 4.578.543 5.69 1.81 1.01 1.15 1.304 2.42 1.012 4.287-.023.143-.047.288-.077.437-.946 5.05-4.336 6.794-9.116 6.794h-.303c-.62 0-1.064.44-1.136 1.06l-.769 4.877a.643.643 0 0 0 .633.744h.001c.62 0 1.064.44 1.136 1.06L9.48 22.38a.641.641 0 0 1-.633.744h-1.68a.643.643 0 0 1-.09-.007z"/></svg> PayPal
+                            <span className="mb-3 text-xl font-bold italic">PP</span> PayPal
                         </Label>
                     </div>
                 </RadioGroup>
@@ -293,7 +390,6 @@ export default function PaymentPage() {
                     </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                    {/* Basic Info */}
                     <div className="space-y-2 pb-4 border-b">
                         <div className="flex items-start justify-between text-sm">
                             <span className="text-gray-600 flex items-center gap-2">
@@ -307,7 +403,7 @@ export default function PaymentPage() {
                             <span className="text-gray-600 flex items-center gap-2">
                                 <Calendar className="w-4 h-4" /> Date
                             </span>
-                            <span className="font-medium text-right text-xs max-w-[150px] text-right leading-tight">
+                            <span className="font-medium text-right text-xs max-w-[150px] leading-tight">
                                 {displayData.date}
                             </span>
                         </div>
@@ -332,8 +428,6 @@ export default function PaymentPage() {
                                             <div>
                                                 <span className="text-[10px] font-bold text-white bg-gray-800 px-2 py-0.5 rounded-full uppercase">Day {idx + 1}</span>
                                                 <div className="font-bold text-gray-800 mt-1">{day.location.toUpperCase()}</div>
-                                                
-                                                {/* --- ADDED: SPECIFIC DAY DETAILS --- */}
                                                 <div className="flex items-center gap-2 mt-1">
                                                     <span className="text-xs text-gray-500">{format(new Date(day.date), "MMM dd")}</span>
                                                     <span className="text-gray-300">•</span>
@@ -345,18 +439,15 @@ export default function PaymentPage() {
                                             </div>
                                             <div className="font-bold text-red-600 text-sm">¥{day.price.toLocaleString()}</div>
                                         </div>
-                                        
-                                        {/* Destinations List */}
                                         <div className="text-xs text-gray-600 border-t border-gray-200 pt-2 mt-2">
                                             <p className="font-semibold mb-1">Destinations:</p>
                                             <ul className="list-disc pl-4 space-y-0.5">
                                                 {day.destinations.map((destId: string) => (
                                                     <li key={destId}>{getDestName(destId)}</li>
                                                 ))}
-                                                {/* --- RENDER AIRPORT TRANSFER ADD-ON --- */}
                                                 {day.transportation && day.transportation.includes("airport-transfer") && (
                                                     <li className="text-blue-600 font-medium flex items-center -ml-1">
-                                                        <Plane className="w-3 h-3 mr-1" /> Airport Transfer (+¥8,000)
+                                                        <Plane className="w-3 h-3 mr-1" /> Airport Transfer Included
                                                     </li>
                                                 )}
                                             </ul>
@@ -367,9 +458,24 @@ export default function PaymentPage() {
                         </div>
                     )}
 
-                    <div className="flex justify-between items-center text-xl font-bold text-gray-900 pt-2 border-t">
-                        <span>Total:</span>
-                        <span>¥{displayData.price.toLocaleString()}</span>
+                    {/* --- TOTALS SECTION (UPDATED) --- */}
+                    <div className="flex flex-col gap-2 pt-4 border-t">
+                        <div className="flex justify-between items-center text-sm text-gray-600">
+                            <span>Package Total:</span>
+                            <span>¥{totalAmount.toLocaleString()}</span>
+                        </div>
+                        
+                        {paymentOption === 'downpayment' && (
+                            <div className="flex justify-between items-center text-sm text-gray-600">
+                                <span>Remaining Balance:</span>
+                                <span className="font-bold text-orange-600">¥{balanceAmount.toLocaleString()}</span>
+                            </div>
+                        )}
+
+                        <div className="flex justify-between items-center text-xl font-bold text-gray-900 pt-2 border-t mt-2">
+                            <span>Total Due Now:</span>
+                            <span>¥{amountToPay.toLocaleString()}</span>
+                        </div>
                     </div>
 
                     <Button 
@@ -389,13 +495,9 @@ export default function PaymentPage() {
                             </>
                         )}
                     </Button>
-                    <p className="text-xs text-center text-gray-500 mt-2">
-                        By clicking pay, you agree to our Terms & Conditions.
-                    </p>
                 </CardContent>
             </Card>
           </div>
-
         </div>
       </div>
     </div>
