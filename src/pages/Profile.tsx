@@ -19,6 +19,8 @@ import { mockBookings, tourPackages } from "../data/offers";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabaseClient"; 
+import { TourPackage } from "../types/travel";
+import OfferModal from "../components/OfferModal"; // Added Import
 import {
   User,
   Mail,
@@ -43,6 +45,13 @@ export default function Profile() {
   const [isLoading, setIsLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState("");
   
+  // --- New State for Dynamic Favorites ---
+  const [favorites, setFavorites] = useState<TourPackage[]>([]);
+
+  // --- Modal Logic States ---
+  const [selectedTour, setSelectedTour] = useState<TourPackage | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  
   const [userInfo, setUserInfo] = useState({
     name: "",
     email: "",
@@ -61,7 +70,6 @@ export default function Profile() {
         setIsLoading(true);
         console.log("Fetching user...");
 
-        // 1. Get Auth User
         const { data: { user }, error: authError } = await supabase.auth.getUser();
 
         if (authError || !user) {
@@ -70,9 +78,6 @@ export default function Profile() {
           return;
         }
 
-        console.log("User found:", user.email);
-
-        // 2. Try to fetch Profile from DB
         const { data: profile, error: dbError } = await supabase
           .from('profiles')
           .select('*')
@@ -81,10 +86,8 @@ export default function Profile() {
 
         if (dbError) {
           console.warn("Database error (Profile might not exist yet):", dbError.message);
-          // Don't crash, just use Auth data
         }
 
-        // 3. Set State (Merge Auth data with DB data if it exists)
         setUserInfo({
           name: profile?.full_name || user.user_metadata?.full_name || "Traveler",
           email: user.email || "", 
@@ -105,6 +108,16 @@ export default function Profile() {
     };
 
     fetchUserData();
+
+    // --- FAVORITES SYNC LOGIC ---
+    const loadFavorites = () => {
+      const saved = JSON.parse(localStorage.getItem("tour_favorites") || "[]");
+      setFavorites(saved);
+    };
+
+    loadFavorites();
+    window.addEventListener("favoritesUpdated", loadFavorites);
+    return () => window.removeEventListener("favoritesUpdated", loadFavorites);
   }, [navigate]);
 
   const handleSignOut = async () => {
@@ -113,11 +126,9 @@ export default function Profile() {
   };
 
   const handleSave = () => {
-    // Save logic placeholder
     setIsEditing(false);
   };
 
-  // Safe Name Display Helper
   const getInitials = (name: string) => {
     return name && name.length > 0 ? name.charAt(0).toUpperCase() : "U";
   };
@@ -136,7 +147,19 @@ export default function Profile() {
 
   const favoriteDestinations = ["Nagoya Castle", "Tokyo Disneyland", "Kyoto Temples", "Osaka Castle"];
 
-  // --- RENDER ---
+  // Helper to remove favorite directly from Profile
+  const removeFavorite = (id: string) => {
+    const updated = favorites.filter(f => f.id !== id);
+    localStorage.setItem("tour_favorites", JSON.stringify(updated));
+    setFavorites(updated);
+    window.dispatchEvent(new Event("favoritesUpdated"));
+  };
+
+  // --- Modal Trigger Handler ---
+  const handleViewTour = (tour: TourPackage) => {
+    setSelectedTour(tour);
+    setIsModalOpen(true);
+  };
 
   if (isLoading) {
     return (
@@ -162,8 +185,6 @@ export default function Profile() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-
-      {/* Profile Header */}
       <div className="bg-white shadow-sm">
         <div className="max-w-6xl mx-auto px-4 py-8">
           <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
@@ -220,7 +241,6 @@ export default function Profile() {
             <TabsTrigger value="settings">Settings</TabsTrigger>
           </TabsList>
 
-          {/* My Bookings Tab */}
           <TabsContent value="bookings" className="space-y-6">
             <Card>
               <CardHeader>
@@ -309,7 +329,6 @@ export default function Profile() {
             </Card>
           </TabsContent>
 
-          {/* Profile Info Tab */}
           <TabsContent value="profile" className="space-y-6">
             <Card>
               <CardHeader>
@@ -356,9 +375,6 @@ export default function Profile() {
                       />
                     </div>
                   </div>
-                  
-                  {/* ... (rest of form fields same as before) ... */}
-
                 </div>
 
                 {isEditing && (
@@ -376,7 +392,6 @@ export default function Profile() {
             </Card>
           </TabsContent>
 
-          {/* Favorites Tab */}
           <TabsContent value="favorites" className="space-y-6">
             <div className="grid md:grid-cols-2 gap-6">
               <Card>
@@ -415,7 +430,7 @@ export default function Profile() {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-3">
-                    {tourPackages.slice(0, 3).map((pkg) => (
+                    {favorites.length > 0 ? favorites.map((pkg) => (
                       <div
                         key={pkg.id}
                         className="flex items-center justify-between p-3 border rounded-lg"
@@ -426,18 +441,35 @@ export default function Profile() {
                             ¥{pkg.price.toLocaleString()}
                           </p>
                         </div>
-                        <Button size="sm" variant="outline">
-                          View
-                        </Button>
+                        <div className="flex gap-2">
+                            <Button 
+                              size="sm" 
+                              variant="ghost"
+                              onClick={() => removeFavorite(pkg.id)}
+                            >
+                              <Heart className="w-4 h-4 text-red-600 fill-current" />
+                            </Button>
+                            {/* Updated View Button Trigger */}
+                            <Button 
+                              size="sm" 
+                              variant="outline"
+                              onClick={() => handleViewTour(pkg)}
+                            >
+                              View
+                            </Button>
+                        </div>
                       </div>
-                    ))}
+                    )) : (
+                        <div className="text-center py-6 text-sm text-gray-500">
+                            No saved packages yet.
+                        </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>
             </div>
           </TabsContent>
 
-          {/* Settings Tab */}
           <TabsContent value="settings" className="space-y-6">
             <div className="grid md:grid-cols-2 gap-6">
               <Card>
@@ -475,6 +507,13 @@ export default function Profile() {
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* RENDER THE MODAL AT THE BOTTOM */}
+      <OfferModal 
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        offer={selectedTour}
+      />
     </div>
   );
 }

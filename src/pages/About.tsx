@@ -46,6 +46,7 @@ export default function About() {
 
   const [newReview, setNewReview] = useState({ name: "", comment: "", rating: 5 });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false); // New state for prompt
 
   const formatDate = (dateString: string) => {
     if (!dateString) return "Just now";
@@ -67,7 +68,6 @@ export default function About() {
     return "Poor";
   };
 
-  // UPDATED: Fixed Refresh and Double-Entry Logic
   useEffect(() => {
     const fetchReviews = async () => {
       const { data, error } = await supabase
@@ -82,11 +82,9 @@ export default function About() {
 
       if (data) {
         setReviews(prev => {
-          // Identify static reviews to keep them at the top
           const staticIds = ["static-1", "static-2"];
           const staticReviews = prev.filter(r => staticIds.includes(r.id));
           
-          // Filter data to ensure we don't add something that's already there
           const uniqueNewData = data.filter(dbReview => 
             !staticReviews.some(s => s.id === dbReview.id) &&
             !prev.some(p => p.id === dbReview.id)
@@ -125,6 +123,10 @@ export default function About() {
       } else if (data) {
         setReviews(prev => [data[0], ...prev]);
         setNewReview({ name: "", comment: "", rating: 5 });
+        
+        // Show success prompt
+        setShowSuccess(true);
+        setTimeout(() => setShowSuccess(false), 3000);
       }
     } catch (err) {
       console.error("Submission failed:", err);
@@ -151,7 +153,17 @@ export default function About() {
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 relative">
+      {/* Success Prompt Overlay */}
+      {showSuccess && (
+        <div className="fixed bottom-10 left-1/2 transform -translate-x-1/2 z-50 animate-in fade-in slide-in-from-bottom-5 duration-300">
+          <div className="bg-green-600 text-white px-6 py-3 rounded-full shadow-2xl flex items-center gap-2 font-medium">
+            <CheckCircle className="w-5 h-5" />
+            Review submitted
+          </div>
+        </div>
+      )}
+
       {/* Hero Section */}
       <div
         className="relative h-96 flex items-center justify-center"

@@ -9,6 +9,13 @@ import {
   CardDescription,
   CardFooter
 } from "../components/ui/card";
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogHeader, 
+  DialogTitle, 
+  DialogFooter 
+} from "../components/ui/dialog"; 
 import { RadioGroup, RadioGroupItem } from "../components/ui/radio-group";
 import { 
   CreditCard, 
@@ -21,9 +28,8 @@ import {
   Lock, 
   ArrowRight,
   Loader2,
-  Layers,
-  Plane,
-  Banknote // Added icon for cash/payment
+  Info,    // Added for the notice
+  XCircle  // Added for the notice
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -146,6 +152,7 @@ export default function PaymentPage() {
 
   // Form State
   const [isProcessing, setIsProcessing] = useState(false);
+  const [showWaiver, setShowWaiver] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState("card");
   const [formData, setFormData] = useState({
     firstName: "", lastName: "", email: "", phone: "",
@@ -164,6 +171,11 @@ export default function PaymentPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setShowWaiver(true); // Open waiver instead of processing immediately
+  };
+
+  const handleFinalConfirm = async () => {
+    setShowWaiver(false);
     setIsProcessing(true);
     await new Promise(resolve => setTimeout(resolve, 2000));
 
@@ -340,10 +352,7 @@ export default function PaymentPage() {
           <div className="lg:col-span-1">
             <Card className="sticky top-8 shadow-lg border-t-4 border-t-red-600">
                 <CardHeader>
-                    <CardTitle className="flex justify-between items-center">
-                        Order Summary
-                        {displayData.isCustom && <Layers className="w-4 h-4 text-gray-400" />}
-                    </CardTitle>
+                    <CardTitle>Payment Summary</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-6">
                     {/* Basic Info */}
@@ -372,69 +381,28 @@ export default function PaymentPage() {
                         </div>
                     </div>
 
-                    {/* === CHOSEN TRIPS / ITINERARY === */}
-                    {displayData.isCustom && displayData.details.length > 0 && (
-                        <div>
-                            <h3 className="font-bold text-gray-900 mb-3 flex items-center gap-2 text-sm">
-                                <Layers className="w-4 h-4 text-red-600"/> Chosen Trips
-                            </h3>
-                            <div className="space-y-4 max-h-[300px] overflow-y-auto pr-1">
-                                {displayData.details.map((day, idx) => (
-                                    <div key={idx} className="bg-gray-50 p-3 rounded-lg border border-gray-100 relative">
-                                        <div className="flex justify-between items-start mb-2">
-                                            <div>
-                                                <span className="text-[10px] font-bold text-white bg-gray-800 px-2 py-0.5 rounded-full uppercase">Day {idx + 1}</span>
-                                                <div className="font-bold text-gray-800 mt-1">{day.location.toUpperCase()}</div>
-                                                
-                                                <div className="flex items-center gap-2 mt-1">
-                                                    <span className="text-xs text-gray-500">{format(new Date(day.date), "MMM dd")}</span>
-                                                    <span className="text-gray-300">•</span>
-                                                    <span className="text-xs text-gray-500 flex items-center">
-                                                        <Users className="w-3 h-3 mr-1" />
-                                                        {day.travelers}
-                                                    </span>
-                                                </div>
-                                            </div>
-                                            <div className="font-bold text-red-600 text-sm">¥{day.price.toLocaleString()}</div>
-                                        </div>
-                                        
-                                        <div className="text-xs text-gray-600 border-t border-gray-200 pt-2 mt-2">
-                                            <p className="font-semibold mb-1">Destinations:</p>
-                                            <ul className="list-disc pl-4 space-y-0.5">
-                                                {day.destinations.map((destId: string) => (
-                                                    <li key={destId}>{getDestName(destId)}</li>
-                                                ))}
-                                                {day.transportation && day.transportation.includes("airport-transfer") && (
-                                                    <li className="text-blue-600 font-medium flex items-center -ml-1">
-                                                        <Plane className="w-3 h-3 mr-1" /> Airport Transfer (+¥8,000)
-                                                    </li>
-                                                )}
-                                            </ul>
-                                        </div>
-                                    </div>
-                                ))}
+                    {/* TRAVEL INCLUSION NOTICE ADDED HERE */}
+                    <div className="bg-orange-50 border border-orange-100 rounded-lg p-3">
+                        <div className="flex items-center gap-2 text-orange-800 font-semibold text-xs mb-2">
+                            <Info className="w-3.5 h-3.5" />
+                            <span>Travel Inclusion Notice</span>
+                        </div>
+                        <p className="text-[11px] text-gray-700 leading-tight mb-2">
+                            This tour package covers *optional* <strong>private transportation and guide services only</strong>.
+                        </p>
+                        <div className="space-y-1">
+                            <div className="flex items-center text-[10px] text-red-600 gap-1.5 font-medium">
+                                <XCircle className="w-3 h-3" /> Roundtrip Airfare
+                            </div>
+                            <div className="flex items-center text-[10px] text-red-600 gap-1.5 font-medium">
+                                <XCircle className="w-3 h-3" /> Hotel Accommodations
                             </div>
                         </div>
-                    )}
+                    </div>
 
-                    {/* --- TOTALS SECTION (DYNAMIC) --- */}
-                    <div className="border-t pt-4 space-y-2">
-                        <div className="flex justify-between items-center text-sm text-gray-600">
-                            <span>Package Total:</span>
-                            <span>¥{totalAmount.toLocaleString()}</span>
-                        </div>
-                        
-                        {paymentOption === 'downpayment' && (
-                            <div className="flex justify-between items-center text-sm text-gray-600">
-                                <span>Remaining Balance:</span>
-                                <span className="font-bold text-orange-600">¥{balanceAmount.toLocaleString()}</span>
-                            </div>
-                        )}
-
-                        <div className="flex justify-between items-center text-xl font-bold text-gray-900 pt-2 border-t mt-2">
-                            <span>Total Due Now:</span>
-                            <span>¥{amountToPay.toLocaleString()}</span>
-                        </div>
+                    <div className="flex justify-between items-center text-xl font-bold text-gray-900 pt-2">
+                        <span>Total:</span>
+                        <span>¥{parseInt(price).toLocaleString()}</span>
                     </div>
 
                     <Button 
@@ -463,6 +431,80 @@ export default function PaymentPage() {
 
         </div>
       </div>
+
+      {/* --- WAIVER MODAL --- */}
+      <Dialog open={showWaiver} onOpenChange={setShowWaiver}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold text-center border-b pb-4">
+              ACCIDENT WAIVER AND RELEASE OF LIABILITY FORM
+            </DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-4 text-sm text-gray-700 leading-relaxed py-4">
+            <p className="font-semibold italic">Please read carefully before signing:</p>
+            
+            <p>
+              I hereby assume all risks of participating in any and all activities associated with this tour event. 
+              I certify that I am physically fit and have sufficiently prepared for participation in this activity.
+            </p>
+
+            <div className="bg-red-50 p-4 rounded-md border border-red-100">
+              <p className="text-red-900 font-medium">
+                <strong>Liability Limitation:</strong> I acknowledge and agree that the liability of 
+                <span className="font-bold"> Uncle Sam (UncleSam Japan Tour)</span> is strictly limited to 
+                occurrences and activities within the scheduled tours. Uncle Sam shall not be held liable 
+                for any incidents, injuries, or losses occurring outside of the official tour itinerary.
+              </p>
+            </div>
+
+            <p>
+              (A) I WAIVE, RELEASE, AND DISCHARGE from any and all liability, including but not 
+              limited to, liability arising from the negligence or fault of the entities or persons released, 
+              for my death, disability, personal injury, property damage, or actions of any kind.
+            </p>
+
+            <p>
+              (B) I INDEMNIFY AND HOLD HARMLESS the entities or persons mentioned in this 
+              paragraph from any and all liabilities or claims made as a result of participation in this 
+              activity, whether caused by negligence or otherwise.
+            </p>
+
+            {/* Signature Section */}
+            <div className="mt-12 pt-8 border-t flex flex-col items-center">
+              <div className="w-full max-w-md space-y-2">
+                {/* Blank space for signature */}
+                <div className="h-16" /> 
+                
+                {/* The Signature Line */}
+                <div className="border-b-2 border-black w-full" />
+                
+                {/* Name BELOW the line */}
+                <div className="flex flex-col items-center pt-1">
+                  <span className="font-serif italic text-lg text-gray-900 uppercase tracking-wide">
+                    {formData.firstName} {formData.lastName}
+                  </span>
+                  <p className="text-[10px] uppercase tracking-[0.2em] text-gray-500 font-bold mt-1 text-center">
+                    Electronic Signature of Participant
+                  </p>
+                </div>
+              </div>
+
+              <div className="w-full max-w-md flex justify-between text-[11px] font-bold text-gray-500 mt-8 uppercase">
+                <p>PRINTED NAME: {formData.firstName} {formData.lastName}</p>
+                <p>DATE: {new Date().toLocaleDateString()}</p>
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter className="sm:justify-center gap-2 border-t pt-4">
+            <Button variant="outline" onClick={() => setShowWaiver(false)}>Cancel</Button>
+            <Button className="bg-red-600 hover:bg-red-700 text-white px-8" onClick={handleFinalConfirm}>
+              I Agree & Authorize Payment
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
