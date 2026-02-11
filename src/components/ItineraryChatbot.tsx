@@ -1,6 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
+import { Input } from "./ui/input";
 import { Badge } from "./ui/badge";
 import {
   MapPin,
@@ -17,15 +18,27 @@ import {
   Utensils,
   Maximize2,
   Minimize2,
+  Sparkles,
+  Car,
+  RotateCcw, 
+  RefreshCw, 
+  Pencil,    
+  Trash2,    
+  Send,
+  Umbrella,
+  ArrowRightLeft
 } from "lucide-react";
 
+// --- TYPES ---
 interface ItineraryItem {
+  id: string;
   time: string;
   activity: string;
   location: string;
   duration: string;
   type: "travel" | "sightseeing" | "meal" | "activity";
   notes?: string;
+  weatherWarning?: boolean;
 }
 
 interface DayItinerary {
@@ -35,17 +48,46 @@ interface DayItinerary {
   weather: {
     condition: string;
     temp: string;
-    warning?: string;
+    summary: string;
   };
 }
 
 interface ItineraryChatbotProps {
-  selectedDestinations: string[]; // Receives names like "Tokyo Tower"
+  selectedDestinations: string[]; 
   isVisible: boolean;
   onClose: () => void;
   travelDate: string;
   travelers: number;
 }
+
+// --- MOCK DATA ---
+const MOCK_WEATHER_DB: Record<string, { condition: string; temp: string; icon: 'sun' | 'rain' | 'cloud' }> = {
+  "Tokyo Tower": { condition: "Sunny", temp: "24°C", icon: 'sun' },
+  "TeamLab Planets": { condition: "Rain", temp: "19°C", icon: 'rain' }, 
+  "Bamboo Grove": { condition: "Heavy Rain", temp: "18°C", icon: 'rain' },
+  "Fushimi Inari": { condition: "Rain", temp: "20°C", icon: 'rain' },
+  "Nagoya Castle": { condition: "Sunny", temp: "25°C", icon: 'sun' },
+  "Legoland Japan": { condition: "Cloudy", temp: "22°C", icon: 'cloud' },
+  "Ghibli Park": { condition: "Sunny", temp: "23°C", icon: 'sun' },
+  "Oasis 21": { condition: "Clear", temp: "21°C", icon: 'sun' },
+};
+
+const INDOOR_ALTERNATIVES = [
+  "Toyota Commemorative Museum",
+  "Nagoya City Science Museum",
+  "SCMAGLEV and Railway Park",
+  "Noritake Garden (Craft Center)",
+  "Tokugawa Art Museum"
+];
+
+// --- HELPER: Time Calculator ---
+const addTime = (startTime: string, minutesToAdd: number): string => {
+  const [hours, mins] = startTime.split(':').map(Number);
+  const date = new Date();
+  date.setHours(hours, mins, 0, 0);
+  date.setMinutes(date.getMinutes() + minutesToAdd);
+  return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
+};
 
 export default function ItineraryChatbot({
   selectedDestinations,
@@ -54,521 +96,482 @@ export default function ItineraryChatbot({
   travelDate,
   travelers,
 }: ItineraryChatbotProps) {
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [itinerary, setItinerary] = useState<DayItinerary[]>([]);
-  const [weatherWarnings, setWeatherWarnings] = useState<string[]>([]);
-  const [alternatives, setAlternatives] = useState<string[]>([]);
-  const [showAlternatives, setShowAlternatives] = useState(false);
+  // UI States
   const [isMinimized, setIsMinimized] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [prompt, setPrompt] = useState("");
+  
+  // Data States
+  const [currentItinerary, setCurrentItinerary] = useState<DayItinerary[]>([]);
+  const [history, setHistory] = useState<DayItinerary[][]>([]); 
+  const [revisionCount, setRevisionCount] = useState(0);
+  
+  // UPDATED: Limit to 5 revisions
+  const MAX_REVISIONS = 5;
 
-  // 1. EXPANDED MOCK DATA: Covers Tokyo, Kyoto, Osaka, Nagoya
-  const mockWeather: Record<string, { condition: string; temp: string; warning?: string }> = {
-    // Tokyo
-    "Tokyo Tower": { condition: "Sunny", temp: "24°C" },
-    "Senso-ji Temple": { condition: "Partly Cloudy", temp: "23°C" },
-    "Shibuya Crossing": { condition: "Clear", temp: "22°C" },
-    "TeamLab Planets": { condition: "Rain", temp: "19°C", warning: "Indoor activity recommended due to rain" },
-    "Tokyo Disneyland": { condition: "Sunny", temp: "25°C" },
+  const [weatherWarnings, setWeatherWarnings] = useState<string[]>([]);
+  const [feasibilityIssue, setFeasibilityIssue] = useState<string | null>(null);
+  
+  // Manual Edit State
+  const [editingItemId, setEditingItemId] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState("");
 
-    // Kyoto
-    "Kinkaku-ji": { condition: "Sunny", temp: "21°C" },
-    "Fushimi Inari": { condition: "Cloudy", temp: "20°C" },
-    "Bamboo Grove": { condition: "Rain", temp: "18°C", warning: "Slippery paths expected" },
-    "Kiyomizu-dera": { condition: "Sunny", temp: "22°C" },
+  // Suggestions State
+  const [weatherSuggestions, setWeatherSuggestions] = useState<{original: string, suggested: string}[]>([]);
 
-    // Osaka
-    "Dotonbori": { condition: "Clear", temp: "23°C" },
-    "Universal Studios": { condition: "Sunny", temp: "26°C" },
-    "Osaka Castle": { condition: "Partly Cloudy", temp: "24°C" },
-
-    // Nagoya
-    "Nagoya Castle": { condition: "Sunny", temp: "24°C" },
-    "Legoland Japan": { condition: "Partly Cloudy", temp: "22°C" },
-    "Ghibli Park": { condition: "Sunny", temp: "23°C" },
-  };
-
-  // Generic alternatives pool
-  const allAlternatives = [
-    "Local History Museum",
-    "City Art Gallery",
-    "Botanical Garden",
-    "Traditional Tea House",
-    "Shopping District",
-  ];
-
+  // Initial Generation
   useEffect(() => {
-    if (isVisible && selectedDestinations.length > 0) {
-      generateItinerary();
+    if (isVisible && selectedDestinations.length > 0 && currentItinerary.length === 0) {
+      generateItinerary(false); 
     }
   }, [isVisible, selectedDestinations]);
 
-  const generateItinerary = async () => {
-    setIsGenerating(true);
+  // --- CORE GENERATOR LOGIC ---
+  const generateItinerary = async (isRevision: boolean = false, customInstruction: string = "") => {
+    if (isRevision && revisionCount >= MAX_REVISIONS) return;
 
-    // Check weather warnings based on name matching
+    setIsGenerating(true);
+    setWeatherSuggestions([]); 
+    setFeasibilityIssue(null);
+
+    // 1. Save History
+    if (currentItinerary.length > 0) {
+        setHistory(prev => [...prev, currentItinerary]);
+    }
+
+    // 2. Feasibility Logic (Strict 12-Hour inclusive of Travel)
+    // Assumption: 1.5h per spot + 45min travel per spot + 1h lunch
+    const estTime = (selectedDestinations.length * 1.5) + (selectedDestinations.length * 0.75) + 1;
+    if (estTime > 12) {
+        setFeasibilityIssue(`⚠️ Time Warning: You selected ${selectedDestinations.length} spots. Since travel time is included in your 12-hour booking, this might be rushed.`);
+    }
+
+    // 3. Analyze Weather
+    const suggestions: {original: string, suggested: string}[] = [];
+    const usedAlternatives = new Set<string>();
     const warnings: string[] = [];
-    selectedDestinations.forEach((destName) => {
-      // Find matching key in mockWeather (partial match or exact)
-      const weatherKey = Object.keys(mockWeather).find(k => destName.includes(k) || k.includes(destName));
-      const weather = weatherKey ? mockWeather[weatherKey] : { condition: "Sunny", temp: "22°C", warning: undefined };
-      
-      if (weather?.warning) {
-        warnings.push(`${destName}: ${weather.warning}`);
-      }
+
+    selectedDestinations.forEach(dest => {
+       const weather = MOCK_WEATHER_DB[dest] || { condition: "Sunny", temp: "24°C" };
+       
+       if (weather.condition.toLowerCase().includes("rain")) {
+           warnings.push(`${dest}: ${weather.condition}`);
+           const alt = INDOOR_ALTERNATIVES.find(a => !selectedDestinations.includes(a) && !usedAlternatives.has(a));
+           if (alt) {
+               suggestions.push({ original: dest, suggested: alt });
+               usedAlternatives.add(alt);
+           }
+       }
     });
     setWeatherWarnings(warnings);
+    setWeatherSuggestions(suggestions);
 
-    if (warnings.length > 0) {
-      setAlternatives(allAlternatives.slice(0, 3));
-      setShowAlternatives(true);
-    }
-
-    // Simulate AI generation delay
+    // 4. Simulate AI "Thinking"
     await new Promise((resolve) => setTimeout(resolve, 2000));
 
-    // 2. DYNAMIC ITINERARY GENERATION
-    // Map selected destinations to time slots
-    const generatedItems: ItineraryItem[] = [
-        {
-          time: "09:00",
-          activity: "Hotel Pick-up & Welcome Briefing",
-          location: "Your Hotel",
-          duration: "30 mins",
-          type: "travel",
-          notes: "Meet your multilingual driver and tour assistant",
-        }
-    ];
+    // 5. Build Itinerary Items
+    const generatedItems: ItineraryItem[] = [];
+    
+    // --- UPDATED DEFAULT START TIME TO 06:00 AM ---
+    let currentTime = customInstruction.toLowerCase().includes("start at") 
+        ? customInstruction.split("start at")[1].trim().split(" ")[0] 
+        : "06:00"; 
+    
+    // Fallback check
+    if (!currentTime.includes(":")) currentTime = "06:00"; 
 
-    // Add First Destination (Morning)
-    if (selectedDestinations[0]) {
-        generatedItems.push({
-            time: "09:30",
-            activity: "Travel to Destination 1",
-            location: selectedDestinations[0],
-            duration: "45 mins",
-            type: "travel",
-        });
-        generatedItems.push({
-            time: "10:15",
-            activity: `Explore ${selectedDestinations[0]}`,
-            location: selectedDestinations[0],
-            duration: "2 hours",
-            type: "sightseeing",
-            notes: "Guided tour with historical insights and photo opportunities",
-        });
-    }
+    let hasHadLunch = false;
 
-    // Lunch
+    // Start - Explicit Pick-up
     generatedItems.push({
-        time: "12:30",
-        activity: "Traditional Japanese Lunch",
-        location: "Local Restaurant",
-        duration: "1 hour",
-        type: "meal",
-        notes: "Authentic cuisine experience with dietary accommodations",
+      id: "start-1",
+      time: currentTime,
+      activity: "Hotel/Accommodation Pick-up",
+      location: "Your Stay",
+      duration: "30 mins",
+      type: "travel",
+      notes: "Driver arrival & briefing"
+    });
+    currentTime = addTime(currentTime, 30);
+
+    // Destinations Loop
+    const destsToMap = isRevision ? [...selectedDestinations].reverse() : selectedDestinations;
+
+    destsToMap.forEach((dest, index) => {
+        // Calculate Travel Time (Counts against 12hr limit)
+        generatedItems.push({
+            id: `travel-${index}`,
+            time: currentTime,
+            activity: `Travel to ${dest}`,
+            location: "En route",
+            duration: "45 mins",
+            type: "travel"
+        });
+        currentTime = addTime(currentTime, 45);
+
+        // Visit
+        const weather = MOCK_WEATHER_DB[dest];
+        const isRainy = weather?.condition.toLowerCase().includes("rain");
+
+        generatedItems.push({
+            id: `visit-${index}`,
+            time: currentTime,
+            activity: `Explore ${dest}`,
+            location: dest,
+            duration: "1h 30m",
+            type: "sightseeing",
+            notes: isRainy ? "⚠️ Rain expected. Bring umbrella." : "Guided tour",
+            weatherWarning: isRainy
+        });
+        currentTime = addTime(currentTime, 90);
+
+        // Lunch Logic
+        const currentHour = parseInt(currentTime.split(':')[0]);
+        // Simple logic: Lunch between 11:00 and 14:00 (11am - 2pm)
+        if (currentHour >= 11 && currentHour <= 14 && !hasHadLunch) {
+            generatedItems.push({
+                id: "lunch-1",
+                time: currentTime,
+                activity: "Lunch Break",
+                location: "Local Restaurant",
+                duration: "1 hour",
+                type: "meal",
+                notes: "Local cuisine"
+            });
+            currentTime = addTime(currentTime, 60);
+            hasHadLunch = true;
+        }
     });
 
-    // Add Second Destination (Afternoon)
-    if (selectedDestinations[1]) {
-        generatedItems.push({
-            time: "14:00",
-            activity: `Visit ${selectedDestinations[1]}`,
-            location: selectedDestinations[1],
-            duration: "3 hours",
-            type: "activity",
-            notes: "Interactive experience and exploration",
-        });
-    }
-
-    // Add Third Destination (Evening) or Free Time
-    if (selectedDestinations[2]) {
-        generatedItems.push({
-            time: "17:30",
-            activity: `Evening at ${selectedDestinations[2]}`,
-            location: selectedDestinations[2],
-            duration: "1.5 hours",
-            type: "sightseeing",
-            notes: "Sunset views and evening atmosphere",
-        });
-    } else {
-        generatedItems.push({
-            time: "17:30",
-            activity: "Evening Shopping & Leisure",
-            location: "City Center",
-            duration: "1.5 hours",
-            type: "sightseeing",
-            notes: "Free time for souvenirs",
-        });
-    }
-
-    // Return
+    // End
     generatedItems.push({
-        time: "19:30",
-        activity: "Return to Hotel",
-        location: "Your Hotel",
+        id: "end-1",
+        time: currentTime,
+        activity: "Drop-off at Hotel",
+        location: "Your Stay",
         duration: "45 mins",
         type: "travel",
-        notes: "Safe drop-off with tour summary",
+        notes: "End of 12-hour service"
     });
 
-    const mockItinerary: DayItinerary[] = [
-      {
+    const newDay: DayItinerary = {
         day: 1,
         date: travelDate,
         items: generatedItems,
-        weather: { condition: "Clear", temp: "24°C" }, // General day weather
-      },
-    ];
+        weather: { 
+            condition: suggestions.length > 0 ? "Rainy" : "Sunny", 
+            temp: "24°C",
+            summary: suggestions.length > 0 ? "Rain showers expected. Indoor backups available." : "Perfect weather for sightseeing."
+        }, 
+    };
 
-    setItinerary(mockItinerary);
+    setCurrentItinerary([newDay]);
+    if (isRevision) setRevisionCount(prev => prev + 1);
+    
     setIsGenerating(false);
+    setPrompt(""); 
   };
 
-  const acceptAlternative = (alternative: string, replaceIndex: number) => {
-    // In a real app, this would update the parent state. 
-    // Here we just update the local view for the demo.
-    const newItems = [...itinerary];
-    if(newItems[0] && newItems[0].items) {
-        // Find the item corresponding to the destination to replace
-        // This is a simplified mock logic
-        alert(`Ideally this updates your main selection. For now, imagine ${alternative} is added!`);
-    }
-    setShowAlternatives(false);
+  // --- ACTIONS ---
+  
+  const handleSwapDestination = (original: string, suggested: string) => {
+      setHistory(prev => [...prev, currentItinerary]);
+
+      const newItinerary = [...currentItinerary];
+      newItinerary[0].items = newItinerary[0].items.map(item => {
+          if (item.activity.includes(original)) {
+              return {
+                  ...item,
+                  activity: item.activity.replace(original, suggested),
+                  location: suggested,
+                  notes: "Replaced due to weather",
+                  weatherWarning: false 
+              };
+          }
+          if (item.activity.includes(`Travel to ${original}`)) {
+              return { ...item, activity: `Travel to ${suggested}` };
+          }
+          return item;
+      });
+
+      setWeatherSuggestions(prev => prev.filter(s => s.original !== original));
+      setCurrentItinerary(newItinerary);
   };
 
-  const exportToPDF = () => {
-    // Mock PDF generation
-    const pdfContent = `
-UncleSam Tours - Personal Itinerary
-Generated for ${travelers} passenger${travelers > 1 ? "s" : ""}
-Travel Date: ${travelDate}
-
-DESTINATIONS:
-${selectedDestinations.map((dest, i) => `${i + 1}. ${dest}`).join("\n")}
-
-DETAILED SCHEDULE:
-${itinerary
-  .map(
-    (day) =>
-      `Day ${day.day} (${day.date}):\n` +
-      day.items
-        .map(
-          (item) =>
-            `${item.time} - ${item.activity} at ${item.location} (${item.duration})`
-        )
-        .join("\n")
-  )
-  .join("\n\n")}
-
-INCLUSIONS:
-• 12-hour private tour with dedicated tour assistant
-• Private van transportation with multilingual driver
-• Gas and toll fees included
-• Hotel pick-up and drop-off service
-• Driver fluent in English, Japanese, and Tagalog
-
-Contact: unclesamtourservices1988@gmail.com | +81 80-5331-1738
-    `;
-
-    const blob = new Blob([pdfContent], { type: "text/plain" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `UncleSam-Tours-Itinerary-${travelDate}.txt`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+  const handleUndo = () => {
+    if (history.length === 0) return;
+    const previous = history[history.length - 1];
+    setCurrentItinerary(previous);
+    setHistory(prev => prev.slice(0, -1));
+    setRevisionCount(prev => Math.max(0, prev - 1));
   };
 
+  const handleManualEditSave = (dayIndex: number) => {
+      if (!editingItemId) return;
+      const newItinerary = [...currentItinerary];
+      const itemIndex = newItinerary[dayIndex].items.findIndex(i => i.id === editingItemId);
+      if (itemIndex > -1) {
+          newItinerary[dayIndex].items[itemIndex].activity = editValue;
+          setCurrentItinerary(newItinerary);
+      }
+      setEditingItemId(null);
+  };
+
+  const handleManualDelete = (dayIndex: number, itemId: string) => {
+      if(!confirm("Remove this item?")) return;
+      const newItinerary = [...currentItinerary];
+      newItinerary[dayIndex].items = newItinerary[dayIndex].items.filter(i => i.id !== itemId);
+      setCurrentItinerary(newItinerary);
+  };
+
+  const handleSubmitPrompt = (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!prompt.trim()) return;
+      generateItinerary(true, prompt);
+  };
+
+  // --- ICONS ---
   const getActivityIcon = (type: string) => {
     switch (type) {
-      case "travel":
-        return <Navigation className="w-4 h-4 text-blue-600" />;
-      case "meal":
-        return <Utensils className="w-4 h-4 text-green-600" />;
-      case "sightseeing":
-        return <Camera className="w-4 h-4 text-purple-600" />;
-      case "activity":
-        return <MapPin className="w-4 h-4 text-red-600" />;
-      default:
-        return <Clock className="w-4 h-4 text-gray-600" />;
+      case "travel": return <Car className="w-4 h-4 text-blue-600" />;
+      case "meal": return <Utensils className="w-4 h-4 text-green-600" />;
+      case "sightseeing": return <Camera className="w-4 h-4 text-purple-600" />;
+      default: return <Clock className="w-4 h-4 text-gray-600" />;
     }
   };
 
   const getWeatherIcon = (condition: string) => {
-    return condition.toLowerCase().includes("rain") ? (
-      <CloudRain className="w-4 h-4 text-blue-600" />
-    ) : (
-      <Sun className="w-4 h-4 text-yellow-600" />
-    );
+    return condition.toLowerCase().includes("rain") ? <CloudRain className="w-6 h-6 text-blue-200" /> : <Sun className="w-6 h-6 text-yellow-300" />;
+  };
+
+  const exportToPDF = () => {
+      alert("Downloading Itinerary PDF...");
   };
 
   if (!isVisible) return null;
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
-      <div
-        className={`bg-white rounded-lg shadow-2xl transition-all duration-300 ${
-          isMinimized
-            ? "w-96 h-16"
-            : "w-[95%] h-[95%] sm:w-[90%] sm:h-[90%] lg:w-[80%] lg:h-[90%]"
-        } max-w-6xl max-h-screen overflow-hidden flex flex-col`}
-      >
+    <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 animate-in fade-in duration-200">
+      <div className={`bg-white rounded-lg shadow-2xl transition-all duration-300 ${isMinimized ? "w-96 h-16" : "w-[95%] h-[95%] sm:w-[90%] sm:h-[90%] lg:w-[80%] lg:h-[90%]"} max-w-6xl max-h-screen overflow-hidden flex flex-col`}>
+        
         {/* Header */}
-        <div className="bg-red-600 text-white p-4 sm:p-6 flex-shrink-0">
+        <div className="bg-gradient-to-r from-red-600 to-red-700 text-white p-4 sm:p-6 flex-shrink-0">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
-              <Bot className="w-6 h-6" />
+              <div className="bg-white/20 p-2 rounded-full"><Bot className="w-6 h-6 text-white" /></div>
               <div>
-                <h2 className="text-xl sm:text-2xl font-bold">
-                  AI Itinerary Planner
-                </h2>
-                <p className="text-red-100 text-sm sm:text-base">
-                  Personalized tour planning for {travelers} passenger
-                  {travelers > 1 ? "s" : ""}
-                </p>
+                <h2 className="text-xl sm:text-2xl font-bold">AI Itinerary Planner</h2>
+                <p className="text-red-100 text-sm">Interactive Assistant (12-Hour Exclusive)</p>
               </div>
             </div>
             <div className="flex items-center space-x-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setIsMinimized(!isMinimized)}
-                className="text-white hover:bg-red-700"
-              >
-                {isMinimized ? (
-                  <Maximize2 className="w-5 h-5" />
-                ) : (
-                  <Minimize2 className="w-5 h-5" />
-                )}
+              <Button variant="ghost" size="sm" onClick={() => setIsMinimized(!isMinimized)} className="text-white hover:bg-white/20">
+                {isMinimized ? <Maximize2 className="w-5 h-5" /> : <Minimize2 className="w-5 h-5" />}
               </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={onClose}
-                className="text-white hover:bg-red-700"
-              >
+              <Button variant="ghost" size="sm" onClick={onClose} className="text-white hover:bg-white/20">
                 <X className="w-5 h-5" />
               </Button>
             </div>
           </div>
         </div>
 
-        {/* Content */}
+        {/* Main Content Area */}
         {!isMinimized && (
-          <div className="flex-1 overflow-hidden">
-            {isGenerating ? (
-              <div className="flex items-center justify-center h-full">
-                <div className="text-center py-12">
-                  <Bot className="w-16 h-16 text-red-600 mx-auto mb-4 animate-pulse" />
-                  <h3 className="text-2xl font-semibold text-gray-900 mb-2">
-                    Generating Your Personalized Itinerary
-                  </h3>
-                  <p className="text-gray-600 mb-6">
-                    Analyzing destinations, checking weather, and optimizing
-                    your schedule...
-                  </p>
-                  <div className="flex justify-center">
-                    <div className="flex space-x-1">
-                      <div className="w-3 h-3 bg-red-600 rounded-full animate-bounce"></div>
-                      <div
-                        className="w-3 h-3 bg-red-600 rounded-full animate-bounce"
-                        style={{ animationDelay: "0.1s" }}
-                      ></div>
-                      <div
-                        className="w-3 h-3 bg-red-600 rounded-full animate-bounce"
-                        style={{ animationDelay: "0.2s" }}
-                      ></div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="h-full overflow-y-auto">
-                <div className="p-4 sm:p-6 space-y-6">
-                  {/* Weather Warnings */}
-                  {weatherWarnings.length > 0 && (
-                    <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded">
-                      <div className="flex items-start space-x-3">
-                        <AlertTriangle className="w-6 h-6 text-yellow-600 mt-0.5 flex-shrink-0" />
-                        <div>
-                          <h4 className="font-semibold text-yellow-800 text-lg">
-                            Weather Advisory
-                          </h4>
-                          <ul className="text-yellow-700 mt-2 space-y-1">
-                            {weatherWarnings.map((warning, index) => (
-                              <li key={index} className="text-base">
-                                • {warning}
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Alternative Suggestions */}
-                  {showAlternatives && (
-                    <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg">
-                      <h4 className="font-semibold text-blue-900 mb-4 text-lg">
-                        Suggested Alternatives (Better Weather)
-                      </h4>
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        {alternatives.map((alternative, index) => (
-                          <div
-                            key={alternative}
-                            className="bg-white p-4 rounded border shadow-sm"
-                          >
-                            <h5 className="font-medium text-gray-900 text-base">
-                              {alternative}
-                            </h5>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() =>
-                                acceptAlternative(alternative, index)
-                              }
-                              className="mt-3 w-full"
-                            >
-                              Consider Alternative
-                            </Button>
-                          </div>
-                        ))}
-                      </div>
-                      <Button
-                        onClick={() => setShowAlternatives(false)}
-                        variant="outline"
-                        size="sm"
-                        className="mt-4"
-                      >
-                        Keep Original Destinations
-                      </Button>
-                    </div>
-                  )}
-
-                  {/* Generated Itinerary */}
-                  {itinerary.length > 0 && (
-                    <div className="space-y-6">
-                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                        <h3 className="text-2xl font-bold text-gray-900">
-                          Your Personalized Itinerary
-                        </h3>
-                        <Button
-                          onClick={exportToPDF}
-                          className="bg-red-600 hover:bg-red-700 text-white px-6 py-3 text-base"
-                        >
-                          <Download className="w-5 h-5 mr-2" />
-                          Export PDF
+          <div className="flex-1 overflow-hidden bg-gray-50 flex flex-col">
+            
+            {/* Toolbar */}
+            <div className="bg-white border-b px-4 py-3 flex justify-between items-center flex-wrap gap-3">
+                <div className="flex items-center gap-2">
+                    <Badge variant={revisionCount >= MAX_REVISIONS ? "destructive" : "secondary"} className="text-xs">
+                        Revisions: {revisionCount}/{MAX_REVISIONS}
+                    </Badge>
+                    {history.length > 0 && (
+                        <Button variant="outline" size="sm" onClick={handleUndo} className="text-gray-600 h-8">
+                            <RotateCcw className="w-3 h-3 mr-2" /> Undo
                         </Button>
-                      </div>
-
-                      {itinerary.map((day) => (
-                        <Card
-                          key={day.day}
-                          className="border-gray-200 shadow-sm"
-                        >
-                          <CardHeader className="bg-gray-50 py-4">
-                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                              <div className="flex items-center space-x-3">
-                                <Calendar className="w-6 h-6 text-red-600" />
-                                <div>
-                                  <h4 className="font-semibold text-lg">
-                                    Day {day.day}
-                                  </h4>
-                                  <p className="text-gray-600">{day.date}</p>
-                                </div>
-                              </div>
-                              <div className="flex items-center space-x-2">
-                                {getWeatherIcon(day.weather.condition)}
-                                <span className="text-gray-600">
-                                  {day.weather.condition} • {day.weather.temp}
-                                </span>
-                              </div>
-                            </div>
-                          </CardHeader>
-                          <CardContent className="p-4 sm:p-6">
-                            <div className="space-y-4">
-                              {day.items.map((item, index) => (
-                                <div
-                                  key={index}
-                                  className="flex items-start space-x-4 pb-4 border-b border-gray-100 last:border-b-0"
-                                >
-                                  <div className="flex-shrink-0 mt-1">
-                                    {getActivityIcon(item.type)}
-                                  </div>
-                                  <div className="flex-1 min-w-0">
-                                    <div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-2">
-                                      <span className="font-medium text-gray-900 text-base">
-                                        {item.time}
-                                      </span>
-                                      <Badge
-                                        variant="outline"
-                                        className="text-xs w-fit"
-                                      >
-                                        {item.duration}
-                                      </Badge>
-                                    </div>
-                                    <h5 className="font-semibold text-gray-900 text-base mb-1">
-                                      {item.activity}
-                                    </h5>
-                                    <p className="text-gray-600 flex items-center text-base">
-                                      <MapPin className="w-4 h-4 mr-1 flex-shrink-0" />
-                                      {item.location}
-                                    </p>
-                                    {item.notes && (
-                                      <p className="text-gray-500 mt-2 text-sm italic">
-                                        {item.notes}
-                                      </p>
-                                    )}
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          </CardContent>
-                        </Card>
-                      ))}
-
-                      {/* Package Inclusions Reminder */}
-                      <Card className="bg-green-50 border-green-200">
-                        <CardContent className="p-4 sm:p-6">
-                          <h4 className="font-semibold text-green-900 mb-3 text-lg">
-                            Included in Your Tour Package
-                          </h4>
-                          <div className="grid sm:grid-cols-2 gap-3">
-                            <ul className="text-green-800 space-y-2">
-                              <li className="flex items-center">
-                                <div className="w-2 h-2 bg-green-600 rounded-full mr-3"></div>
-                                12-hour private tour with dedicated tour
-                                assistant
-                              </li>
-                              <li className="flex items-center">
-                                <div className="w-2 h-2 bg-green-600 rounded-full mr-3"></div>
-                                Private van transportation
-                              </li>
-                              <li className="flex items-center">
-                                <div className="w-2 h-2 bg-green-600 rounded-full mr-3"></div>
-                                Gas and toll fees included
-                              </li>
-                            </ul>
-                            <ul className="text-green-800 space-y-2">
-                              <li className="flex items-center">
-                                <div className="w-2 h-2 bg-green-600 rounded-full mr-3"></div>
-                                Hotel pick-up and drop-off service
-                              </li>
-                              <li className="flex items-center">
-                                <div className="w-2 h-2 bg-green-600 rounded-full mr-3"></div>
-                                Driver fluent in English, Japanese, and Tagalog
-                              </li>
-                            </ul>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    </div>
-                  )}
+                    )}
                 </div>
-              </div>
-            )}
+                <Button onClick={exportToPDF} variant="outline" size="sm" className="h-8">
+                    <Download className="w-3 h-3 mr-2" /> Save PDF
+                </Button>
+            </div>
+
+            {/* Scrollable Itinerary View */}
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
+                
+                {isGenerating ? (
+                    <div className="flex flex-col items-center justify-center h-full text-center py-12">
+                        <Sparkles className="w-12 h-12 text-red-600 mb-4 animate-spin" />
+                        <h3 className="text-xl font-bold text-gray-900">Optimizing Schedule...</h3>
+                        <p className="text-gray-500 text-sm">Checking travel times, traffic, and weather conditions</p>
+                    </div>
+                ) : (
+                    <>
+                        {/* 1. Feasibility Alert */}
+                        {feasibilityIssue && (
+                            <div className="bg-orange-50 border-l-4 border-orange-500 p-4 rounded-md flex items-start gap-3">
+                                <AlertTriangle className="w-5 h-5 text-orange-600 mt-0.5" />
+                                <div>
+                                    <h4 className="font-bold text-orange-800">Time Constraint Alert</h4>
+                                    <p className="text-sm text-orange-700">{feasibilityIssue}</p>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* 2. Weather Dashboard */}
+                        {currentItinerary.length > 0 && (
+                            <div className="bg-gradient-to-r from-blue-600 to-blue-500 rounded-lg p-6 text-white shadow-lg relative overflow-hidden">
+                                {/* Decorative Circles */}
+                                <div className="absolute -top-10 -right-10 w-32 h-32 bg-white/10 rounded-full blur-2xl"></div>
+                                <div className="absolute top-10 left-10 w-16 h-16 bg-white/10 rounded-full blur-xl"></div>
+
+                                <div className="flex justify-between items-start relative z-10">
+                                    <div>
+                                        <h3 className="font-bold text-lg flex items-center gap-2">
+                                            {getWeatherIcon(currentItinerary[0].weather.condition)}
+                                            {travelDate} Forecast
+                                        </h3>
+                                        <p className="text-blue-100 mt-1">{currentItinerary[0].weather.summary}</p>
+                                    </div>
+                                    <div className="text-right">
+                                        <span className="text-3xl font-bold">{currentItinerary[0].weather.temp}</span>
+                                        <p className="text-xs text-blue-100 uppercase font-semibold tracking-wider">{currentItinerary[0].weather.condition}</p>
+                                    </div>
+                                </div>
+
+                                {/* Smart Suggestions Section */}
+                                {weatherSuggestions.length > 0 && (
+                                    <div className="mt-6 bg-white/10 rounded-lg p-3 border border-white/20 backdrop-blur-sm">
+                                        <h4 className="text-sm font-semibold flex items-center gap-2 mb-3">
+                                            <AlertTriangle className="w-4 h-4 text-yellow-300" />
+                                            Bad Weather Detected. AI Suggests:
+                                        </h4>
+                                        <div className="space-y-2">
+                                            {weatherSuggestions.map((sug, idx) => (
+                                                <div key={idx} className="flex items-center justify-between bg-white/90 text-gray-800 p-2 rounded text-sm shadow-sm">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="line-through text-gray-400">{sug.original}</span>
+                                                        <ArrowRightLeft className="w-3 h-3 text-blue-500" />
+                                                        <span className="font-bold text-blue-700 flex items-center">
+                                                            <Umbrella className="w-3 h-3 mr-1" /> {sug.suggested}
+                                                        </span>
+                                                    </div>
+                                                    <Button 
+                                                        size="sm" 
+                                                        className="h-7 bg-blue-600 hover:bg-blue-700 text-white text-xs"
+                                                        onClick={() => handleSwapDestination(sug.original, sug.suggested)}
+                                                    >
+                                                        Swap Now
+                                                    </Button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* 3. Itinerary Cards */}
+                        {currentItinerary.map((day, dayIndex) => (
+                            <Card key={day.day} className="border-gray-200 shadow-md overflow-hidden">
+                                <CardHeader className="bg-white border-b py-3 px-4">
+                                    <div className="flex justify-between items-center">
+                                        <div className="flex items-center gap-2">
+                                            <Calendar className="w-5 h-5 text-red-600"/>
+                                            <span className="font-bold text-gray-800">Day {day.day} Timeline</span>
+                                        </div>
+                                    </div>
+                                </CardHeader>
+                                <CardContent className="p-0">
+                                    <div className="divide-y divide-gray-100">
+                                        {day.items.map((item, index) => (
+                                            <div key={item.id} className={`flex p-4 hover:bg-gray-50 transition-colors group relative ${item.weatherWarning ? "bg-yellow-50/50" : ""}`}>
+                                                {/* Time */}
+                                                <div className="flex flex-col items-center mr-4 w-16 pt-1">
+                                                    <span className="text-sm font-bold text-gray-900">{item.time}</span>
+                                                    <div className="h-full w-0.5 bg-gray-200 mt-2 group-last:hidden"></div>
+                                                </div>
+
+                                                {/* Details */}
+                                                <div className="flex-1 pb-2">
+                                                    <div className="flex justify-between items-start">
+                                                        <div className="w-full">
+                                                            {/* Edit Mode */}
+                                                            {editingItemId === item.id ? (
+                                                                <div className="flex gap-2 mb-2 w-full">
+                                                                    <Input 
+                                                                        value={editValue} 
+                                                                        onChange={(e) => setEditValue(e.target.value)} 
+                                                                        className="h-8 text-sm bg-white"
+                                                                    />
+                                                                    <Button size="sm" onClick={() => handleManualEditSave(dayIndex)} className="h-8 bg-green-600">Save</Button>
+                                                                    <Button size="sm" variant="ghost" onClick={() => setEditingItemId(null)} className="h-8">Cancel</Button>
+                                                                </div>
+                                                            ) : (
+                                                                <h5 className="font-bold text-gray-800 text-sm sm:text-base mb-1 flex items-center gap-2">
+                                                                    {item.activity}
+                                                                    {item.type === 'meal' && <Utensils className="w-3 h-3 text-gray-400"/>}
+                                                                    {item.type === 'travel' && <Car className="w-3 h-3 text-gray-400"/>}
+                                                                </h5>
+                                                            )}
+                                                            
+                                                            <p className="text-xs sm:text-sm text-gray-500 flex items-center gap-1 mb-1">
+                                                                <Clock className="w-3 h-3"/> {item.duration} 
+                                                                <span className="mx-1 text-gray-300">|</span> 
+                                                                <MapPin className="w-3 h-3"/> {item.location}
+                                                            </p>
+                                                            {item.notes && (
+                                                                <Badge variant="secondary" className={`text-[10px] font-normal border ${item.weatherWarning ? "bg-yellow-100 text-yellow-800 border-yellow-200" : "bg-blue-50 text-blue-700 border-blue-100"}`}>
+                                                                    {item.notes}
+                                                                </Badge>
+                                                            )}
+                                                        </div>
+
+                                                        {/* Action Buttons */}
+                                                        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity absolute right-4 top-4 bg-white shadow-sm border rounded p-1">
+                                                            <button onClick={() => { setEditingItemId(item.id); setEditValue(item.activity); }} className="p-1 hover:bg-gray-100 rounded text-blue-600">
+                                                                <Pencil className="w-3.5 h-3.5" />
+                                                            </button>
+                                                            <button onClick={() => handleManualDelete(dayIndex, item.id)} className="p-1 hover:bg-gray-100 rounded text-red-600">
+                                                                <Trash2 className="w-3.5 h-3.5" />
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        ))}
+                    </>
+                )}
+            </div>
+
+            {/* Chat/Instruction Input */}
+            <div className="p-4 bg-white border-t">
+                <form onSubmit={handleSubmitPrompt} className="flex gap-2">
+                    <Input 
+                        value={prompt}
+                        onChange={(e) => setPrompt(e.target.value)}
+                        placeholder="Ask AI to change something (e.g., 'Swap lunch spot')..."
+                        disabled={isGenerating || revisionCount >= MAX_REVISIONS}
+                        className="flex-1"
+                    />
+                    <Button 
+                        type="submit" 
+                        disabled={isGenerating || !prompt.trim() || revisionCount >= MAX_REVISIONS}
+                        className="bg-red-600 hover:bg-red-700 text-white"
+                    >
+                        {isGenerating ? <Sparkles className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                    </Button>
+                </form>
+                <div className="flex justify-between items-center mt-2 text-xs text-gray-400 px-1">
+                    <span>AI Assistant active (12hr Exclusive)</span>
+                    <span>{MAX_REVISIONS - revisionCount} revisions remaining</span>
+                </div>
+            </div>
+
           </div>
         )}
       </div>
