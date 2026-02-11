@@ -210,20 +210,18 @@ export default function PaymentPage() {
       const queryParams = new URLSearchParams({
         bookingId: data[0].booking_id,
         price: displayData.price.toString(),
-        date: displayData.date,
+        date: displayData.date, 
         travelers: displayData.travelersLabel,
         location: displayData.location,
         custom: isCustom ? "true" : "false",
         cartData: cartDataRaw || "",
-        name: `${formData.firstName} ${formData.lastName}`,
-        email: formData.email,
-        phone: formData.phone,
+        // Payment Specifics
         paymentType: paymentOption,
         amountPaid: amountToPay.toString(),
         balance: balanceAmount.toString()
-        });
+      });
 
-        navigate(`/booking-confirmation?${queryParams.toString()}`);
+      navigate(`/booking-confirmation?${queryParams.toString()}`);
 
     } catch (err: any) {
       console.error("Booking Error:", err.message);

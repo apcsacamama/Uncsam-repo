@@ -183,9 +183,9 @@ export default function BookingConfirmation() {
               <CheckCircle className="w-12 h-12 text-green-600" />
             </div>
           </div>
-          <h1 className="text-4xl font-bold mb-2">Booking Paid!</h1>
+          <h1 className="text-4xl font-bold mb-2">Booking Confirmed!</h1>
           <p className="text-xl text-green-100">
-            Thank you, {customerName}. Please wait for staff or admin for the confirmation!
+            Thank you, {customerName}. Your Japanese adventure is officially locked in!
           </p>
         </div>
       </div>
@@ -212,7 +212,7 @@ export default function BookingConfirmation() {
                                 <p className="text-lg font-mono font-bold text-gray-800">{bookingId}</p>
                             </div>
                             <Badge className="bg-green-100 text-green-800 px-3 py-1 text-sm border-green-200">
-                                Paid
+                                Confirmed
                             </Badge>
                         </div>
 
@@ -441,7 +441,7 @@ export default function BookingConfirmation() {
             phone: customerPhone,
             travelDate: displayDate,
             // Status depends on balance
-            status: balance > 0 ? "partial" : "paid",
+            status: balance > 0 ? "partial" : "confirmed",
             details: customItinerary, // Pass details for custom listing
             createdAt: new Date().toISOString().split("T")[0]
         }}
