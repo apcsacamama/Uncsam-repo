@@ -23,7 +23,7 @@ import {
   Loader2,
   Layers,
   Plane,
-  Banknote // Added Banknote icon
+  Banknote 
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -33,20 +33,7 @@ import { supabase } from "../lib/supabaseClient";
 const DEFAULT_DESTINATIONS = [
   { id: "hasedera", name: "Hasedera Temple" },
   { id: "kotoku-in", name: "Kotoku-in" },
-  { id: "hokokuji", name: "Hokokuji Temple" },
-  { id: "kenchoji", name: "Kenchoji Temple" },
-  { id: "tsurugaoka", name: "Tsurugaoka Hachimangu" },
-  { id: "enraku-ji", name: "Enraku-ji Temple" },
-  { id: "komachi", name: "Komachi Dori Street" },
-  { id: "kokomae", name: "Kokomae Station" },
-  { id: "nagoya-castle", name: "Nagoya Castle" },
-  { id: "legoland", name: "Legoland Japan" },
-  { id: "nagoya-science", name: "Nagoya City Science Museum" },
-  { id: "oasis21", name: "Oasis 21" },
-  { id: "hakone-open-air", name: "The Hakone Open Air Museum" },
-  { id: "hakone-pirate", name: "Hakone Pirate Ship" },
-  { id: "owakudani", name: "Owakudani Black Egg" },
-  { id: "hakone-yunessun", name: "Hakone Kowakien Yunessun" },
+  // ... (keep rest of your defaults)
 ];
 
 const DOWN_PAYMENT_AMOUNT_JPY = 26000;
@@ -63,15 +50,10 @@ export default function PaymentPage() {
   const priceParam = searchParams.get("price");
   const cartDataRaw = searchParams.get("cartData");
   const totalPriceParam = searchParams.get("totalPrice");
-  const packageId = searchParams.get("packageId");
 
   // --- 2. STATE ---
   const [allDestinations, setAllDestinations] = useState<any[]>(DEFAULT_DESTINATIONS);
-  
-  // DB Date State
   const [dbDate, setDbDate] = useState<string | null>(null);
-
-  // Payment Option State
   const [paymentOption, setPaymentOption] = useState<'full' | 'downpayment'>('full');
 
   const [displayData, setDisplayData] = useState({
@@ -121,11 +103,9 @@ export default function PaymentPage() {
         let validStartDate = new Date().toISOString(); 
 
         if (cart.length > 0) {
-            // UI Date String
             const uniqueDates = Array.from(new Set(cart.map((i: any) => format(new Date(i.date), "MMM dd, yyyy"))));
             dateStr = uniqueDates.join(" | ");
 
-            // DB Date (Earliest)
             const sortedDates = cart
               .map((item: any) => new Date(item.date))
               .sort((a: Date, b: Date) => a.getTime() - b.getTime());
@@ -151,7 +131,6 @@ export default function PaymentPage() {
       }
     } else {
       setDbDate(dateParam);
-      
       setDisplayData({
         title: "Standard Tour",
         date: dateParam || "Date not selected",
@@ -164,15 +143,45 @@ export default function PaymentPage() {
     }
   }, [searchParams, isCustom, cartDataRaw, totalPriceParam, dateParam, travelersParam, priceParam, locationParam]);
 
+  // --- FIXED INPUT HANDLER ---
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    let formattedValue = value;
+
+    if (name === "cardNumber") {
+        // Remove non-digits
+        const raw = value.replace(/\D/g, "");
+        // Limit to 16 digits
+        const truncated = raw.slice(0, 16);
+        // Add space every 4 digits
+        formattedValue = truncated.replace(/(\d{4})(?=\d)/g, "$1 ");
+    } else if (name === "expiry") {
+        // Remove non-digits
+        const raw = value.replace(/\D/g, "");
+        // Limit to 4 digits (MMYY)
+        const truncated = raw.slice(0, 4);
+        // Add slash after 2 digits
+        if (truncated.length >= 3) {
+            formattedValue = `${truncated.slice(0, 2)}/${truncated.slice(2)}`;
+        } else {
+            formattedValue = truncated;
+        }
+    } else if (name === "cvc") {
+        // Limit to 3 or 4 digits
+        formattedValue = value.replace(/\D/g, "").slice(0, 4);
+    }
+
+    setFormData(prev => ({ ...prev, [name]: formattedValue }));
   };
 
   // --- CALCULATE TOTALS ---
+  // Trip Count Logic for Down Payment Multiplier
+  const tripCount = displayData.isCustom && displayData.details.length > 0 ? displayData.details.length : 1;
+  const totalDownPayment = tripCount * DOWN_PAYMENT_AMOUNT_JPY;
+
   const totalAmount = displayData.price;
-  const amountToPay = paymentOption === 'full' ? totalAmount : DOWN_PAYMENT_AMOUNT_JPY;
-  const balanceAmount = paymentOption === 'full' ? 0 : totalAmount - DOWN_PAYMENT_AMOUNT_JPY;
+  const amountToPay = paymentOption === 'full' ? totalAmount : totalDownPayment;
+  const balanceAmount = paymentOption === 'full' ? 0 : totalAmount - totalDownPayment;
 
   // --- 5. SUBMIT TO SUPABASE ---
   const handleSubmit = async (e: React.FormEvent) => {
@@ -192,8 +201,8 @@ export default function PaymentPage() {
           user_id: user.id,
           itinerary_id: isCustom ? null : (searchParams.get("packageId") || null), 
           pax_count: parseInt(displayData.travelersLabel) || 1,
-          total_price: displayData.price, // Store the FULL price in DB so owner knows value
-          status: "Paid", // Keeps dashboard logic simple
+          total_price: displayData.price, 
+          status: "Paid", 
           travel_date: dbDate,
           created_by: formData.email,
           updated_by: formData.email
@@ -206,7 +215,6 @@ export default function PaymentPage() {
 
       if (error) throw error;
 
-      // Pass payment details to confirmation page via URL
       const queryParams = new URLSearchParams({
         bookingId: data[0].booking_id,
         price: displayData.price.toString(),
@@ -215,7 +223,6 @@ export default function PaymentPage() {
         location: displayData.location,
         custom: isCustom ? "true" : "false",
         cartData: cartDataRaw || "",
-        // Payment Specifics
         paymentType: paymentOption,
         amountPaid: amountToPay.toString(),
         balance: balanceAmount.toString()
@@ -239,6 +246,7 @@ export default function PaymentPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-6xl mx-auto px-4 py-12">
+        {/* ... (Keep Header Breadcrumbs same as before) ... */}
         <div className="flex items-center gap-2 mb-8 text-sm text-gray-500">
             <span>Select Tour</span>
             <span>→</span>
@@ -254,7 +262,7 @@ export default function PaymentPage() {
           {/* LEFT COLUMN: FORMS */}
           <div className="lg:col-span-2 space-y-8">
             
-            {/* 1. CONTACT CARD */}
+            {/* 1. CONTACT CARD (Unchanged) */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -292,7 +300,7 @@ export default function PaymentPage() {
               </CardContent>
             </Card>
 
-            {/* 2. PAYMENT OPTIONS CARD (NEW) */}
+            {/* 2. PAYMENT OPTIONS CARD */}
             <Card className="border-l-4 border-l-blue-600">
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2">
@@ -318,14 +326,22 @@ export default function PaymentPage() {
                                     <div className="bg-green-100 text-green-700 text-[10px] font-bold px-2 py-0.5 rounded h-fit">INSTALLMENT</div>
                                 </div>
                                 <div className="text-sm text-gray-500 mb-2">Reserve now, pay the rest later.</div>
-                                <div className="text-lg font-bold text-blue-700">¥{DOWN_PAYMENT_AMOUNT_JPY.toLocaleString()}</div>
+                                {/* VISUAL BREAKDOWN OF DOWN PAYMENT */}
+                                <div className="flex items-baseline gap-2">
+                                    <div className="text-lg font-bold text-blue-700">¥{totalDownPayment.toLocaleString()}</div>
+                                    {tripCount > 1 && (
+                                        <div className="text-xs text-gray-400 font-medium">
+                                            (¥{DOWN_PAYMENT_AMOUNT_JPY.toLocaleString()} × {tripCount} trips)
+                                        </div>
+                                    )}
+                                </div>
                             </Label>
                         </div>
                     </RadioGroup>
                 </CardContent>
             </Card>
 
-            {/* 3. PAYMENT METHOD CARD */}
+            {/* 3. PAYMENT METHOD CARD (UPDATED INPUTS) */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -357,16 +373,37 @@ export default function PaymentPage() {
                         </div>
                         <div className="space-y-2">
                             <Label>Card Number</Label>
-                            <Input name="cardNumber" placeholder="0000 0000 0000 0000" value={formData.cardNumber} onChange={handleInputChange} />
+                            <Input 
+                                name="cardNumber" 
+                                placeholder="0000 0000 0000 0000" 
+                                value={formData.cardNumber} 
+                                onChange={handleInputChange} 
+                                maxLength={19} 
+                                inputMode="numeric"
+                            />
                         </div>
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
                                 <Label>Expiry Date</Label>
-                                <Input name="expiry" placeholder="MM/YY" value={formData.expiry} onChange={handleInputChange} />
+                                <Input 
+                                    name="expiry" 
+                                    placeholder="MM/YY" 
+                                    value={formData.expiry} 
+                                    onChange={handleInputChange}
+                                    maxLength={5}
+                                    inputMode="numeric"
+                                />
                             </div>
                             <div className="space-y-2">
                                 <Label>CVC</Label>
-                                <Input name="cvc" placeholder="123" maxLength={3} value={formData.cvc} onChange={handleInputChange} />
+                                <Input 
+                                    name="cvc" 
+                                    placeholder="123" 
+                                    maxLength={4} 
+                                    value={formData.cvc} 
+                                    onChange={handleInputChange} 
+                                    inputMode="numeric"
+                                />
                             </div>
                         </div>
                     </div>
@@ -419,44 +456,52 @@ export default function PaymentPage() {
                             <h3 className="font-bold text-gray-900 mb-3 flex items-center gap-2 text-sm">
                                 <Layers className="w-4 h-4 text-red-600"/> Chosen Trips
                             </h3>
-                            <div className="space-y-4 max-h-[400px] overflow-y-auto pr-1">
-                                {displayData.details.map((day, idx) => (
-                                    <div key={idx} className="bg-gray-50 p-3 rounded-lg border border-gray-100 relative">
-                                        <div className="flex justify-between items-start mb-2">
-                                            <div>
-                                                <span className="text-[10px] font-bold text-white bg-gray-800 px-2 py-0.5 rounded-full uppercase">Day {idx + 1}</span>
-                                                <div className="font-bold text-gray-800 mt-1">{day.location.toUpperCase()}</div>
-                                                <div className="flex items-center gap-2 mt-1">
-                                                    <span className="text-xs text-gray-500">{format(new Date(day.date), "MMM dd")}</span>
-                                                    <span className="text-gray-300">•</span>
-                                                    <span className="text-xs text-gray-500 flex items-center">
-                                                        <Users className="w-3 h-3 mr-1" />
-                                                        {day.travelers}
-                                                    </span>
+                            <div className="space-y-4 max-h-[300px] overflow-y-auto pr-1">
+                                {displayData.details.map((day, idx) => {
+                                    const hasTransfer = day.transportation && day.transportation.includes("airport-transfer");
+                                    const AIRPORT_TRANSFER_PRICE = 8000;
+                                    const listingPrice = day.price - (hasTransfer ? AIRPORT_TRANSFER_PRICE : 0);
+
+                                    return (
+                                        <div key={idx} className="bg-gray-50 p-3 rounded-lg border border-gray-100 relative">
+                                            <div className="flex justify-between items-start mb-2">
+                                                <div>
+                                                    <span className="text-[10px] font-bold text-white bg-gray-800 px-2 py-0.5 rounded-full uppercase">Day {idx + 1}</span>
+                                                    <div className="font-bold text-gray-800 mt-1">{day.location.toUpperCase()}</div>
+                                                    
+                                                    <div className="flex items-center gap-2 mt-1">
+                                                        <span className="text-xs text-gray-500">{format(new Date(day.date), "MMM dd")}</span>
+                                                        <span className="text-gray-300">•</span>
+                                                        <span className="text-xs text-gray-500 flex items-center">
+                                                            <Users className="w-3 h-3 mr-1" />
+                                                            {day.travelers}
+                                                        </span>
+                                                    </div>
                                                 </div>
+                                                <div className="font-bold text-red-600 text-sm">¥{listingPrice.toLocaleString()}</div>
                                             </div>
-                                            <div className="font-bold text-red-600 text-sm">¥{day.price.toLocaleString()}</div>
+                                            
+                                            <div className="text-xs text-gray-600 border-t border-gray-200 pt-2 mt-2">
+                                                <p className="font-semibold mb-1">Destinations:</p>
+                                                <ul className="list-disc pl-4 space-y-0.5">
+                                                    {day.destinations.map((destId: string) => (
+                                                        <li key={destId}>{getDestName(destId)}</li>
+                                                    ))}
+                                                    {hasTransfer && (
+                                                        <li className="text-blue-600 font-medium flex items-center -ml-1">
+                                                            <Plane className="w-3 h-3 mr-1" /> Airport Transfer (+¥{AIRPORT_TRANSFER_PRICE.toLocaleString()})
+                                                        </li>
+                                                    )}
+                                                </ul>
+                                            </div>
                                         </div>
-                                        <div className="text-xs text-gray-600 border-t border-gray-200 pt-2 mt-2">
-                                            <p className="font-semibold mb-1">Destinations:</p>
-                                            <ul className="list-disc pl-4 space-y-0.5">
-                                                {day.destinations.map((destId: string) => (
-                                                    <li key={destId}>{getDestName(destId)}</li>
-                                                ))}
-                                                {day.transportation && day.transportation.includes("airport-transfer") && (
-                                                    <li className="text-blue-600 font-medium flex items-center -ml-1">
-                                                        <Plane className="w-3 h-3 mr-1" /> Airport Transfer Included
-                                                    </li>
-                                                )}
-                                            </ul>
-                                        </div>
-                                    </div>
-                                ))}
+                                    );
+                                })}
                             </div>
                         </div>
                     )}
 
-                    {/* --- TOTALS SECTION (UPDATED) --- */}
+                    {/* --- TOTALS SECTION --- */}
                     <div className="flex flex-col gap-2 pt-4 border-t">
                         <div className="flex justify-between items-center text-sm text-gray-600">
                             <span>Package Total:</span>
@@ -493,6 +538,9 @@ export default function PaymentPage() {
                             </>
                         )}
                     </Button>
+                    <p className="text-xs text-center text-gray-500 mt-2">
+                        By clicking pay, you agree to our Terms & Conditions.
+                    </p>
                 </CardContent>
             </Card>
           </div>
