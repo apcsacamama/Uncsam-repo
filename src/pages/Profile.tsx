@@ -15,12 +15,20 @@ import {
   TabsList,
   TabsTrigger,
 } from "../components/ui/tabs";
-import { mockBookings, tourPackages } from "../data/offers";
+// Added Dialog imports for the "Details" popup
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "../components/ui/dialog";
+import { tourPackages } from "../data/offers"; 
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabaseClient"; 
 import {
-  User,
   Mail,
   Phone,
   Calendar,
@@ -34,7 +42,8 @@ import {
   Settings,
   LogOut,
   Loader2,
-  AlertCircle 
+  AlertCircle,
+  Info 
 } from "lucide-react";
 
 export default function Profile() {
@@ -54,50 +63,45 @@ export default function Profile() {
     role: "customer"
   });
 
-  // --- FETCH DATA ---
+  const [liveBookings, setLiveBookings] = useState<any[]>([]);
+
   useEffect(() => {
     const fetchUserData = async () => {
       try {
         setIsLoading(true);
-        console.log("Fetching user...");
-
-        // 1. Get Auth User
         const { data: { user }, error: authError } = await supabase.auth.getUser();
 
         if (authError || !user) {
-          console.log("No user found, redirecting...");
           navigate("/signin");
           return;
         }
 
-        console.log("User found:", user.email);
-
-        // 2. Try to fetch Profile from DB
-        const { data: profile, error: dbError } = await supabase
-          .from('profiles')
+        const { data: profile } = await supabase
+          .from('user')
           .select('*')
           .eq('id', user.id)
           .single();
 
-        if (dbError) {
-          console.warn("Database error (Profile might not exist yet):", dbError.message);
-          // Don't crash, just use Auth data
-        }
+        // Fetching live bookings - ensure travel_date is included in your SELECT
+        const { data: bookings, error: bookingError } = await supabase
+          .from('bookings')
+          .select('*')
+          .eq('user_id', user.id);
 
-        // 3. Set State (Merge Auth data with DB data if it exists)
+        if (!bookingError) setLiveBookings(bookings || []);
+
         setUserInfo({
           name: profile?.full_name || user.user_metadata?.full_name || "Traveler",
           email: user.email || "", 
           phone: profile?.phone || user.user_metadata?.phone || "",
-          dateOfBirth: "1990-01-01", 
-          address: "Tokyo, Japan",   
-          preferences: "Culture, Food", 
+          dateOfBirth: profile?.dob || "1990-01-01", 
+          address: profile?.address || "Not set",   
+          preferences: profile?.preferences || "None set", 
           avatar_url: profile?.avatar_url || "",
           role: profile?.role || "customer"
         });
 
       } catch (error: any) {
-        console.error("Critical Error:", error);
         setErrorMsg(error.message || "Failed to load profile");
       } finally {
         setIsLoading(false);
@@ -112,20 +116,34 @@ export default function Profile() {
     navigate("/signin");
   };
 
-  const handleSave = () => {
-    // Save logic placeholder
-    setIsEditing(false);
+  const handleSave = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { error } = await supabase
+        .from('user')
+        .update({
+          full_name: userInfo.name,
+          phone: userInfo.phone,
+          address: userInfo.address,
+          preferences: userInfo.preferences
+        })
+        .eq('id', user.id);
+
+      if (error) throw error;
+      setIsEditing(false);
+    } catch (error: any) {
+      alert("Error saving: " + error.message);
+    }
   };
 
-  // Safe Name Display Helper
   const getInitials = (name: string) => {
     return name && name.length > 0 ? name.charAt(0).toUpperCase() : "U";
   };
 
-  const userBookings = mockBookings.filter((b) => b.userId === "user-001");
-
   const getStatusColor = (status: string) => {
-    switch (status) {
+    switch (status?.toLowerCase()) {
       case "confirmed": return "bg-green-100 text-green-800";
       case "pending": return "bg-yellow-100 text-yellow-800";
       case "completed": return "bg-blue-100 text-blue-800";
@@ -136,34 +154,10 @@ export default function Profile() {
 
   const favoriteDestinations = ["Nagoya Castle", "Tokyo Disneyland", "Kyoto Temples", "Osaka Castle"];
 
-  // --- RENDER ---
-
-  if (isLoading) {
-    return (
-        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-            <Loader2 className="w-8 h-8 animate-spin text-red-600" />
-            <span className="ml-2 text-gray-600">Loading Profile...</span>
-        </div>
-    );
-  }
-
-  if (errorMsg) {
-    return (
-        <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-            <div className="bg-white p-6 rounded-lg shadow-lg text-center max-w-md">
-                <AlertCircle className="w-12 h-12 text-red-600 mx-auto mb-4" />
-                <h2 className="text-xl font-bold mb-2">Something went wrong</h2>
-                <p className="text-gray-600 mb-4">{errorMsg}</p>
-                <Button onClick={() => navigate('/signin')}>Back to Login</Button>
-            </div>
-        </div>
-    );
-  }
+  if (isLoading) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="animate-spin text-red-600" /></div>;
 
   return (
     <div className="min-h-screen bg-gray-50">
-
-      {/* Profile Header */}
       <div className="bg-white shadow-sm">
         <div className="max-w-6xl mx-auto px-4 py-8">
           <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
@@ -172,40 +166,17 @@ export default function Profile() {
                 {getInitials(userInfo.name)}
               </div>
               <div>
-                <h1 className="text-3xl font-bold text-gray-900">
-                  {userInfo.name}
-                </h1>
-                <p className="text-gray-600 flex items-center mt-1">
-                  <Mail className="w-4 h-4 mr-2" />
-                  {userInfo.email}
-                </p>
+                <h1 className="text-3xl font-bold text-gray-900">{userInfo.name}</h1>
+                <p className="text-gray-600 flex items-center mt-1"><Mail className="w-4 h-4 mr-2" /> {userInfo.email}</p>
                 <div className="flex items-center space-x-4 mt-2">
-                  <Badge variant="outline">{userInfo.role === 'admin' ? 'Administrator' : 'Traveler'}</Badge>
-                  <span className="text-sm text-gray-600">
-                    {userBookings.length} trips completed
-                  </span>
+                  <Badge variant="outline" className="capitalize">{userInfo.role}</Badge>
+                  <span className="text-sm text-gray-600">{liveBookings.length} trips total</span>
                 </div>
               </div>
             </div>
-            
             <div className="flex gap-3">
-                <Button
-                    variant="ghost"
-                    onClick={handleSignOut}
-                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                >
-                    <LogOut className="w-4 h-4 mr-2" />
-                    Sign Out
-                </Button>
-
-                <Button
-                onClick={() => setIsEditing(!isEditing)}
-                variant="outline"
-                className="flex items-center gap-2"
-                >
-                <Edit3 className="w-4 h-4" />
-                {isEditing ? "Cancel" : "Edit Profile"}
-                </Button>
+                <Button variant="ghost" onClick={handleSignOut} className="text-red-600 hover:bg-red-50"><LogOut className="w-4 h-4 mr-2" /> Sign Out</Button>
+                <Button onClick={() => setIsEditing(!isEditing)} variant="outline"><Edit3 className="w-4 h-4 mr-2" /> {isEditing ? "Cancel" : "Edit Profile"}</Button>
             </div>
           </div>
         </div>
@@ -220,258 +191,141 @@ export default function Profile() {
             <TabsTrigger value="settings">Settings</TabsTrigger>
           </TabsList>
 
-          {/* My Bookings Tab */}
           <TabsContent value="bookings" className="space-y-6">
             <Card>
-              <CardHeader>
-                <CardTitle>Booking History</CardTitle>
-                <p className="text-sm text-gray-600">
-                  View and manage all your travel bookings
-                </p>
-              </CardHeader>
+              <CardHeader><CardTitle>Booking History</CardTitle></CardHeader>
               <CardContent>
                 <div className="space-y-6">
-                  {userBookings.length > 0 ? userBookings.map((booking) => {
-                    const packageInfo = tourPackages.find(
-                      (p) => p.id === booking.packageId,
-                    );
+                  {liveBookings.length > 0 ? liveBookings.map((booking) => {
                     return (
-                      <div
-                        key={booking.id}
-                        className="border rounded-lg p-6 hover:bg-gray-50"
-                      >
+                      <div key={booking.booking_id} className="border rounded-lg p-6 hover:bg-gray-50">
                         <div className="flex justify-between items-start mb-4">
                           <div>
-                            <h3 className="text-lg font-semibold text-gray-900">
-                              {packageInfo?.title || "Unknown Package"}
-                            </h3>
-                            <p className="text-sm text-gray-600">
-                              Booking ID: {booking.id}
-                            </p>
+                            <h3 className="text-lg font-semibold">Itinerary #{booking.itinerary_id || "Custom"}</h3>
+                            <p className="text-sm text-gray-600">Booking ID: {booking.booking_id}</p>
                           </div>
-                          <Badge className={getStatusColor(booking.status)}>
-                            {booking.status}
-                          </Badge>
+                          <Badge className={getStatusColor(booking.status)}>{booking.status}</Badge>
                         </div>
-
-                        <div className="grid md:grid-cols-4 gap-4 text-sm mb-4">
+                        <div className="grid md:grid-cols-3 gap-4 text-sm mb-4">
+                          {/* FIX: Using travel_date column here */}
                           <div className="flex items-center text-gray-600">
-                            <Calendar className="w-4 h-4 mr-2" />
-                            <div>
-                              <p className="font-medium">Travel Date</p>
-                              <p>{booking.travelDate}</p>
-                            </div>
+                            <Calendar className="w-4 h-4 mr-2" /> {booking.travel_date || "Date Pending"}
                           </div>
-                          <div className="flex items-center text-gray-600">
-                            <MapPin className="w-4 h-4 mr-2" />
-                            <div>
-                              <p className="font-medium">Travelers</p>
-                              <p>{booking.travelers} people</p>
-                            </div>
-                          </div>
-                          <div className="flex items-center text-gray-600">
-                            <Star className="w-4 h-4 mr-2" />
-                            <div>
-                              <p className="font-medium">Total Paid</p>
-                              <p className="font-bold text-red-600">
-                                ¥{booking.totalPrice.toLocaleString()}
-                              </p>
-                            </div>
-                          </div>
-                          <div className="flex items-center text-gray-600">
-                            <Calendar className="w-4 h-4 mr-2" />
-                            <div>
-                              <p className="font-medium">Booked On</p>
-                              <p>{booking.createdAt}</p>
-                            </div>
-                          </div>
+                          <div className="flex items-center text-gray-600"><MapPin className="w-4 h-4 mr-2" /> {booking.pax_count} Travelers</div>
+                          <div className="flex items-center font-bold text-red-600">¥{Number(booking.total_price).toLocaleString()}</div>
                         </div>
-
                         <div className="flex gap-2">
-                          <Button size="sm" variant="outline">
-                            <Eye className="w-4 h-4 mr-1" />
-                            View Details
-                          </Button>
-                          <Button size="sm" variant="outline">
-                            <Download className="w-4 h-4 mr-1" />
-                            Download Receipt
-                          </Button>
+                          {/* Details Dialog */}
+                          <Dialog>
+                            <DialogTrigger asChild>
+                              <Button size="sm" variant="outline">
+                                <Eye className="w-4 h-4 mr-1" /> Details
+                              </Button>
+                            </DialogTrigger>
+                            <DialogContent className="max-w-lg">
+                              <DialogHeader>
+                                <DialogTitle className="flex items-center gap-2">
+                                  <Info className="w-5 h-5 text-blue-600" /> Booking Details
+                                </DialogTitle>
+                                <DialogDescription>
+                                  Detailed information for Itinerary #{booking.itinerary_id}
+                                </DialogDescription>
+                              </DialogHeader>
+                              <div className="space-y-4 py-4">
+                                <div className="grid grid-cols-2 gap-4 text-sm">
+                                  <div className="bg-gray-50 p-3 rounded-lg">
+                                    <p className="text-gray-500 font-medium">Travel Date</p>
+                                    <p className="text-base font-semibold">{booking.travel_date}</p>
+                                  </div>
+                                  <div className="bg-gray-50 p-3 rounded-lg">
+                                    <p className="text-gray-500 font-medium">Pax Count</p>
+                                    <p className="text-base font-semibold">{booking.pax_count} Travelers</p>
+                                  </div>
+                                  <div className="bg-gray-50 p-3 rounded-lg">
+                                    <p className="text-gray-500 font-medium">Booking ID</p>
+                                    <p className="text-base font-semibold">{booking.booking_id}</p>
+                                  </div>
+                                  <div className="bg-gray-50 p-3 rounded-lg">
+                                    <p className="text-gray-500 font-medium">Total Paid</p>
+                                    <p className="text-base font-bold text-green-700">¥{Number(booking.total_price).toLocaleString()}</p>
+                                  </div>
+                                </div>
+                                <div className="border-t pt-4">
+                                  <h4 className="font-semibold mb-2">Booking Status</h4>
+                                  <Badge className={getStatusColor(booking.status)}>{booking.status}</Badge>
+                                  <p className="text-xs text-gray-500 mt-2 italic">
+                                    Note: Your professional driver will contact you 24 hours before your travel date.
+                                  </p>
+                                </div>
+                              </div>
+                            </DialogContent>
+                          </Dialog>
+                          
+                          <Button size="sm" variant="outline"><Download className="w-4 h-4 mr-1" /> Receipt</Button>
                         </div>
                       </div>
                     );
                   }) : (
-                    <div className="text-center py-8 text-gray-500">
-                        No bookings found. Time to plan a trip!
-                    </div>
+                    <div className="text-center py-8 text-gray-500">No live bookings found.</div>
                   )}
                 </div>
               </CardContent>
             </Card>
           </TabsContent>
 
-          {/* Profile Info Tab */}
           <TabsContent value="profile" className="space-y-6">
             <Card>
-              <CardHeader>
-                <CardTitle>Personal Information</CardTitle>
-                <p className="text-sm text-gray-600">
-                  Manage your account details and preferences
-                </p>
-              </CardHeader>
-              <CardContent>
+              <CardHeader><CardTitle>Personal Information</CardTitle></CardHeader>
+              <CardContent className="space-y-4">
                 <div className="grid md:grid-cols-2 gap-6">
-                  <div className="space-y-4">
-                    <div>
-                      <Label htmlFor="name">Full Name</Label>
-                      <Input
-                        id="name"
-                        value={userInfo.name}
-                        onChange={(e) =>
-                          setUserInfo({ ...userInfo, name: e.target.value })
-                        }
-                        disabled={!isEditing}
-                      />
-                    </div>
-
-                    <div>
-                      <Label htmlFor="email">Email Address</Label>
-                      <Input
-                        id="email"
-                        type="email"
-                        value={userInfo.email}
-                        disabled={true} 
-                        className="bg-gray-100 text-gray-500"
-                      />
-                    </div>
-
-                    <div>
-                      <Label htmlFor="phone">Phone Number</Label>
-                      <Input
-                        id="phone"
-                        value={userInfo.phone}
-                        onChange={(e) =>
-                          setUserInfo({ ...userInfo, phone: e.target.value })
-                        }
-                        disabled={!isEditing}
-                      />
-                    </div>
+                  <div className="space-y-2">
+                    <Label>Full Name</Label>
+                    <Input disabled={!isEditing} value={userInfo.name} onChange={(e) => setUserInfo({ ...userInfo, name: e.target.value })} />
                   </div>
-                  
-                  {/* ... (rest of form fields same as before) ... */}
-
+                  <div className="space-y-2">
+                    <Label>Phone</Label>
+                    <Input disabled={!isEditing} value={userInfo.phone} onChange={(e) => setUserInfo({ ...userInfo, phone: e.target.value })} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Address</Label>
+                    <Input disabled={!isEditing} value={userInfo.address} onChange={(e) => setUserInfo({ ...userInfo, address: e.target.value })} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Preferences</Label>
+                    <Input disabled={!isEditing} value={userInfo.preferences} onChange={(e) => setUserInfo({ ...userInfo, preferences: e.target.value })} />
+                  </div>
                 </div>
-
                 {isEditing && (
-                  <div className="flex justify-end mt-6">
-                    <Button
-                      onClick={handleSave}
-                      className="bg-red-600 hover:bg-red-700"
-                    >
-                      <Save className="w-4 h-4 mr-2" />
-                      Save Changes
-                    </Button>
-                  </div>
+                  <Button onClick={handleSave} className="bg-red-600 hover:bg-red-700 mt-4"><Save className="w-4 h-4 mr-2" /> Save Changes</Button>
                 )}
               </CardContent>
             </Card>
           </TabsContent>
 
-          {/* Favorites Tab */}
-          <TabsContent value="favorites" className="space-y-6">
-            <div className="grid md:grid-cols-2 gap-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Heart className="w-5 h-5 text-red-600" />
-                    Favorite Destinations
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    {favoriteDestinations.map((destination, index) => (
-                      <div
-                        key={index}
-                        className="flex items-center justify-between p-3 border rounded-lg"
-                      >
-                        <div className="flex items-center">
-                          <MapPin className="w-4 h-4 text-red-600 mr-3" />
-                          <span>{destination}</span>
-                        </div>
-                        <Button size="sm" variant="ghost">
-                          <Heart className="w-4 h-4 text-red-600 fill-current" />
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Star className="w-5 h-5 text-yellow-600" />
-                    Saved Packages
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    {tourPackages.slice(0, 3).map((pkg) => (
-                      <div
-                        key={pkg.id}
-                        className="flex items-center justify-between p-3 border rounded-lg"
-                      >
-                        <div>
-                          <p className="font-medium">{pkg.title}</p>
-                          <p className="text-sm text-gray-600">
-                            ¥{pkg.price.toLocaleString()}
-                          </p>
-                        </div>
-                        <Button size="sm" variant="outline">
-                          View
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
+          <TabsContent value="favorites" className="grid md:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader><CardTitle className="flex items-center gap-2"><Heart className="text-red-600" /> Favorite Destinations</CardTitle></CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {favoriteDestinations.map((dest, i) => (
+                    <div key={i} className="flex justify-between items-center p-3 border rounded-lg">
+                      <div className="flex items-center"><MapPin className="w-4 h-4 text-red-600 mr-3" /> {dest}</div>
+                      <Button size="sm" variant="ghost"><Heart className="text-red-600 fill-current w-4" /></Button>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
 
-          {/* Settings Tab */}
-          <TabsContent value="settings" className="space-y-6">
-            <div className="grid md:grid-cols-2 gap-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Settings className="w-5 h-5" />
-                    Account Settings
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <Button variant="outline" className="w-full justify-start">
-                    Change Password
-                  </Button>
-                  <Button variant="outline" className="w-full justify-start">
-                    Email Notifications
-                  </Button>
-                  
-                  <Button 
-                    variant="outline" 
-                    className="w-full justify-start text-gray-700"
-                    onClick={handleSignOut}
-                  >
-                    <LogOut className="w-4 h-4 mr-2" /> Sign Out
-                  </Button>
-
-                  <Button
-                    variant="outline"
-                    className="w-full justify-start text-red-600 border-red-600 hover:bg-red-50"
-                  >
-                    Delete Account
-                  </Button>
-                </CardContent>
-              </Card>
-            </div>
+          <TabsContent value="settings">
+            <Card>
+              <CardHeader><CardTitle><Settings className="inline w-5 h-5 mr-2" /> Account Settings</CardTitle></CardHeader>
+              <CardContent className="space-y-2">
+                <Button variant="outline" className="w-full justify-start">Change Password</Button>
+                <Button variant="outline" className="w-full justify-start text-red-600 border-red-600 hover:bg-red-50" onClick={handleSignOut}>Sign Out</Button>
+              </CardContent>
+            </Card>
           </TabsContent>
         </Tabs>
       </div>
