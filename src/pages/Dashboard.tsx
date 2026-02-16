@@ -38,14 +38,31 @@ import {
 } from "recharts";
 
 
-// --- LOCAL DATA ---
+// --- REALISTIC MERGED DATA ---
 const mockBookings = [
-  { id: 1, customerName: "Alice Johnson", email: "alice@example.com", status: "pending", packageId: 1, travelDate: "2025-04-10", travelers: 2, totalPrice: 240000 },
-  { id: 2, customerName: "Bob Smith", email: "bob@example.com", status: "completed", packageId: 2, travelDate: "2023-12-15", travelers: 1, totalPrice: 150000 },
-  { id: 3, customerName: "Charlie Brown", email: "charlie@example.com", status: "confirmed", packageId: 3, travelDate: "2025-05-20", travelers: 4, totalPrice: 500000 },
-  { id: 4, customerName: "Diana Prince", email: "diana@example.com", status: "pending", packageId: 1, travelDate: "2025-06-01", travelers: 2, totalPrice: 240000 },
-  { id: 5, customerName: "Evan Wright", email: "evan@example.com", status: "completed", packageId: 2, travelDate: "2024-01-10", travelers: 1, totalPrice: 150000 },
-  { id: 6, customerName: "Fiona Gallagher", email: "fiona@example.com", status: "confirmed", packageId: 3, travelDate: "2025-08-15", travelers: 3, totalPrice: 375000 },
+  // 2023: Startup
+  { id: 101, customerName: "Early Group", email: "g1@ex.com", status: "completed", packageId: 1, travelDate: "2023-04-10", travelers: 4, totalPrice: 450000 },
+  { id: 102, customerName: "Family Trip", email: "f1@ex.com", status: "completed", packageId: 2, travelDate: "2023-10-15", travelers: 5, totalPrice: 750000 },
+
+  // 2024: Growth Phase
+  { id: 201, customerName: "Winter Tour", email: "w1@ex.com", status: "completed", packageId: 2, travelDate: "2024-01-20", travelers: 4, totalPrice: 600000 },
+  { id: 202, customerName: "Cherry Group", email: "c1@ex.com", status: "completed", packageId: 1, travelDate: "2024-03-25", travelers: 6, totalPrice: 720000 },
+  { id: 203, customerName: "Summer Solstice", email: "s1@ex.com", status: "completed", packageId: 3, travelDate: "2024-07-10", travelers: 8, totalPrice: 950000 },
+  { id: 204, customerName: "Autumn Leaves", email: "a1@ex.com", status: "completed", packageId: 2, travelDate: "2024-11-05", travelers: 7, totalPrice: 980000 },
+
+  // 2025: High Volume (Synced Monthly Activity)
+  { id: 1, customerName: "New Year Group", email: "ny@ex.com", status: "completed", packageId: 1, travelDate: "2025-01-05", travelers: 4, totalPrice: 450000 },
+  { id: 2, customerName: "Feb Skiers", email: "feb@ex.com", status: "completed", packageId: 2, travelDate: "2025-02-14", travelers: 3, totalPrice: 380000 },
+  { id: 3, customerName: "March Madness", email: "grad@ex.com", status: "completed", packageId: 1, travelDate: "2025-03-20", travelers: 6, totalPrice: 720000 },
+  { id: 4, customerName: "Alice Johnson", email: "alice@example.com", status: "confirmed", packageId: 1, travelDate: "2025-04-10", travelers: 8, totalPrice: 850000 },
+  { id: 5, customerName: "Charlie Brown", email: "charlie@example.com", status: "confirmed", packageId: 3, travelDate: "2025-05-20", travelers: 5, totalPrice: 550000 },
+  { id: 6, customerName: "Diana Prince", email: "diana@example.com", status: "pending", packageId: 1, travelDate: "2025-06-01", travelers: 4, totalPrice: 420000 },
+  { id: 7, customerName: "Summer Peak", email: "sum@ex.com", status: "confirmed", packageId: 2, travelDate: "2025-07-15", travelers: 6, totalPrice: 680000 },
+  { id: 8, customerName: "Fiona Gallagher", email: "fiona@example.com", status: "confirmed", packageId: 3, travelDate: "2025-08-15", travelers: 4, totalPrice: 450000 },
+  { id: 9, customerName: "Sept Explorers", email: "sep@ex.com", status: "pending", packageId: 1, travelDate: "2025-09-10", travelers: 3, totalPrice: 320000 },
+  { id: 10, customerName: "Momiji Group", email: "mom@ex.com", status: "confirmed", packageId: 2, travelDate: "2025-10-25", travelers: 8, totalPrice: 820000 },
+  { id: 11, customerName: "Culture Tour", email: "cult@ex.com", status: "confirmed", packageId: 3, travelDate: "2025-11-12", travelers: 4, totalPrice: 410000 },
+  { id: 12, customerName: "Year End Bash", email: "bash@ex.com", status: "pending", packageId: 1, travelDate: "2025-12-28", travelers: 5, totalPrice: 480000 },
 ];
 
 const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
@@ -56,9 +73,8 @@ export default function Dashboard() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   
-  // Logic States
-  const [timeframeType, setTimeframeType] = useState<string>("monthly"); 
-  const [selectedSubValue, setSelectedSubValue] = useState<string>("April"); 
+  const [timeframeType, setTimeframeType] = useState<string>("annually"); 
+  const [selectedSubValue, setSelectedSubValue] = useState<string>("2025"); 
 
   const [packages, setPackages] = useState<any[]>([]);
 
@@ -76,11 +92,10 @@ export default function Dashboard() {
     }
   };
 
-  // Reset sub-value when type changes to ensure valid selection
   const handleTypeChange = (val: string) => {
     setTimeframeType(val);
-    if (val === "monthly") setSelectedSubValue("January");
-    if (val === "quarterly") setSelectedSubValue("Q1 (Jan-Mar)");
+    if (val === "monthly") setSelectedSubValue("April");
+    if (val === "quarterly") setSelectedSubValue("Q2 (Apr-Jun)");
     if (val === "annually") setSelectedSubValue("2025");
   };
 
@@ -93,33 +108,33 @@ export default function Dashboard() {
       if (timeframeType === "monthly") {
         return months[bMonth] === selectedSubValue;
       } 
-      
       if (timeframeType === "quarterly") {
         const qIndex = quarters.indexOf(selectedSubValue);
         const bookingQ = Math.floor(bMonth / 3);
         return bookingQ === qIndex;
       } 
-      
       if (timeframeType === "annually") {
         return bYear === selectedSubValue;
       }
-      
       return true;
     });
 
     return filteredByRange.reduce((acc, curr) => acc + curr.totalPrice, 0);
   }, [timeframeType, selectedSubValue]);
 
-  // --- TOURIST TRAFFIC DATA ---
   const touristTrafficData = useMemo(() => {
     const data = months.map(m => ({ name: m.substring(0, 3), travelers: 0 }));
+    let activeYear = timeframeType === "annually" ? selectedSubValue : "2025";
+
     mockBookings.forEach(booking => {
       const date = new Date(booking.travelDate);
-      const monthIndex = date.getMonth();
-      data[monthIndex].travelers += booking.travelers;
+      if (date.getFullYear().toString() === activeYear) {
+        const monthIndex = date.getMonth();
+        data[monthIndex].travelers += booking.travelers;
+      }
     });
     return data;
-  }, []);
+  }, [timeframeType, selectedSubValue]);
 
   const filteredBookings = mockBookings.filter((booking) => {
     const matchesSearch =
@@ -151,31 +166,36 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-7xl mx-auto space-y-8">
-        <div>
-           <h1 className="text-3xl font-bold text-gray-900">Hi UncleSam!</h1>
-           <p className="text-gray-500">Overview of performance and bookings</p>
+        <div className="flex justify-between items-center">
+            <div>
+                <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Hi UncleSam!</h1>
+                <p className="text-gray-500 font-medium">Monitoring growth across 10,000+ followers</p>
+            </div>
+            <div className="bg-blue-600 text-white px-4 py-2 rounded-lg shadow-sm flex items-center gap-2">
+                <Users className="w-5 h-5" />
+                <span className="font-bold">10K Community</span>
+            </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          
           <Card className="lg:col-span-2 bg-white shadow-sm border-l-4 border-l-green-500 overflow-hidden">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <div>
                 <CardTitle className="text-lg font-medium text-gray-700">Total Revenue</CardTitle>
-                <CardDescription>Filter by period</CardDescription>
+                <CardDescription>Select period to view income</CardDescription>
               </div>
               <div className="bg-green-100 p-3 rounded-full">
                 <JapaneseYen className="w-6 h-6 text-green-600" />
               </div>
             </CardHeader>
             <CardContent>
-              <div className="flex flex-wrap gap-6 mb-6">
+              <div className="flex flex-wrap gap-6 mb-8">
                 <div className="grid gap-1">
-                  <label className="text-xs font-semibold text-gray-500 uppercase">Timeframe</label>
+                  <label className="text-xs font-bold text-gray-400 uppercase">View Type</label>
                   <select 
                     value={timeframeType} 
                     onChange={(e) => handleTypeChange(e.target.value)}
-                    className="text-sm border rounded-md p-2 bg-gray-50 min-w-[140px]"
+                    className="text-sm border-b-2 border-gray-200 py-1 bg-transparent focus:border-green-500 outline-none font-semibold transition-all"
                   >
                     <option value="monthly">Monthly</option>
                     <option value="quarterly">Quarterly</option>
@@ -184,13 +204,11 @@ export default function Dashboard() {
                 </div>
 
                 <div className="grid gap-1">
-                  <label className="text-xs font-semibold text-gray-500 uppercase">
-                    {timeframeType === "monthly" ? "Select Month" : timeframeType === "quarterly" ? "Select Quarter" : "Select Year"}
-                  </label>
+                  <label className="text-xs font-bold text-gray-400 uppercase">Selection</label>
                   <select 
                     value={selectedSubValue} 
                     onChange={(e) => setSelectedSubValue(e.target.value)}
-                    className="text-sm border rounded-md p-2 bg-gray-50 min-w-[140px]"
+                    className="text-sm border-b-2 border-gray-200 py-1 bg-transparent focus:border-green-500 outline-none font-semibold transition-all"
                   >
                     {timeframeType === "monthly" && months.map(m => <option key={m} value={m}>{m}</option>)}
                     {timeframeType === "quarterly" && quarters.map(q => <option key={q} value={q}>{q}</option>)}
@@ -199,13 +217,13 @@ export default function Dashboard() {
                 </div>
               </div>
               
-              <div className="flex items-center gap-3">
-                <span className="text-5xl font-black text-gray-900">
+              <div className="flex items-center gap-4">
+                <span className="text-6xl font-black text-gray-900 tracking-tighter">
                     ¥{currentRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
-                <div className="flex items-center gap-1 px-2 py-1 bg-green-50 rounded-full border border-green-100">
-                    <TrendingUp className="w-4 h-4 text-green-600" />
-                    <span className="text-xs font-bold text-green-600">Verified Income</span>
+                <div className="flex items-center gap-1 px-3 py-1 bg-green-100 rounded-full text-green-700 border border-green-200 shadow-sm">
+                    <TrendingUp className="w-4 h-4" />
+                    <span className="text-xs font-bold uppercase">Growth Mode</span>
                 </div>
               </div>
             </CardContent>
@@ -213,7 +231,7 @@ export default function Dashboard() {
 
           <Card className="lg:col-span-1 shadow-sm">
             <CardHeader className="pb-2">
-                <CardTitle className="text-lg">Popular Destinations</CardTitle>
+                <CardTitle className="text-lg font-bold">Top Destinations</CardTitle>
             </CardHeader>
             <CardContent>
                 <div className="h-[180px] w-full relative">
@@ -240,23 +258,37 @@ export default function Dashboard() {
           </Card>
         </div>
 
-        <Card className="shadow-sm">
+        {/* --- DYNAMIC TRAFFIC TRENDS --- */}
+        <Card className="shadow-sm border-t-4 border-t-blue-500">
             <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                     <Users className="w-5 h-5 text-blue-600" />
-                    Tourist Traffic Trends
+                    Tourist Traffic Trend: {timeframeType === "annually" ? selectedSubValue : "2025 Peak Year"}
                 </CardTitle>
-                <CardDescription>Number of travelers per month</CardDescription>
+                <CardDescription>Visualizing traveler volume from Facebook bookings</CardDescription>
             </CardHeader>
             <CardContent>
                 <div className="h-[300px] w-full">
                     <ResponsiveContainer width="100%" height="100%">
                         <LineChart data={touristTrafficData}>
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                            <XAxis dataKey="name" axisLine={false} tickLine={false} />
-                            <YAxis axisLine={false} tickLine={false} />
-                            <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }} />
-                            <Line type="monotone" dataKey="travelers" stroke="#2563EB" strokeWidth={3} dot={{ r: 4, fill: "#2563EB" }} />
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#eee" />
+                            <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#888', fontSize: 12}} />
+                            {/* FIX: Set a fixed domain so the graph scale doesn't change between years */}
+                            <YAxis 
+                                domain={[0, 15]} 
+                                axisLine={false} 
+                                tickLine={false} 
+                                tick={{fill: '#888', fontSize: 12}} 
+                            />
+                            <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }} />
+                            <Line 
+                                type="monotone" 
+                                dataKey="travelers" 
+                                stroke="#2563EB" 
+                                strokeWidth={4} 
+                                dot={{ r: 6, fill: "#2563EB", strokeWidth: 2, stroke: "#fff" }} 
+                                activeDot={{ r: 8 }}
+                            />
                         </LineChart>
                     </ResponsiveContainer>
                 </div>
@@ -265,7 +297,7 @@ export default function Dashboard() {
 
         <Card className="shadow-sm">
             <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle>Recent Bookings</CardTitle>
+                <CardTitle>Recent Sales Activity</CardTitle>
                 <div className="flex gap-2">
                     <div className="relative">
                         <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
@@ -280,11 +312,11 @@ export default function Dashboard() {
             </CardHeader>
             <CardContent>
                 <div className="space-y-4">
-                    {filteredBookings.map((booking) => (
+                    {filteredBookings.slice(0, 5).map((booking) => (
                     <div key={booking.id} className="border rounded-lg p-4 hover:bg-gray-50 transition-colors">
                         <div className="flex justify-between items-start mb-2">
                         <div>
-                            <h4 className="font-medium text-gray-900">{booking.customerName}</h4>
+                            <h4 className="font-bold text-gray-900">{booking.customerName}</h4>
                             <p className="text-sm text-gray-600">{booking.email}</p>
                         </div>
                         <Badge className={getStatusColor(booking.status)}>{booking.status}</Badge>
@@ -296,7 +328,7 @@ export default function Dashboard() {
                         </div>
                         <div>
                             <span className="font-medium text-gray-900 block">Total</span>
-                            <span className="font-bold text-red-600">
+                            <span className="font-bold text-blue-700">
                                 ¥{booking.totalPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </span>
                         </div>
