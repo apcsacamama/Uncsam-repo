@@ -44,7 +44,7 @@ const TIERED_PRICING: Record<string, { tier1: number; tier2: number }> = {
   "nara-tour": { tier1: 85000, tier2: 105000 },
 };
 const FIXED_PRICE_IDS = ["fukuoka-tour", "fukui-tour", "hiroshima-tour"];
-const AIRPORT_TRANSFER_PRICE = 8000; // Define constant
+const AIRPORT_TRANSFER_PRICE = 8000; 
 
 // --- TYPES ---
 interface OfferModalProps {
@@ -281,12 +281,16 @@ export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) 
         price: currentFormPrice
     };
 
-    setCart([...cart, newItem]);
-    
     if (isMultiDay) {
+        // Multi-day: Append to list
+        setCart([...cart, newItem]);
+        // Reset form for next day
         setCustomDate(undefined);
         setSelectedDestinations([]);
         setSelectedTransportation(["private-van"]);
+    } else {
+        // Single-day: Overwrite list (Treat as "Update Summary")
+        setCart([newItem]);
     }
   };
 
@@ -297,6 +301,7 @@ export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) 
   const cartTotal = cart.reduce((sum, item) => sum + item.price, 0);
 
   const handleFinalCheckout = () => {
+    // If user hasn't clicked "Add/Checkout" yet but form is valid (Single Day fallback)
     if (cart.length === 0 && !isMultiDay && isCurrentFormValid && customDate) {
         const tempCartItem: CartItem = {
             id: Math.random().toString(36).substr(2, 9),
@@ -316,10 +321,35 @@ export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) 
     navigate(`/payment?custom=true&cartData=${cartData}&totalPrice=${cartTotal}&name=Valued+Customer`);
   };
 
-  // ... (Admin functions: handleSaveDestination, handleDeleteDestination, prepareEdit remain same)
-  const handleSaveDestination = async () => { /* ... */ };
-  const handleDeleteDestination = async (id: string) => { /* ... */ };
-  const prepareEdit = (dest: any) => { /* ... */ };
+  const handleSaveDestination = async () => {
+    if (!destForm.name || !destForm.location) { alert("Please provide a name and location."); return; }
+    setIsSavingDest(true);
+    try {
+        if (editingDestId) {
+            const { error } = await supabase.from('tour_destinations').update({ name: destForm.name, description: destForm.description, location: destForm.location }).eq('id', editingDestId);
+            if (error) throw error;
+            alert("Destination updated!");
+        } else {
+            const id = destForm.name.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-');
+            const { error } = await supabase.from('tour_destinations').insert([{ id: id, name: destForm.name, description: destForm.description, location: destForm.location }]);
+            if (error) throw error;
+            alert("New destination added!");
+        }
+        fetchDestinations();
+        setEditingDestId(null);
+        setDestForm({ name: "", description: "", location: location || "nagoya" });
+    } catch (error) { console.error("Error saving:", error); alert("Failed to save."); } finally { setIsSavingDest(false); }
+  };
+
+  const handleDeleteDestination = async (id: string) => {
+      if(!confirm("Are you sure?")) return;
+      try { const { error } = await supabase.from('tour_destinations').delete().eq('id', id); if (error) throw error; fetchDestinations(); } catch (err) { console.error(err); alert("Failed to delete."); }
+  };
+
+  const prepareEdit = (dest: any) => {
+      setEditingDestId(dest.id);
+      setDestForm({ name: dest.name, description: dest.description, location: dest.location });
+  };
 
   if (!isOpen || !offer) return null;
 
@@ -330,7 +360,6 @@ export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) 
         {/* VIEW MODE: OFFER */}
         {viewMode === 'offer' && (
            <>
-            {/* ... (Keep existing Offer UI) ... */}
             <div className="relative h-48 w-full flex-shrink-0 bg-gray-200">
               <img src={offer.image} alt={offer.title} className="w-full h-full object-cover" />
               <Button variant="ghost" size="icon" className="absolute top-3 right-3 bg-white/20 hover:bg-white/40 text-white rounded-full" onClick={onClose}>
@@ -483,9 +512,7 @@ export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) 
                             </CardContent>
                         </Card>
 
-                        {/* 2. Destinations Selection - (Keep existing code) */}
                         <Card className="flex-1 shadow-sm">
-                             {/* ... (Destinations checkboxes code) ... */}
                              <CardHeader className="py-4 bg-gray-50/30 border-b flex flex-row justify-between items-center">
                                 <div className="flex items-center gap-3">
                                     <CardTitle className="text-base font-bold text-gray-800">2. Select Destinations</CardTitle>
@@ -493,6 +520,11 @@ export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) 
                                         {selectedDestinations.length}/5 Selected
                                     </Badge>
                                 </div>
+                                {isAdmin && (
+                                    <Button size="sm" variant="ghost" className="h-7 text-xs text-red-600 hover:bg-red-50" onClick={() => setIsDestModalOpen(true)}>
+                                        <Settings className="w-3 h-3 mr-1" /> Manage
+                                    </Button>
+                                )}
                              </CardHeader>
                              <CardContent className="p-6">
                                 {!location ? (
@@ -517,6 +549,9 @@ export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) 
                                                 </div>
                                             );
                                         })}
+                                        {filteredDestinations.length === 0 && (
+                                            <p className="text-sm text-gray-500 col-span-2">No destinations found for {location}. Admin can add some here.</p>
+                                        )}
                                     </div>
                                 )}
                              </CardContent>
@@ -549,44 +584,40 @@ export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) 
                                         <PlusCircle className="w-5 h-5 mr-2" /> Add Day to Trip
                                     </Button>
                                 ) : (
-                                    <Button size="lg" onClick={handleFinalCheckout} disabled={!isCurrentFormValid} className="bg-red-600 text-white hover:bg-red-700 shadow-md transition-all">
-                                        <CheckCircle className="w-5 h-5 mr-2" /> Confirm & Checkout
+                                    <Button size="lg" onClick={addToCart} disabled={!isCurrentFormValid} className="bg-red-600 text-white hover:bg-red-700 shadow-md transition-all">
+                                        <CheckCircle className="w-5 h-5 mr-2" /> Checkout
                                     </Button>
                                 )}
                              </div>
                         </Card>
                       </div>
 
-                      {/* RIGHT COLUMN: SUMMARY - FIXED DISPLAY */}
+                      {/* RIGHT COLUMN: SUMMARY */}
                       <div className="lg:col-span-4 flex flex-col h-full">
                          <Card className="sticky top-0 shadow-lg border-t-4 border-t-red-600 flex flex-col h-full max-h-[calc(100vh-120px)]">
                             <CardHeader className="py-4 border-b bg-white z-10">
                                 <CardTitle className="text-lg flex items-center gap-2">
                                     <Layers className="w-5 h-5 text-red-600"/> 
-                                    {isMultiDay ? "Chosen Trips" : "Your Itinerary"}
+                                    Trip Summary
                                 </CardTitle>
                             </CardHeader>
                             
                             <CardContent className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
-                                {isMultiDay && cart.length === 0 ? (
+                                {cart.length === 0 ? (
                                     <div className="text-center py-10 text-gray-400 space-y-2">
                                         <div className="bg-white p-4 rounded-full w-16 h-16 mx-auto flex items-center justify-center shadow-sm">
                                             <AlertCircle className="w-8 h-8 opacity-20" />
                                         </div>
                                         <p className="text-sm font-medium text-gray-600">Your trip is currently empty</p>
-                                        <p className="text-xs">Configure a day on the left and click "Add Day to Trip".</p>
+                                        <p className="text-xs">
+                                            {isMultiDay 
+                                                ? 'Configure a day on the left and click "Add Day to Trip".' 
+                                                : 'Configure your tour and click "Checkout" to review.'}
+                                        </p>
                                     </div>
                                 ) : (
                                     <div className="space-y-3">
-                                        {/* SINGLE MODE PREVIEW (LIVE FORM) */}
-                                        {!isMultiDay && isCurrentFormValid && (
-                                            <div className="bg-white p-3 rounded-lg border shadow-sm border-blue-200 bg-blue-50/20">
-                                                {/* ... (Single mode logic same as multi but utilizing live state vars) ... */}
-                                                {/* For brevity, omitting single mode unique block since user asked about CART items which uses the map below */}
-                                            </div>
-                                        )}
-
-                                        {/* CART ITEMS (SAVED) - FIXED PRICE SPLIT */}
+                                        {/* CART ITEMS (SAVED) */}
                                         {cart.map((item, index) => {
                                             const hasTransfer = item.transportation.includes("airport-transfer");
                                             const addOnPrice = hasTransfer ? AIRPORT_TRANSFER_PRICE : 0;
@@ -636,7 +667,7 @@ export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) 
                                 )}
                             </CardContent>
                             
-                            {isMultiDay && (
+                            {cart.length > 0 && (
                                 <div className="p-4 border-t bg-white shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] z-10">
                                     <div className="flex justify-between items-end mb-4">
                                         <span className="text-sm text-gray-600 font-medium">Total Amount Due</span>
@@ -645,7 +676,7 @@ export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) 
                                             <p className="text-xs text-gray-400">Tax included</p>
                                         </div>
                                     </div>
-                                    <Button className="w-full bg-red-600 hover:bg-red-700 h-12 text-md shadow-md" disabled={cart.length === 0} onClick={handleFinalCheckout}>
+                                    <Button className="w-full bg-red-600 hover:bg-red-700 h-12 text-md shadow-md" onClick={handleFinalCheckout}>
                                         Proceed to Payment <ArrowRight className="w-4 h-4 ml-2" />
                                     </Button>
                                 </div>
@@ -654,6 +685,33 @@ export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) 
                       </div>
                   </div>
               </div>
+
+               {/* INNER ADMIN MODAL */}
+              {isDestModalOpen && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
+                   <Card className="w-full max-w-3xl max-h-[85vh] flex flex-col shadow-2xl animate-in zoom-in-95">
+                      <CardHeader className="flex flex-row items-center justify-between py-3 border-b bg-gray-50">
+                         <CardTitle className="text-base">Manage {location ? location.toUpperCase() : "All"} Destinations</CardTitle>
+                         <Button variant="ghost" size="sm" onClick={() => setIsDestModalOpen(false)}><X className="w-4 h-4"/></Button>
+                      </CardHeader>
+                      <CardContent className="flex flex-1 overflow-hidden p-0">
+                         <div className="w-1/2 border-r overflow-y-auto p-3 space-y-2">
+                            {filteredDestinations.map(dest => (
+                                <div key={dest.id} onClick={() => prepareEdit(dest)} className={cn("p-2 border rounded text-sm cursor-pointer hover:bg-gray-50", editingDestId === dest.id && "border-red-500 bg-red-50")}>
+                                    <div className="flex justify-between"><span className="font-bold">{dest.name}</span><Trash2 className="w-3 h-3 text-gray-400 hover:text-red-600" onClick={(e) => {e.stopPropagation(); handleDeleteDestination(dest.id)}}/></div>
+                                </div>
+                            ))}
+                         </div>
+                         <div className="w-1/2 p-4 bg-gray-50 space-y-3">
+                             <h4 className="font-bold text-sm">{editingDestId ? "Edit" : "Add New"}</h4>
+                             <Input placeholder="Name" value={destForm.name} onChange={e => setDestForm({...destForm, name: e.target.value})} className="bg-white"/>
+                             <Textarea placeholder="Desc" value={destForm.description} onChange={e => setDestForm({...destForm, description: e.target.value})} className="bg-white h-20"/>
+                             <Button size="sm" className="w-full bg-red-600" onClick={handleSaveDestination} disabled={isSavingDest}>{isSavingDest ? <Loader2 className="w-3 h-3 animate-spin"/> : <Save className="w-3 h-3 mr-2"/>} Save</Button>
+                         </div>
+                      </CardContent>
+                   </Card>
+                </div>
+              )}
            </div>
         )}
       </div>
