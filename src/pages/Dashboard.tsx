@@ -13,26 +13,16 @@ import { useState, useMemo, useEffect } from "react";
 import {
   Search,
   Eye,
+  Edit,
   JapaneseYen,
   TrendingUp,
+  MapPin,
   Calendar,
   Users,
-  Loader2,
-  MapPin,
-  Mail,
-  Info,
-  CheckCircle,
-  Clock,
-  ArrowRightCircle
+  ChevronDown,
+  ChevronUp,
+  List
 } from "lucide-react";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "../components/ui/dialog";
 import {
   PieChart,
   Pie,
@@ -47,134 +37,107 @@ import {
   ResponsiveContainer,
 } from "recharts";
 
+
+// --- LOCAL DATA ---
+const mockBookings = [
+  { id: 1, customerName: "Alice Johnson", email: "alice@example.com", status: "pending", packageId: 1, travelDate: "2025-04-10", travelers: 2, totalPrice: 240000 },
+  { id: 2, customerName: "Bob Smith", email: "bob@example.com", status: "completed", packageId: 2, travelDate: "2023-12-15", travelers: 1, totalPrice: 150000 },
+  { id: 3, customerName: "Charlie Brown", email: "charlie@example.com", status: "confirmed", packageId: 3, travelDate: "2025-05-20", travelers: 4, totalPrice: 500000 },
+  { id: 4, customerName: "Diana Prince", email: "diana@example.com", status: "pending", packageId: 1, travelDate: "2025-06-01", travelers: 2, totalPrice: 240000 },
+  { id: 5, customerName: "Evan Wright", email: "evan@example.com", status: "completed", packageId: 2, travelDate: "2024-01-10", travelers: 1, totalPrice: 150000 },
+  { id: 6, customerName: "Fiona Gallagher", email: "fiona@example.com", status: "confirmed", packageId: 3, travelDate: "2025-08-15", travelers: 3, totalPrice: 375000 },
+];
+
 const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+const quarters = ["Q1 (Jan-Mar)", "Q2 (Apr-Jun)", "Q3 (Jul-Sep)", "Q4 (Oct-Dec)"];
+const years = ["2023", "2024", "2025"];
 
 export default function Dashboard() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [startMonth, setStartMonth] = useState<string>("January");
-  const [endMonth, setEndMonth] = useState<string>("December");
+  
+  // Logic States
+  const [timeframeType, setTimeframeType] = useState<string>("monthly"); 
+  const [selectedSubValue, setSelectedSubValue] = useState<string>("April"); 
 
-  // --- DB STATE ---
-  const [bookings, setBookings] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [selectedBooking, setSelectedBooking] = useState<any>(null);
+  const [packages, setPackages] = useState<any[]>([]);
 
   useEffect(() => {
-    fetchInitialData();
-
-    // REALTIME: Listen for ALL changes (Insert, Update, Delete) to keep dashboard in sync
-    const channel = supabase
-      .channel('dashboard-sync')
-      .on('postgres_changes', 
-        { event: '*', schema: 'public', table: 'bookings' }, 
-        () => fetchInitialData() 
-      )
-      .subscribe();
-
-    return () => { supabase.removeChannel(channel); };
+    fetchPackages();
   }, []);
 
-  const fetchInitialData = async () => {
-  setIsLoading(true);
-  try {
-    // 1. Attempt to fetch raw bookings first (easiest to succeed)
-    console.log("Fetching bookings...");
-    
-    const { data, error } = await supabase
-      .from('bookings')
-      .select(`
-        *,
-        user:user_id (full_name) 
-      `) 
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      console.error("Dashboard Fetch Error:", error.message);
-      alert("Error loading data: " + error.message);
-      return;
-    }
-
-    console.log("Bookings loaded:", data);
-    setBookings(data || []);
-  } catch (err: any) {
-    console.error("Unexpected Error:", err.message);
-  } finally {
-    setIsLoading(false);
-  }
-};
-
-  const updateBookingStatus = async (bookingId: number, newStatus: string) => {
+  const fetchPackages = async () => {
     try {
-      const { error } = await supabase
-        .from('bookings')
-        .update({ status: newStatus })
-        .eq('booking_id', bookingId);
-  
+      const { data, error } = await supabase.from('tour_packages').select('*');
       if (error) throw error;
-  
-      // Update local state so the list updates immediately
-      const updatedBookings = bookings.map((b) => (b.booking_id === bookingId ? { ...b, status: newStatus } : b));
-      setBookings(updatedBookings);
-      
-      // Update the modal view instantly if it's open
-      if (selectedBooking && selectedBooking.booking_id === bookingId) {
-        setSelectedBooking({ ...selectedBooking, status: newStatus });
-      }
-      
-      alert(`Status updated to: ${newStatus}`);
-    } catch (err: any) {
-      console.error("Update Error:", err.message);
-      alert("Failed to update status");
+      setPackages(data || []);
+    } catch (error) {
+      console.error("Error fetching packages:", error);
     }
   };
 
-  // --- CALCULATIONS ---
-  const currentRevenue = useMemo(() => {
-    const startIndex = months.indexOf(startMonth);
-    const endIndex = months.indexOf(endMonth);
+  // Reset sub-value when type changes to ensure valid selection
+  const handleTypeChange = (val: string) => {
+    setTimeframeType(val);
+    if (val === "monthly") setSelectedSubValue("January");
+    if (val === "quarterly") setSelectedSubValue("Q1 (Jan-Mar)");
+    if (val === "annually") setSelectedSubValue("2025");
+  };
 
-    const filteredByRange = bookings.filter((booking) => {
-      const dateStr = booking.travel_date || booking.created_at;
-      const bookingDate = new Date(dateStr);
-      const bookingMonthIndex = bookingDate.getMonth();
+  const currentRevenue = useMemo(() => {
+    const filteredByRange = mockBookings.filter((booking) => {
+      const bookingDate = new Date(booking.travelDate);
+      const bMonth = bookingDate.getMonth();
+      const bYear = bookingDate.getFullYear().toString();
+
+      if (timeframeType === "monthly") {
+        return months[bMonth] === selectedSubValue;
+      } 
       
-      if (startIndex <= endIndex) {
-        return bookingMonthIndex >= startIndex && bookingMonthIndex <= endIndex;
-      } else {
-        return bookingMonthIndex >= startIndex || bookingMonthIndex <= endIndex;
+      if (timeframeType === "quarterly") {
+        const qIndex = quarters.indexOf(selectedSubValue);
+        const bookingQ = Math.floor(bMonth / 3);
+        return bookingQ === qIndex;
+      } 
+      
+      if (timeframeType === "annually") {
+        return bYear === selectedSubValue;
       }
+      
+      return true;
     });
 
-    return filteredByRange.reduce((acc, curr) => acc + (Number(curr.total_price) || 0), 0);
-  }, [startMonth, endMonth, bookings]);
+    return filteredByRange.reduce((acc, curr) => acc + curr.totalPrice, 0);
+  }, [timeframeType, selectedSubValue]);
 
+  // --- TOURIST TRAFFIC DATA ---
   const touristTrafficData = useMemo(() => {
     const data = months.map(m => ({ name: m.substring(0, 3), travelers: 0 }));
-    bookings.forEach(booking => {
-      const dateStr = booking.travel_date || booking.created_at;
-      const date = new Date(dateStr);
+    mockBookings.forEach(booking => {
+      const date = new Date(booking.travelDate);
       const monthIndex = date.getMonth();
-      data[monthIndex].travelers += (Number(booking.pax_count) || 0);
+      data[monthIndex].travelers += booking.travelers;
     });
     return data;
-  }, [bookings]);
+  }, []);
 
-  const filteredBookings = bookings.filter((booking) => {
-    const name = booking.user?.full_name?.toLowerCase() || booking.created_by?.toLowerCase() || "";
-    const matchesSearch = name.includes(searchTerm.toLowerCase());
-    const matchesStatus = statusFilter === "all" || booking.status?.toLowerCase() === statusFilter.toLowerCase();
+  const filteredBookings = mockBookings.filter((booking) => {
+    const matchesSearch =
+      booking.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      booking.email.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesStatus =
+      statusFilter === "all" || booking.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
 
   const getStatusColor = (status: string) => {
-    const s = status?.toLowerCase();
-    if (s === "completed") return "bg-emerald-100 text-emerald-800 border-emerald-200"; 
-    if (s === "confirmed") return "bg-green-100 text-green-800 border-green-200";
-    if (s === "pending") return "bg-orange-100 text-orange-800 border-orange-200"; // Queue color
-    if (s === "paid") return "bg-blue-100 text-blue-800 border-blue-200"; // New Initial color
-    if (s === "cancelled") return "bg-red-100 text-red-800 border-red-200";
-    return "bg-gray-100 text-gray-800";
+    switch (status) {
+      case "confirmed": return "bg-green-100 text-green-800";
+      case "pending": return "bg-yellow-100 text-yellow-800";
+      case "completed": return "bg-blue-100 text-blue-800";
+      case "cancelled": return "bg-red-100 text-red-800";
+      default: return "bg-gray-100 text-gray-800";
+    }
   };
 
   const destinationData = [
@@ -185,72 +148,65 @@ export default function Dashboard() {
   ];
   const PIE_COLORS = ["#DC2626", "#2563EB", "#16A34A", "#9333EA"];
 
-  if (isLoading && bookings.length === 0) {
-    return (
-      <div className="h-screen w-full flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-red-600" />
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-7xl mx-auto space-y-8">
-        <div className="flex justify-between items-end">
-            <div>
-                <h1 className="text-3xl font-bold text-gray-900">Hi UncleSam!</h1>
-                <p className="text-gray-500">Overview of performance and {bookings.length} live bookings</p>
-            </div>
-            <Button onClick={fetchInitialData} variant="outline" size="sm" className="bg-white">
-               {isLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2"/> : null} Refresh Data
-            </Button>
+        <div>
+           <h1 className="text-3xl font-bold text-gray-900">Hi UncleSam!</h1>
+           <p className="text-gray-500">Overview of performance and bookings</p>
         </div>
 
-        {/* --- REVENUE & POPULAR --- */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <Card className="lg:col-span-2 bg-white shadow-sm border-l-4 border-l-green-600">
+          
+          <Card className="lg:col-span-2 bg-white shadow-sm border-l-4 border-l-green-500 overflow-hidden">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <div>
                 <CardTitle className="text-lg font-medium text-gray-700">Total Revenue</CardTitle>
-                <CardDescription>Filtering by tour month</CardDescription>
+                <CardDescription>Filter by period</CardDescription>
               </div>
               <div className="bg-green-100 p-3 rounded-full">
                 <JapaneseYen className="w-6 h-6 text-green-600" />
               </div>
             </CardHeader>
             <CardContent>
-              <div className="flex flex-col sm:flex-row sm:items-end gap-4 mb-6">
-                 <div className="flex items-center gap-2">
-                    <div className="grid gap-1">
-                        <label className="text-xs font-semibold text-gray-500 uppercase">From</label>
-                        <select 
-                            value={startMonth} 
-                            onChange={(e) => setStartMonth(e.target.value)}
-                            className="text-sm border rounded-md p-2 bg-white shadow-sm focus:ring-2 focus:ring-green-500 outline-none"
-                        >
-                            {months.map(m => <option key={m} value={m}>{m}</option>)}
-                        </select>
-                    </div>
-                    <span className="text-gray-400 mt-5">to</span>
-                    <div className="grid gap-1">
-                        <label className="text-xs font-semibold text-gray-500 uppercase">To</label>
-                        <select 
-                            value={endMonth} 
-                            onChange={(e) => setEndMonth(e.target.value)}
-                            className="text-sm border rounded-md p-2 bg-white shadow-sm focus:ring-2 focus:ring-green-500 outline-none"
-                        >
-                            {months.map(m => <option key={m} value={m}>{m}</option>)}
-                        </select>
-                    </div>
-                 </div>
+              <div className="flex flex-wrap gap-6 mb-6">
+                <div className="grid gap-1">
+                  <label className="text-xs font-semibold text-gray-500 uppercase">Timeframe</label>
+                  <select 
+                    value={timeframeType} 
+                    onChange={(e) => handleTypeChange(e.target.value)}
+                    className="text-sm border rounded-md p-2 bg-gray-50 min-w-[140px]"
+                  >
+                    <option value="monthly">Monthly</option>
+                    <option value="quarterly">Quarterly</option>
+                    <option value="annually">Annually</option>
+                  </select>
+                </div>
+
+                <div className="grid gap-1">
+                  <label className="text-xs font-semibold text-gray-500 uppercase">
+                    {timeframeType === "monthly" ? "Select Month" : timeframeType === "quarterly" ? "Select Quarter" : "Select Year"}
+                  </label>
+                  <select 
+                    value={selectedSubValue} 
+                    onChange={(e) => setSelectedSubValue(e.target.value)}
+                    className="text-sm border rounded-md p-2 bg-gray-50 min-w-[140px]"
+                  >
+                    {timeframeType === "monthly" && months.map(m => <option key={m} value={m}>{m}</option>)}
+                    {timeframeType === "quarterly" && quarters.map(q => <option key={q} value={q}>{q}</option>)}
+                    {timeframeType === "annually" && years.map(y => <option key={y} value={y}>{y}</option>)}
+                  </select>
+                </div>
               </div>
-              <div className="flex items-baseline gap-2">
-                <span className="text-5xl font-black text-gray-900 tracking-tighter">
-                    ¥{currentRevenue.toLocaleString()}
+              
+              <div className="flex items-center gap-3">
+                <span className="text-5xl font-black text-gray-900">
+                    ¥{currentRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
-                <Badge variant="outline" className="text-green-600 bg-green-50 border-green-200">
-                    <TrendingUp className="w-3 h-3 mr-1" /> LIVE
-                </Badge>
+                <div className="flex items-center gap-1 px-2 py-1 bg-green-50 rounded-full border border-green-100">
+                    <TrendingUp className="w-4 h-4 text-green-600" />
+                    <span className="text-xs font-bold text-green-600">Verified Income</span>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -266,13 +222,13 @@ export default function Dashboard() {
                             <Pie 
                                 data={destinationData} 
                                 cx="50%" cy="50%" 
-                                innerRadius={50} 
-                                outerRadius={70} 
-                                paddingAngle={8} 
+                                innerRadius={40} 
+                                outerRadius={60} 
+                                paddingAngle={5} 
                                 dataKey="value"
                             >
                                 {destinationData.map((entry, index) => (
-                                    <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} strokeWidth={0} />
+                                    <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
                                 ))}
                             </Pie>
                             <Tooltip />
@@ -284,228 +240,69 @@ export default function Dashboard() {
           </Card>
         </div>
 
-        {/* --- TRAFFIC TRENDS --- */}
         <Card className="shadow-sm">
             <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                     <Users className="w-5 h-5 text-blue-600" />
                     Tourist Traffic Trends
                 </CardTitle>
+                <CardDescription>Number of travelers per month</CardDescription>
             </CardHeader>
             <CardContent>
                 <div className="h-[300px] w-full">
                     <ResponsiveContainer width="100%" height="100%">
                         <LineChart data={touristTrafficData}>
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                            <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#9ca3af', fontSize: 12}} />
-                            <YAxis axisLine={false} tickLine={false} tick={{fill: '#9ca3af', fontSize: 12}} />
-                            <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }} />
-                            <Line 
-                                type="monotone" 
-                                dataKey="travelers" 
-                                stroke="#2563EB" 
-                                strokeWidth={4} 
-                                dot={{ r: 6, fill: "#2563EB", strokeWidth: 2, stroke: "#fff" }} 
-                                activeDot={{ r: 8, strokeWidth: 0 }}
-                            />
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                            <XAxis dataKey="name" axisLine={false} tickLine={false} />
+                            <YAxis axisLine={false} tickLine={false} />
+                            <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }} />
+                            <Line type="monotone" dataKey="travelers" stroke="#2563EB" strokeWidth={3} dot={{ r: 4, fill: "#2563EB" }} />
                         </LineChart>
                     </ResponsiveContainer>
                 </div>
             </CardContent>
         </Card>
 
-        {/* --- BOOKINGS TABLE --- */}
-        <Card className="shadow-sm border-t-4 border-t-blue-600">
+        <Card className="shadow-sm">
             <CardHeader className="flex flex-row items-center justify-between">
-                <div>
-                  <CardTitle>Recent Bookings</CardTitle>
-                  <CardDescription>Showing {filteredBookings.length} filtered results</CardDescription>
-                </div>
+                <CardTitle>Recent Bookings</CardTitle>
                 <div className="flex gap-2">
                     <div className="relative">
                         <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
                         <Input 
-                            placeholder="Search customer..." 
+                            placeholder="Search..." 
                             value={searchTerm} 
                             onChange={(e) => setSearchTerm(e.target.value)} 
-                            className="pl-8 h-10 w-[250px] bg-white" 
+                            className="pl-8 h-9 w-[200px]" 
                         />
                     </div>
-                    <select 
-                        value={statusFilter} 
-                        onChange={(e) => setStatusFilter(e.target.value)} 
-                        className="px-3 py-1 text-sm border border-gray-300 rounded-md bg-white shadow-sm"
-                    >
-                        <option value="all">All Status</option>
-                        <option value="Paid">Paid</option>
-                        <option value="Pending">Pending (Queue)</option>
-                        <option value="Confirmed">Confirmed</option>
-                        <option value="Completed">Completed</option>
-                        <option value="Cancelled">Cancelled</option>
-                    </select>
                 </div>
             </CardHeader>
             <CardContent>
                 <div className="space-y-4">
                     {filteredBookings.map((booking) => (
-                    <div key={booking.booking_id} className="border rounded-xl p-5 hover:border-blue-300 hover:shadow-md transition-all bg-white group">
-                        <div className="flex justify-between items-start mb-4">
+                    <div key={booking.id} className="border rounded-lg p-4 hover:bg-gray-50 transition-colors">
+                        <div className="flex justify-between items-start mb-2">
                         <div>
-                            <h4 className="font-bold text-lg text-gray-900">
-                            {booking.user?.full_name || booking.created_by || "Guest Traveler"}
-                            </h4>
-                            <div className="flex items-center gap-2 mt-1">
-                            <Badge variant="outline" className="text-[10px] font-mono">#{booking.booking_id}</Badge>
-                            <span className="text-xs text-gray-400 flex items-center">
-                                <Calendar className="w-3 h-3 mr-1"/> 
-                                Booked: {booking.created_at ? new Date(booking.created_at).toLocaleDateString() : "Pending"}
-                            </span>
-                            </div>
+                            <h4 className="font-medium text-gray-900">{booking.customerName}</h4>
+                            <p className="text-sm text-gray-600">{booking.email}</p>
                         </div>
-                        <Badge className={`${getStatusColor(booking.status)} px-3 py-1 border`}>{booking.status}</Badge>
+                        <Badge className={getStatusColor(booking.status)}>{booking.status}</Badge>
                         </div>
-
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-sm">
-                        <div className="space-y-1">
-                            <span className="text-gray-400 block uppercase text-[10px] font-bold">Tour Package</span>
-                            <span className="font-semibold text-gray-800 flex items-center gap-1">
-                            <MapPin className="w-3 h-3 text-red-500"/> 
-                            {booking.package?.title || "Custom Itinerary"}
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-gray-600 mb-3">
+                        <div>
+                            <span className="font-medium text-gray-900 block">Travel Date</span>
+                            <span className="flex items-center gap-1"><Calendar className="w-3 h-3"/> {booking.travelDate}</span>
+                        </div>
+                        <div>
+                            <span className="font-medium text-gray-900 block">Total</span>
+                            <span className="font-bold text-red-600">
+                                ¥{booking.totalPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </span>
                         </div>
-                        <div className="space-y-1">
-                            <span className="text-gray-400 block uppercase text-[10px] font-bold">Travel Date</span>
-                            <span className="font-semibold text-blue-600">
-                            {booking.travel_date || "Not set"}
-                            </span>
-                        </div>
-                        <div className="space-y-1">
-                            <span className="text-gray-400 block uppercase text-[10px] font-bold">Group Size</span>
-                            <span className="font-semibold text-gray-800">{booking.pax_count} Travelers</span>
-                        </div>
-                        <div className="space-y-1">
-                            <span className="text-gray-400 block uppercase text-[10px] font-bold">Total Paid</span>
-                            <span className="font-bold text-green-700 text-lg">¥{Number(booking.total_price).toLocaleString()}</span>
-                        </div>
-                        </div>
-                        
-                        <div className="mt-4 pt-4 border-t flex justify-end">
-                            <Dialog>
-                                <DialogTrigger asChild>
-                                <Button 
-                                    size="sm" 
-                                    variant="ghost" 
-                                    className="text-blue-600 hover:bg-blue-50"
-                                    onClick={() => setSelectedBooking(booking)}
-                                >
-                                    <Eye className="w-4 h-4 mr-2" /> View Details
-                                </Button>
-                                </DialogTrigger>
-                                <DialogContent className="max-w-2xl">
-                                <DialogHeader>
-                                    <DialogTitle className="text-2xl font-bold flex items-center gap-2">
-                                        <Info className="w-6 h-6 text-blue-600" /> Booking Management
-                                    </DialogTitle>
-                                    <DialogDescription>
-                                    Manage workflow for Booking ID: #{booking.booking_id}
-                                    </DialogDescription>
-                                </DialogHeader>
-
-                                <div className="space-y-6 py-4">
-                                    {/* INFO GRID */}
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div className="bg-gray-50 p-4 rounded-xl border border-gray-100">
-                                            <h5 className="text-xs font-bold text-gray-400 uppercase mb-2">Customer Info</h5>
-                                            <p className="font-bold text-gray-900">{booking.user?.full_name || "Guest"}</p>
-                                            <p className="text-sm text-gray-600 flex items-center gap-2 mt-1">
-                                                <Mail className="w-3 h-3" /> {booking.created_by}
-                                            </p>
-                                        </div>
-                                        <div className="bg-green-50 p-4 rounded-xl border border-green-100">
-                                            <h5 className="text-xs font-bold text-green-600 uppercase mb-2">Revenue</h5>
-                                            <p className="text-2xl font-black text-green-700">¥{Number(booking.total_price).toLocaleString()}</p>
-                                            <p className="text-xs text-green-600 italic">Confirmed Transaction</p>
-                                        </div>
-                                    </div>
-
-                                    <div className="space-y-3">
-                                        <h5 className="font-bold text-gray-900 flex items-center gap-2">
-                                            <MapPin className="w-4 h-4 text-red-500" /> Logistics Status
-                                        </h5>
-                                        <div className="grid grid-cols-2 gap-y-4 text-sm border rounded-xl p-4">
-                                            <div>
-                                                <p className="text-gray-400 uppercase text-[10px] font-bold">Package Name</p>
-                                                <p className="font-semibold text-gray-800">{booking.package?.title || "Custom Itinerary"}</p>
-                                            </div>
-                                            <div className="text-right">
-                                                <p className="text-gray-400 uppercase text-[10px] font-bold">Travel Date</p>
-                                                <p className="font-semibold text-blue-600">{booking.travel_date || "TBD"}</p>
-                                            </div>
-                                            <div className="text-right">
-                                                <p className="text-gray-400 uppercase text-[10px] font-bold">Current Status</p>
-                                                <Badge className={`${getStatusColor(booking.status)} mt-1`}>{booking.status}</Badge>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* WORKFLOW ACTION BUTTONS */}
-                                    <div className="flex flex-col gap-3 pt-4 border-t">
-                                        {/* STEP 1: PAID -> PENDING (QUEUE) */}
-                                        {booking.status === "Paid" && (
-                                            <Button 
-                                                className="w-full bg-orange-500 hover:bg-orange-600 text-white"
-                                                onClick={() => updateBookingStatus(booking.booking_id, "Pending")}
-                                            >
-                                                <Clock className="w-4 h-4 mr-2" /> Move to Queue (Pending)
-                                            </Button>
-                                        )}
-
-                                        {/* STEP 2: PENDING -> CONFIRMED */}
-                                        {booking.status === "Pending" && (
-                                            <Button 
-                                                className="w-full bg-blue-600 hover:bg-blue-700 text-white"
-                                                onClick={() => updateBookingStatus(booking.booking_id, "Confirmed")}
-                                            >
-                                                <ArrowRightCircle className="w-4 h-4 mr-2" /> Confirm Final Logistics
-                                            </Button>
-                                        )}
-
-                                        {/* STEP 3: CONFIRMED -> COMPLETED */}
-                                        {booking.status === "Confirmed" && (
-                                            <Button 
-                                                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white"
-                                                onClick={() => updateBookingStatus(booking.booking_id, "Completed")}
-                                            >
-                                                <CheckCircle className="w-4 h-4 mr-2" /> Mark as Completed
-                                            </Button>
-                                        )}
-
-                                        <div className="flex gap-3 mt-2">
-                                            <Button variant="outline" className="flex-1 border-gray-300">
-                                                Contact Customer
-                                            </Button>
-                                            {booking.status !== "Completed" && booking.status !== "Cancelled" && (
-                                                <Button 
-                                                    variant="outline" 
-                                                    className="flex-1 text-red-600 border-red-200 hover:bg-red-50"
-                                                    onClick={() => updateBookingStatus(booking.booking_id, "Cancelled")}
-                                                >
-                                                    Cancel Booking
-                                                </Button>
-                                            )}
-                                        </div>
-                                    </div>
-                                </div>
-                                </DialogContent>
-                            </Dialog>
                         </div>
                     </div>
                     ))}
-                    {filteredBookings.length === 0 && (
-                      <div className="text-center py-20 bg-gray-50 rounded-xl border-2 border-dashed">
-                        <p className="text-gray-400">No bookings match your search criteria.</p>
-                      </div>
-                    )}
                 </div>
             </CardContent>
         </Card>
