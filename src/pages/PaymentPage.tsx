@@ -23,7 +23,7 @@ import {
   Mail, 
   Phone, 
   MapPin, 
-  Calendar, 
+  Calendar as CalendarIcon, 
   Users, 
   Lock, 
   ArrowRight,
@@ -39,11 +39,6 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { format } from "date-fns";
 import { supabase } from "../lib/supabaseClient";
 
-const DEFAULT_DESTINATIONS = [
-  { id: "hasedera", name: "Hasedera Temple" },
-  { id: "kotoku-in", name: "Kotoku-in" },
-];
-
 const DOWN_PAYMENT_AMOUNT_JPY = 26000;
 
 export default function PaymentPage() {
@@ -51,7 +46,7 @@ export default function PaymentPage() {
   const navigate = useNavigate();
 
   // --- 1. GET URL PARAMETERS ---
-  const isCustom = searchParams.get("custom") === "true";
+  const isCustomParam = searchParams.get("custom") === "true";
   const locationParam = searchParams.get("location");
   const dateParam = searchParams.get("date");
   const travelersParam = searchParams.get("travelers");
@@ -60,10 +55,18 @@ export default function PaymentPage() {
   const totalPriceParam = searchParams.get("totalPrice");
 
   // --- 2. STATE ---
-  const [allDestinations, setAllDestinations] = useState<any[]>(DEFAULT_DESTINATIONS);
+  const [allDestinations, setAllDestinations] = useState<any[]>([]);
   const [dbDate, setDbDate] = useState<string | null>(null);
   const [paymentOption, setPaymentOption] = useState<'full' | 'downpayment'>('full');
   const [showWaiver, setShowWaiver] = useState(false);
+  
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState("card");
+
+  const [formData, setFormData] = useState({
+    firstName: "", lastName: "", email: "", phone: "",
+    cardName: "", cardNumber: "", expiry: "", cvc: ""
+  });
 
   const [displayData, setDisplayData] = useState({
     title: "Tour Package",
@@ -75,57 +78,41 @@ export default function PaymentPage() {
     isCustom: false
   });
 
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState("card");
-  const [formData, setFormData] = useState({
-    firstName: "", lastName: "", email: "", phone: "",
-    cardName: "", cardNumber: "", expiry: "", cvc: ""
-  });
-
   // --- 3. FETCH DESTINATIONS ---
   useEffect(() => {
     const fetchDestinations = async () => {
         const { data } = await supabase.from('tour_destinations').select('*');
-        if (data && data.length > 0) {
-            setAllDestinations(prev => [...prev, ...data]); 
-        }
+        if (data && data.length > 0) setAllDestinations(data);
     };
     fetchDestinations();
   }, []);
 
-  // --- 4. PARSE DATA ---
+  // --- 4. PARSE DATA & MANAGE VIEW ---
   useEffect(() => {
-    if (isCustom && cartDataRaw) {
+    if (isCustomParam && cartDataRaw) {
       try {
         const cart = JSON.parse(decodeURIComponent(cartDataRaw));
         const total = parseInt(totalPriceParam || "0");
         
         let travelersDisplay = "1";
         if (cart.length > 0) {
-            const counts = cart.map((item: any) => item.travelers);
-            const min = Math.min(...counts);
-            const max = Math.max(...counts);
-            travelersDisplay = min === max ? min.toString() : `${min} - ${max}`;
+          const counts = cart.map((item: any) => item.travelers);
+          const min = Math.min(...counts);
+          const max = Math.max(...counts);
+          travelersDisplay = min === max ? min.toString() : `${min} - ${max}`;
         }
         
         let dateStr = "Multiple Dates";
         let validStartDate = new Date().toISOString(); 
 
         if (cart.length > 0) {
-            const uniqueDates = Array.from(new Set(cart.map((i: any) => format(new Date(i.date), "MMM dd, yyyy"))));
-            dateStr = uniqueDates.join(" | ");
-
-            const sortedDates = cart
-              .map((item: any) => new Date(item.date))
-              .sort((a: any, b: any) => a.getTime() - b.getTime());
-            
-            if (sortedDates.length > 0) {
-                validStartDate = sortedDates[0].toISOString();
-            }
+          const uniqueDates = Array.from(new Set(cart.map((i: any) => format(new Date(i.date), "MMM dd, yyyy"))));
+          dateStr = uniqueDates.join(" | ");
+          const sortedDates = cart.map((item: any) => new Date(item.date)).sort((a: any, b: any) => a.getTime() - b.getTime());
+          if (sortedDates.length > 0) validStartDate = sortedDates[0].toISOString();
         }
         
         setDbDate(validStartDate);
-
         setDisplayData({
           title: `Custom Itinerary (${cart.length} Days)`,
           date: dateStr,
@@ -135,9 +122,7 @@ export default function PaymentPage() {
           details: cart,
           isCustom: true
         });
-      } catch (err) {
-        console.error("Error parsing cart data", err);
-      }
+      } catch (err) { console.error("Error parsing cart data", err); }
     } else {
       setDbDate(dateParam);
       setDisplayData({
@@ -150,7 +135,7 @@ export default function PaymentPage() {
         isCustom: false
       });
     }
-  }, [searchParams, isCustom, cartDataRaw, totalPriceParam, dateParam, travelersParam, priceParam, locationParam]);
+  }, [isCustomParam, cartDataRaw, totalPriceParam, dateParam, travelersParam, priceParam, locationParam]);
 
   // --- INPUT HANDLER ---
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -158,41 +143,38 @@ export default function PaymentPage() {
     let formattedValue = value;
 
     if (name === "cardNumber") {
-        const raw = value.replace(/\D/g, "");
-        const truncated = raw.slice(0, 16);
-        formattedValue = truncated.replace(/(\d{4})(?=\d)/g, "$1 ");
+      const raw = value.replace(/\D/g, "");
+      const truncated = raw.slice(0, 16);
+      formattedValue = truncated.replace(/(\d{4})(?=\d)/g, "$1 ");
     } else if (name === "expiry") {
-        const raw = value.replace(/\D/g, "");
-        const truncated = raw.slice(0, 4);
-        formattedValue = truncated.length >= 3 ? `${truncated.slice(0, 2)}/${truncated.slice(2)}` : truncated;
+      const raw = value.replace(/\D/g, "");
+      const truncated = raw.slice(0, 4);
+      formattedValue = truncated.length >= 3 ? `${truncated.slice(0, 2)}/${truncated.slice(2)}` : truncated;
     } else if (name === "cvc") {
-        formattedValue = value.replace(/\D/g, "").slice(0, 4);
+      formattedValue = value.replace(/\D/g, "").slice(0, 4);
     }
-
     setFormData(prev => ({ ...prev, [name]: formattedValue }));
   };
 
-  // --- TOTALS ---
+  // --- TOTALS CALCULATION ---
   const tripCount = displayData.isCustom && displayData.details.length > 0 ? displayData.details.length : 1;
   const totalDownPayment = tripCount * DOWN_PAYMENT_AMOUNT_JPY;
   const totalAmount = displayData.price;
   const amountToPay = paymentOption === 'full' ? totalAmount : totalDownPayment;
   const balanceAmount = paymentOption === 'full' ? 0 : totalAmount - totalDownPayment;
 
-  // --- 5. TRIGGER WAIVER ---
+  // --- SUBMISSION LOGIC ---
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    setShowWaiver(true); // Open the modal
+    setShowWaiver(true); 
   };
 
-  // --- 6. FINAL SUBMIT TO SUPABASE ---
   const handleFinalConfirmAndPay = async () => {
     setShowWaiver(false);
     setIsProcessing(true);
 
     try {
       const { data: { user }, error: authError } = await supabase.auth.getUser();
-      
       if (authError || !user) {
         alert("Session expired. Please sign in again.");
         navigate("/signin");
@@ -200,21 +182,17 @@ export default function PaymentPage() {
       }
 
       const bookingPayload = {
-          user_id: user.id,
-          itinerary_id: isCustom ? null : (searchParams.get("packageId") || null), 
-          pax_count: parseInt(displayData.travelersLabel) || 1,
-          total_price: displayData.price, 
-          status: "Paid", 
-          travel_date: dbDate,
-          created_by: formData.email,
-          updated_by: formData.email
+        user_id: user.id,
+        itinerary_id: isCustomParam ? null : (searchParams.get("packageId") || null), 
+        pax_count: parseInt(displayData.travelersLabel) || 1,
+        total_price: displayData.price, 
+        status: "Paid", 
+        travel_date: dbDate,
+        created_by: formData.email,
+        updated_by: formData.email
       };
 
-      const { data, error } = await supabase
-        .from('bookings')
-        .insert([bookingPayload])
-        .select();
-
+      const { data, error } = await supabase.from('bookings').insert([bookingPayload]).select();
       if (error) throw error;
 
       const queryParams = new URLSearchParams({
@@ -223,7 +201,7 @@ export default function PaymentPage() {
         date: displayData.date, 
         travelers: displayData.travelersLabel,
         location: displayData.location,
-        custom: isCustom ? "true" : "false",
+        custom: isCustomParam ? "true" : "false",
         cartData: cartDataRaw || "",
         paymentType: paymentOption,
         amountPaid: amountToPay.toString(),
@@ -235,23 +213,17 @@ export default function PaymentPage() {
       });
 
       navigate(`/booking-confirmation?${queryParams.toString()}`);
-
     } catch (err: any) {
-      console.error("Booking Error:", err.message);
-      alert("Could not save booking: " + err.message);
+      alert("Booking Error: " + err.message);
     } finally {
       setIsProcessing(false);
     }
   };
 
-  const getDestName = (id: string) => {
-      const found = allDestinations.find(d => d.id === id);
-      return found ? found.name : id; 
-  };
-
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 font-sans">
       <div className="max-w-6xl mx-auto px-4 py-12">
+        {/* Breadcrumbs */}
         <div className="flex items-center gap-2 mb-8 text-sm text-gray-500">
             <span>Select Tour</span>
             <span>→</span>
@@ -263,8 +235,10 @@ export default function PaymentPage() {
         <h1 className="text-3xl font-bold text-gray-900 mb-8">Secure Checkout</h1>
 
         <div className="grid lg:grid-cols-3 gap-8">
-          
+          {/* LEFT COLUMN: FORMS */}
           <div className="lg:col-span-2 space-y-8">
+            
+            {/* 1. CONTACT INFORMATION */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -302,6 +276,7 @@ export default function PaymentPage() {
               </CardContent>
             </Card>
 
+            {/* 2. PAYMENT OPTIONS */}
             <Card className="border-l-4 border-l-blue-600">
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2">
@@ -313,17 +288,23 @@ export default function PaymentPage() {
                         <Label htmlFor="opt-full" className="rounded-md border-2 p-4 cursor-pointer hover:bg-gray-50 bg-white">
                             <RadioGroupItem value="full" id="opt-full" className="sr-only" />
                             <div className="font-bold">Full Payment</div>
+                            <div className="text-sm text-gray-500 mb-2">Pay the entire amount now.</div>
                             <div className="text-lg font-bold text-blue-700">¥{totalAmount.toLocaleString()}</div>
                         </Label>
                         <Label htmlFor="opt-down" className="rounded-md border-2 p-4 cursor-pointer hover:bg-gray-50 bg-white">
                             <RadioGroupItem value="downpayment" id="opt-down" className="sr-only" />
-                            <div className="font-bold">Down Payment</div>
+                            <div className="flex justify-between">
+                              <div className="font-bold">Down Payment</div>
+                              <div className="bg-green-100 text-green-700 text-[10px] font-bold px-2 py-0.5 rounded h-fit">INSTALLMENT</div>
+                            </div>
+                            <div className="text-sm text-gray-500 mb-2">Reserve now, pay later.</div>
                             <div className="text-lg font-bold text-blue-700">¥{totalDownPayment.toLocaleString()}</div>
                         </Label>
                     </RadioGroup>
                 </CardContent>
             </Card>
 
+            {/* 3. CARD DETAILS */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -331,76 +312,154 @@ export default function PaymentPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <Input name="cardName" placeholder="Name on Card" value={formData.cardName} onChange={handleInputChange} />
-                <Input name="cardNumber" placeholder="0000 0000 0000 0000" value={formData.cardNumber} onChange={handleInputChange} maxLength={19} />
+                <div className="space-y-2">
+                    <Label>Name on Card</Label>
+                    <Input name="cardName" placeholder="Name as it appears on card" value={formData.cardName} onChange={handleInputChange} />
+                </div>
+                <div className="space-y-2">
+                    <Label>Card Number</Label>
+                    <Input name="cardNumber" placeholder="0000 0000 0000 0000" value={formData.cardNumber} onChange={handleInputChange} maxLength={19} inputMode="numeric" />
+                </div>
                 <div className="grid grid-cols-2 gap-4">
-                    <Input name="expiry" placeholder="MM/YY" value={formData.expiry} onChange={handleInputChange} maxLength={5} />
-                    <Input name="cvc" placeholder="CVC" value={formData.cvc} onChange={handleInputChange} maxLength={4} />
+                    <div className="space-y-2">
+                        <Label>Expiry Date</Label>
+                        <Input name="expiry" placeholder="MM/YY" value={formData.expiry} onChange={handleInputChange} maxLength={5} inputMode="numeric" />
+                    </div>
+                    <div className="space-y-2">
+                        <Label>CVC</Label>
+                        <Input name="cvc" placeholder="123" value={formData.cvc} onChange={handleInputChange} maxLength={4} inputMode="numeric" />
+                    </div>
                 </div>
               </CardContent>
-              <CardFooter className="bg-gray-50 text-xs justify-center gap-2">
-                <Lock className="w-4 h-4" /> SSL Encrypted
+              <CardFooter className="bg-gray-50 text-xs justify-center gap-2 py-4">
+                <Lock className="w-4 h-4" /> SSL Encrypted Secure Payment
               </CardFooter>
             </Card>
           </div>
 
+          {/* RIGHT COLUMN: ORDER SUMMARY (Fixed Overlap) */}
           <div className="lg:col-span-1">
-            <Card className="sticky top-8 shadow-lg border-t-4 border-t-red-600">
+            <Card className="sticky top-8 shadow-lg border-t-4 border-t-red-600 flex flex-col overflow-hidden">
                 <CardHeader>
-                    <CardTitle className="flex justify-between items-center">
-                        Order Summary {displayData.isCustom && <Layers className="w-4 h-4" />}
+                    <CardTitle className="flex justify-between items-center text-lg">
+                        Order Summary {displayData.isCustom && <Layers className="w-4 h-4 text-gray-400" />}
                     </CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-6">
+                <CardContent className="space-y-6 flex-1 overflow-y-auto max-h-[calc(100vh-250px)] pb-4">
                     <div className="space-y-2 pb-4 border-b text-sm">
-                        <div className="flex justify-between"><span>Location</span><span className="font-bold">{displayData.location}</span></div>
-                        <div className="flex justify-between"><span>Date</span><span className="font-bold">{displayData.date}</span></div>
-                        <div className="flex justify-between"><span>Travelers</span><span className="font-bold">{displayData.travelersLabel}</span></div>
+                        <div className="flex justify-between items-start">
+                            <span className="text-gray-600 flex items-center gap-2"><MapPin className="w-4 h-4" /> Location</span>
+                            <span className="font-bold text-right capitalize truncate max-w-[150px]">{displayData.location}</span>
+                        </div>
+                        <div className="flex justify-between items-start">
+                            <span className="text-gray-600 flex items-center gap-2"><CalendarIcon className="w-4 h-4" /> Date</span>
+                            <span className="font-bold text-right text-xs max-w-[150px] leading-relaxed">{displayData.date}</span>
+                        </div>
+                        <div className="flex justify-between items-start">
+                            <span className="text-gray-600 flex items-center gap-2"><Users className="w-4 h-4" /> Travelers</span>
+                            <span className="font-bold text-right">{displayData.travelersLabel}</span>
+                        </div>
                     </div>
 
-                    <div className="bg-orange-50 border border-orange-100 rounded-lg p-3">
+                    {/* TRAVEL INCLUSION NOTICE - Use relative and lower z-index if needed */}
+                    <div className="bg-orange-50 border border-orange-100 rounded-lg p-3 relative z-10">
                         <div className="flex items-center gap-2 text-orange-800 font-semibold text-xs mb-2">
                             <Info className="w-3.5 h-3.5" /> Inclusion Notice
                         </div>
-                        <p className="text-[11px] mb-2">Transportation and guide only.</p>
-                        <div className="space-y-1 text-[10px] text-red-600 font-medium">
-                            <div className="flex items-center"><XCircle className="w-3 h-3 mr-1" /> No Roundtrip Airfare</div>
-                            <div className="flex items-center"><XCircle className="w-3 h-3 mr-1" /> No Hotel Accommodations</div>
+                        <p className="text-[11px] text-gray-700 leading-tight mb-2">
+                            Package covers <strong>private transportation and guide only</strong>.
+                        </p>
+                        <div className="space-y-1">
+                            <div className="flex items-center text-[10px] text-red-600 gap-1.5 font-medium">
+                                <XCircle className="w-3 h-3" /> No Roundtrip Airfare
+                            </div>
+                            <div className="flex items-center text-[10px] text-red-600 gap-1.5 font-medium">
+                                <XCircle className="w-3 h-3" /> No Hotel Accommodations
+                            </div>
                         </div>
                     </div>
 
-                    <div className="flex justify-between items-center text-xl font-bold pt-2 border-t">
-                        <span>Total Due:</span>
-                        <span>¥{amountToPay.toLocaleString()}</span>
+                    <div className="space-y-2 pt-2 border-t">
+                        <div className="flex justify-between text-sm text-gray-600">
+                          <span>Package Total:</span>
+                          <span>¥{totalAmount.toLocaleString()}</span>
+                        </div>
+                        {paymentOption === 'downpayment' && (
+                           <div className="flex justify-between text-sm text-gray-600">
+                              <span>Remaining Balance:</span>
+                              <span className="font-bold text-orange-600">¥{balanceAmount.toLocaleString()}</span>
+                           </div>
+                        )}
+                        <div className="flex justify-between items-center text-xl font-bold pt-2 border-t mt-2">
+                            <span>Total Due:</span>
+                            <span>¥{amountToPay.toLocaleString()}</span>
+                        </div>
                     </div>
 
-                    <Button onClick={handleSubmit} disabled={isProcessing || !formData.firstName || !formData.email} className="w-full bg-red-600 py-6 text-lg">
-                        {isProcessing ? <Loader2 className="animate-spin mr-2" /> : "Pay & Confirm"}
+                    <Button onClick={handleSubmit} disabled={isProcessing || !formData.firstName || !formData.email} className="w-full bg-red-600 hover:bg-red-700 text-white py-6 text-lg mt-4">
+                        {isProcessing ? <Loader2 className="animate-spin mr-2 h-4 w-4" /> : "Pay & Confirm"}
                     </Button>
+                    <p className="text-xs text-center text-gray-500 mt-2 pb-2">By clicking pay, you agree to our Terms & Conditions.</p>
                 </CardContent>
             </Card>
           </div>
         </div>
       </div>
 
+      {/* --- ACCIDENT WAIVER MODAL --- */}
       <Dialog open={showWaiver} onOpenChange={setShowWaiver}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader><DialogTitle className="text-xl font-bold text-center border-b pb-4">ACCIDENT WAIVER & RELEASE OF LIABILITY</DialogTitle></DialogHeader>
-          <div className="space-y-4 text-sm py-4">
-            <p>I hereby assume all risks of participating in any activities associated with this tour.</p>
-            <div className="bg-red-50 p-4 rounded border border-red-100 text-red-900 font-medium">
-                Uncle Sam is strictly limited to activities within the official tour itinerary.
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold text-center border-b pb-4">
+              ACCIDENT WAIVER AND RELEASE OF LIABILITY FORM
+            </DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-4 text-sm text-gray-700 leading-relaxed py-4">
+            <p className="font-semibold italic">Please read carefully before signing:</p>
+            <p>
+              I hereby assume all risks of participating in any and all activities associated with this tour event. 
+              I certify that I am physically fit and have sufficiently prepared for participation in this activity.
+            </p>
+
+            <div className="bg-red-50 p-4 rounded-md border border-red-100">
+              <p className="text-red-900 font-medium">
+                <strong>Liability Limitation:</strong> I acknowledge and agree that the liability of 
+                <span className="font-bold"> Uncle Sam (UncleSam Japan Tour)</span> is strictly limited to 
+                occurrences and activities within the scheduled tours. Uncle Sam shall not be held liable 
+                for any incidents, injuries, or losses occurring outside of the official tour itinerary.
+              </p>
             </div>
-            <div className="mt-8 pt-8 border-t flex flex-col items-center">
-              <div className="w-full max-w-md border-b-2 border-black text-center italic text-xl">
-                {formData.firstName} {formData.lastName}
+
+            <p>(A) I WAIVE, RELEASE, AND DISCHARGE from any and all liability, including but not limited to, negligence or fault of entities, for my death, disability, personal injury, or property damage.</p>
+            <p>(B) I INDEMNIFY AND HOLD HARMLESS the entities mentioned from all liabilities or claims made as a result of participation in this activity.</p>
+
+            {/* Signature Section */}
+            <div className="mt-12 pt-8 border-t flex flex-col items-center">
+              <div className="w-full max-w-md space-y-2">
+                <div className="h-16" /> 
+                <div className="border-b-2 border-black w-full" />
+                <div className="flex flex-col items-center pt-1">
+                  <span className="font-serif italic text-lg text-gray-900 uppercase tracking-wide">
+                    {formData.firstName} {formData.lastName}
+                  </span>
+                  <p className="text-[10px] uppercase tracking-[0.2em] text-gray-500 font-bold mt-1 text-center">
+                    Electronic Signature of Participant
+                  </p>
+                </div>
               </div>
-              <p className="text-[10px] uppercase text-gray-500 font-bold mt-1">Electronic Signature</p>
+              <div className="w-full max-w-md flex justify-between text-[11px] font-bold text-gray-500 mt-8 uppercase">
+                <p>PRINTED NAME: {formData.firstName} {formData.lastName}</p>
+                <p>DATE: {new Date().toLocaleDateString()}</p>
+              </div>
             </div>
           </div>
-          <DialogFooter className="sm:justify-center gap-2">
+
+          <DialogFooter className="sm:justify-center gap-2 border-t pt-4">
             <Button variant="outline" onClick={() => setShowWaiver(false)}>Cancel</Button>
-            <Button className="bg-red-600 text-white px-8" onClick={handleFinalConfirmAndPay}>I Agree & Authorize Payment</Button>
+            <Button className="bg-red-600 hover:bg-red-700 text-white px-8" onClick={handleFinalConfirmAndPay}>
+              I Agree & Authorize Payment
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
