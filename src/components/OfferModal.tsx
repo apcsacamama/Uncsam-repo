@@ -105,7 +105,7 @@ export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) 
       return;
     }
     const pkgId = (offer as any).slug || offer.id;
-    navigate(`/payment?package=${pkgId}&date=${offerDate}&travelers=${offerTravelers}&price=${offerCalculatedPrice}&name=Guest`);
+    navigate(`/payment?packageId=${pkgId}&date=${offerDate}&travelers=${offerTravelers}&price=${offerCalculatedPrice}&name=Guest`);
   };
 
   // ==========================================
