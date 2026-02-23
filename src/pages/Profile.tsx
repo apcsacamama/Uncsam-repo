@@ -29,8 +29,8 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabaseClient"; 
 import { TourPackage } from "../types/travel";
 import OfferModal from "../components/OfferModal";
+import OfferModal from "../components/OfferModal"; 
 import {
-  User,
   Mail,
   Phone,
   Calendar,
@@ -67,10 +67,8 @@ export default function Profile() {
     name: "",
     email: "",
     phone: "",
-    dateOfBirth: "",
     address: "",
     preferences: "",
-    avatar_url: "",
     role: "customer"
   });
 
@@ -79,26 +77,35 @@ export default function Profile() {
     const fetchInitialData = async () => {
       try {
         setIsLoading(true);
-        console.log("Fetching user...");
-
         const { data: { user }, error: authError } = await supabase.auth.getUser();
 
         if (authError || !user) {
-          console.log("No user found, redirecting...");
           navigate("/signin");
           return;
         }
 
         // 1. Fetch User Profile
         const { data: profile, error: dbError } = await supabase
+        const { data: profile } = await supabase
           .from('user')
           .select('*')
           .eq('id', user.id)
           .single();
 
-        if (dbError) {
-          console.warn("Database error (Profile might not exist yet):", dbError.message);
-        }
+        // 2. Fetch Live Bookings
+        const { data: bookings } = await supabase
+          .from('bookings')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false });
+
+        // 3. Fetch Destination Reference (to map names in Details)
+        const { data: dests } = await supabase
+          .from('tour_destinations')
+          .select('*');
+
+        if (bookings) setLiveBookings(bookings);
+        if (dests) setAllDestinations(dests);
 
         // 2. Fetch Live Bookings
         const { data: bookings } = await supabase
@@ -123,12 +130,15 @@ export default function Profile() {
           address: profile?.address || "Not set",   
           preferences: profile?.preferences || "None set", 
           avatar_url: profile?.avatar_url || "",
+          phone: profile?.phone || "",
+          address: profile?.address || "Not set",   
+          preferences: profile?.preferences || "None set", 
           role: profile?.role || "customer"
         });
 
       } catch (error: any) {
-        console.error("Critical Error:", error);
-        setErrorMsg(error.message || "Failed to load profile");
+        console.error("Profile load error:", error);
+        setErrorMsg("Failed to load profile data.");
       } finally {
         setIsLoading(false);
       }
@@ -136,7 +146,7 @@ export default function Profile() {
 
     fetchInitialData();
 
-    // --- FAVORITES SYNC LOGIC ---
+    // Favorites Sync Logic
     const loadFavorites = () => {
       const saved = JSON.parse(localStorage.getItem("tour_favorites") || "[]");
       setFavorites(saved);
@@ -157,6 +167,10 @@ export default function Profile() {
       const found = allDestinations.find(d => d.id === id);
       return found ? found.name : id;
     });
+  };
+
+  const handleDownloadReceipt = (booking: any) => {
+    alert(`Generating receipt for Booking #${booking.booking_id}...`);
   };
 
   const handleSignOut = async () => {
@@ -186,19 +200,20 @@ export default function Profile() {
     }
   };
 
-  const getInitials = (name: string) => {
-    return name && name.length > 0 ? name.charAt(0).toUpperCase() : "U";
-  };
+      const { error } = await supabase
+        .from('user')
+        .update({
+          full_name: userInfo.name,
+          phone: userInfo.phone,
+          address: userInfo.address,
+          preferences: userInfo.preferences
+        })
+        .eq('id', user.id);
 
-  const userBookings = mockBookings.filter((b) => b.userId === "user-001");
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "confirmed": return "bg-green-100 text-green-800";
-      case "pending": return "bg-yellow-100 text-yellow-800";
-      case "completed": return "bg-blue-100 text-blue-800";
-      case "cancelled": return "bg-red-100 text-red-800";
-      default: return "bg-gray-100 text-gray-800";
+      if (error) throw error;
+      setIsEditing(false);
+    } catch (error: any) {
+      alert("Error saving profile: " + error.message);
     }
   };
 
@@ -216,7 +231,6 @@ export default function Profile() {
     window.dispatchEvent(new Event("favoritesUpdated"));
   };
 
-  // --- Modal Trigger Handler ---
   const handleViewTour = (tour: TourPackage) => {
     setSelectedTour(tour);
     setIsModalOpen(true);
@@ -243,31 +257,21 @@ export default function Profile() {
       </div>
     );
   }
+  const favoriteDestinations = ["Nagoya Castle", "Tokyo Disneyland", "Kyoto Temples", "Osaka Castle"];
+
+  if (isLoading) return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <Loader2 className="animate-spin text-red-600 w-10 h-10" />
+    </div>
+  );
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="bg-white shadow-sm">
-        <div className="max-w-6xl mx-auto px-4 py-8">
-          <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
-            <div className="flex items-center space-x-6">
-              <div className="bg-red-600 rounded-full w-20 h-20 flex items-center justify-center text-white text-2xl font-bold uppercase">
-                {getInitials(userInfo.name)}
-              </div>
-              <div>
-                <h1 className="text-3xl font-bold text-gray-900">
-                  {userInfo.name}
-                </h1>
-                <p className="text-gray-600 flex items-center mt-1">
-                  <Mail className="w-4 h-4 mr-2" />
-                  {userInfo.email}
-                </p>
-                <div className="flex items-center space-x-4 mt-2">
-                  <Badge variant="outline">{userInfo.role === 'admin' ? 'Administrator' : 'Traveler'}</Badge>
-                  <span className="text-sm text-gray-600">
-                    {userBookings.length} trips completed
-                  </span>
-                </div>
-              </div>
+    <div className="min-h-screen bg-gray-50 font-sans">
+      <div className="bg-white border-b shadow-sm">
+        <div className="max-w-6xl mx-auto px-4 py-8 flex flex-col md:flex-row justify-between items-center gap-4">
+          <div className="flex items-center gap-6">
+            <div className="bg-red-600 rounded-full w-20 h-20 flex items-center justify-center text-white text-3xl font-bold uppercase shadow-lg">
+              {userInfo.name.charAt(0)}
             </div>
             
             <div className="flex gap-3">
@@ -288,14 +292,29 @@ export default function Profile() {
                 <Edit3 className="w-4 h-4" />
                 {isEditing ? "Cancel" : "Edit Profile"}
               </Button>
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">{userInfo.name}</h1>
+              <p className="text-gray-500 flex items-center gap-2 mt-1">
+                <Mail className="w-4 h-4" /> {userInfo.email}
+              </p>
+              <Badge variant="outline" className="mt-2 capitalize">{userInfo.role}</Badge>
             </div>
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => setIsEditing(!isEditing)}>
+              <Edit3 className="w-4 h-4 mr-2" />
+              {isEditing ? "Cancel" : "Edit Profile"}
+            </Button>
+            <Button variant="ghost" className="text-red-600 hover:bg-red-50" onClick={handleSignOut}>
+              <LogOut className="w-4 h-4 mr-2" /> Sign Out
+            </Button>
           </div>
         </div>
       </div>
 
       <div className="max-w-6xl mx-auto px-4 py-8">
         <Tabs defaultValue="bookings" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-4 shadow-sm">
             <TabsTrigger value="bookings">My Bookings</TabsTrigger>
             <TabsTrigger value="profile">Profile Info</TabsTrigger>
             <TabsTrigger value="favorites">Favorites</TabsTrigger>
@@ -480,6 +499,12 @@ export default function Profile() {
                   </div>
                 </CardContent>
               </Card>
+              <div className="text-center py-24 bg-white rounded-xl border-2 border-dashed border-gray-200">
+                <Calendar className="mx-auto w-12 h-12 text-gray-300 mb-4" />
+                <h3 className="text-lg font-bold text-gray-900">No trips booked yet</h3>
+                <p className="text-gray-500 mb-6">Explore our tour packages and start your Japan adventure.</p>
+                <Button onClick={() => navigate('/offers')} className="bg-red-600 hover:bg-red-700">Explore Packages</Button>
+              </div>
             )}
           </TabsContent>
 
@@ -494,40 +519,29 @@ export default function Profile() {
               </CardHeader>
               <CardContent>
                 <div className="grid md:grid-cols-2 gap-6">
+          <TabsContent value="profile">
+            <Card className="shadow-sm">
+              <CardHeader><CardTitle>Account Information</CardTitle></CardHeader>
+              <CardContent className="space-y-6">
+                <div className="grid md:grid-cols-2 gap-8">
                   <div className="space-y-4">
-                    <div>
-                      <Label htmlFor="name">Full Name</Label>
-                      <Input
-                        id="name"
-                        value={userInfo.name}
-                        onChange={(e) =>
-                          setUserInfo({ ...userInfo, name: e.target.value })
-                        }
-                        disabled={!isEditing}
-                      />
+                    <div className="space-y-2">
+                      <Label className="text-xs font-bold uppercase text-gray-500">Full Name</Label>
+                      <Input disabled={!isEditing} value={userInfo.name} onChange={e => setUserInfo({...userInfo, name: e.target.value})} className="bg-white" />
                     </div>
-
-                    <div>
-                      <Label htmlFor="email">Email Address</Label>
-                      <Input
-                        id="email"
-                        type="email"
-                        value={userInfo.email}
-                        disabled={true} 
-                        className="bg-gray-100 text-gray-500"
-                      />
+                    <div className="space-y-2">
+                      <Label className="text-xs font-bold uppercase text-gray-500">Phone Number</Label>
+                      <Input disabled={!isEditing} value={userInfo.phone} onChange={e => setUserInfo({...userInfo, phone: e.target.value})} className="bg-white" />
                     </div>
-
-                    <div>
-                      <Label htmlFor="phone">Phone Number</Label>
-                      <Input
-                        id="phone"
-                        value={userInfo.phone}
-                        onChange={(e) =>
-                          setUserInfo({ ...userInfo, phone: e.target.value })
-                        }
-                        disabled={!isEditing}
-                      />
+                  </div>
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label className="text-xs font-bold uppercase text-gray-500">Current Address</Label>
+                      <Input disabled={!isEditing} value={userInfo.address} onChange={e => setUserInfo({...userInfo, address: e.target.value})} className="bg-white" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-xs font-bold uppercase text-gray-500">Travel Preferences</Label>
+                      <Input disabled={!isEditing} value={userInfo.preferences} onChange={e => setUserInfo({...userInfo, preferences: e.target.value})} className="bg-white" />
                     </div>
                   </div>
 
@@ -542,7 +556,6 @@ export default function Profile() {
                     </div>
                   </div>
                 </div>
-
                 {isEditing && (
                   <div className="flex justify-end mt-6">
                     <Button
@@ -551,6 +564,9 @@ export default function Profile() {
                     >
                       <Save className="w-4 h-4 mr-2" />
                       Save Profile Changes
+                  <div className="flex justify-end pt-4 border-t">
+                    <Button onClick={handleSave} className="bg-red-600 hover:bg-red-700 shadow-lg px-8">
+                        <Save className="w-4 h-4 mr-2" /> Save Profile Changes
                     </Button>
                   </div>
                 )}
@@ -563,25 +579,14 @@ export default function Profile() {
             <div className="grid md:grid-cols-2 gap-6">
               <Card>
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Heart className="w-5 h-5 text-red-600" />
-                    Favorite Destinations
-                  </CardTitle>
+                  <CardTitle className="flex items-center gap-2"><Heart className="w-5 h-5 text-red-600" /> Saved Destinations</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-3">
-                    {favoriteDestinations.map((destination, index) => (
-                      <div
-                        key={index}
-                        className="flex items-center justify-between p-3 border rounded-lg"
-                      >
-                        <div className="flex items-center">
-                          <MapPin className="w-4 h-4 text-red-600 mr-3" />
-                          <span>{destination}</span>
-                        </div>
-                        <Button size="sm" variant="ghost">
-                          <Heart className="w-4 h-4 text-red-600 fill-current" />
-                        </Button>
+                    {favoriteDestinations.map((dest, i) => (
+                      <div key={i} className="flex justify-between items-center p-4 border rounded-xl bg-white hover:shadow-sm transition-shadow">
+                        <div className="flex items-center"><MapPin className="w-4 h-4 text-red-600 mr-3" /> <span className="font-bold text-gray-700">{dest}</span></div>
+                        <Button size="sm" variant="ghost" className="hover:bg-red-50 text-red-600"><Heart className="fill-current w-4 h-4" /></Button>
                       </div>
                     ))}
                   </div>
@@ -590,23 +595,15 @@ export default function Profile() {
 
               <Card>
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Star className="w-5 h-5 text-yellow-600" />
-                    Saved Packages
-                  </CardTitle>
+                  <CardTitle className="flex items-center gap-2"><Star className="w-5 h-5 text-yellow-500" /> Saved Packages</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-3">
                     {favorites.length > 0 ? favorites.map((pkg) => (
-                      <div
-                        key={pkg.id}
-                        className="flex items-center justify-between p-3 border rounded-lg"
-                      >
+                      <div key={pkg.id} className="flex items-center justify-between p-4 border rounded-xl bg-white hover:shadow-sm transition-shadow">
                         <div>
-                          <p className="font-medium">{pkg.title}</p>
-                          <p className="text-sm text-gray-600">
-                            ¥{pkg.price.toLocaleString()}
-                          </p>
+                          <p className="font-bold text-gray-900">{pkg.title}</p>
+                          <p className="text-sm text-red-600 font-bold">¥{pkg.price.toLocaleString()}</p>
                         </div>
                         <div className="flex gap-2">
                           <Button 
@@ -629,6 +626,12 @@ export default function Profile() {
                       <div className="text-center py-6 text-sm text-gray-500">
                         No saved packages yet.
                       </div>
+                            <Button size="sm" variant="ghost" onClick={() => removeFavorite(pkg.id)} className="text-gray-400 hover:text-red-600"><Heart className="fill-current w-4 h-4" /></Button>
+                            <Button size="sm" variant="outline" onClick={() => handleViewTour(pkg)} className="font-bold border-2">Book Again</Button>
+                        </div>
+                      </div>
+                    )) : (
+                      <div className="text-center py-10 text-gray-400 italic text-sm">No saved tour packages found.</div>
                     )}
                   </div>
                 </CardContent>
@@ -671,16 +674,23 @@ export default function Profile() {
                 </CardContent>
               </Card>
             </div>
+          <TabsContent value="settings">
+            <Card className="max-w-md shadow-sm">
+              <CardHeader><CardTitle className="flex items-center gap-2"><Settings className="w-5 h-5 text-gray-600" /> Account Security</CardTitle></CardHeader>
+              <CardContent className="space-y-4">
+                <Button variant="outline" className="w-full justify-start font-medium">Change Account Password</Button>
+                <Button variant="outline" className="w-full justify-start font-medium">Notification Preferences</Button>
+                <Button variant="outline" className="w-full justify-start font-bold text-red-600 border-red-600 hover:bg-red-50" onClick={handleSignOut}>
+                    <LogOut className="w-4 h-4 mr-2" /> Sign Out from Device
+                </Button>
+                <Button variant="ghost" className="w-full justify-start text-xs text-gray-400 hover:text-red-500">Request Account Deletion</Button>
+              </CardContent>
+            </Card>
           </TabsContent>
         </Tabs>
       </div>
 
-      {/* RENDER THE MODAL AT THE BOTTOM */}
-      <OfferModal 
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        offer={selectedTour}
-      />
+      <OfferModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} offer={selectedTour} />
     </div>
   );
 }

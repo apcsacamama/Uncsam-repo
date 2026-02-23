@@ -10,13 +10,6 @@ import {
   CardDescription,
   CardFooter
 } from "../components/ui/card";
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogHeader, 
-  DialogTitle, 
-  DialogFooter 
-} from "../components/ui/dialog"; 
 import { RadioGroup, RadioGroupItem } from "../components/ui/radio-group";
 import { 
   CreditCard, 
@@ -30,6 +23,7 @@ import {
   Lock, 
   ArrowRight,
   Loader2,
+<<<<<<< HEAD
   Layers,
   Plane,
   Banknote,
@@ -38,6 +32,9 @@ import {
   Building2,
   Wallet,
   X
+=======
+  Building2  // ← ADDED for Bank Transfer icon
+>>>>>>> 67f615c2cdf5c72026d88ebd749c69770b8ebb82
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -84,6 +81,7 @@ export default function PaymentPage() {
   const [dbDate, setDbDate] = useState<string | null>(null);
   const [paymentOption, setPaymentOption] = useState<'full' | 'downpayment'>('full');
   
+<<<<<<< HEAD
   // Waiver State
   const [showWaiver, setShowWaiver] = useState(false);
   const [waiverAgreed, setWaiverAgreed] = useState(false);
@@ -107,6 +105,16 @@ export default function PaymentPage() {
   });
   const [pricesLoaded, setPricesLoaded] = useState(false);
 
+=======
+  // ← ADDED: booking details for PayMongo
+  const bookingId = searchParams.get("bookingId") || crypto.randomUUID();
+  const tourName = searchParams.get("tourName") || location;
+
+  // State for form
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState("card"); // ← kept your original default
+  const [error, setError] = useState(""); // ← ADDED for PayMongo error handling
+>>>>>>> 67f615c2cdf5c72026d88ebd749c69770b8ebb82
   const [formData, setFormData] = useState({
     firstName: "", lastName: "", email: "", phone: "",
     cardName: "", cardNumber: "", expiry: "", cvc: ""
@@ -275,6 +283,7 @@ export default function PaymentPage() {
     setFormData(prev => ({ ...prev, [name]: formattedValue }));
   };
 
+<<<<<<< HEAD
   // --- CALCULATE TOTALS ---
   const tripCount = displayData.isCustom && displayData.details.length > 0 ? displayData.details.length : 1;
   const totalDownPayment = tripCount * DOWN_PAYMENT_AMOUNT_JPY;
@@ -305,6 +314,17 @@ export default function PaymentPage() {
   const handleQRPh = async () => {
     setIsProcessing(true);
     setError("");
+=======
+  // ← ADDED: PayMongo bank transfer handler
+ const handlePayMongoBankTransfer = async () => {
+    setIsProcessing(true);
+    setError("");
+    
+    console.log("1. Starting PayMongo payment...");
+    console.log("2. Payment method selected:", paymentMethod);
+    console.log("3. Amount:", parseInt(price));
+    console.log("4. Supabase URL:", import.meta.env.VITE_SUPABASE_URL);
+>>>>>>> 67f615c2cdf5c72026d88ebd749c69770b8ebb82
 
     try {
       const response = await fetch(
@@ -316,6 +336,7 @@ export default function PaymentPage() {
             "Authorization": `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
           },
           body: JSON.stringify({
+<<<<<<< HEAD
             amount: paymentOption === "downpayment" ? prices.PHP / 2 : prices.PHP,
             currency: "PHP",
             paymentType: "qrph",
@@ -325,11 +346,21 @@ export default function PaymentPage() {
             bookingId,
             tourName,
             travelDate: dbDate || dateParam,
+=======
+            amount: parseInt(price),
+            customerName: `${formData.firstName} ${formData.lastName}`,
+            customerEmail: formData.email,
+            customerPhone: formData.phone,
+            bookingId: bookingId,
+            tourName: tourName,
+            travelDate: date,
+>>>>>>> 67f615c2cdf5c72026d88ebd749c69770b8ebb82
             withTransfer: false
           })
         }
       );
 
+<<<<<<< HEAD
       const data = await response.json();
       console.log("PayMongo QRPh response:", data);
 
@@ -497,6 +528,34 @@ export default function PaymentPage() {
 
     if (paymentMethod === "card") {
       await handleCard();
+=======
+      console.log("5. Response status:", response.status);
+      const data = await response.json();
+      console.log("6. Response data:", data);
+
+      const checkoutUrl = data?.data?.attributes?.redirect?.checkout_url;
+      console.log("7. Checkout URL:", checkoutUrl);
+      
+      if (checkoutUrl) {
+        window.location.href = checkoutUrl;
+      } else {
+        setError("Failed to generate payment QR. Please try again.");
+        setIsProcessing(false);
+      }
+    } catch (err) {
+      console.log("8. Error caught:", err);
+      setError("Something went wrong. Please try again.");
+      setIsProcessing(false);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // ← ADDED: route to PayMongo if bank transfer selected
+    if (paymentMethod === "qrph") {
+      await handlePayMongoBankTransfer();
+>>>>>>> 67f615c2cdf5c72026d88ebd749c69770b8ebb82
       return;
     }
 
@@ -731,6 +790,7 @@ export default function PaymentPage() {
                 <CardDescription>All transactions are secure and encrypted.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
+<<<<<<< HEAD
                 <RadioGroup
                   defaultValue="card"
                   onValueChange={(val) => {
@@ -749,12 +809,31 @@ export default function PaymentPage() {
                           Bank Transfer
                         </Label>
                     </div>
+=======
+                <RadioGroup defaultValue="card" onValueChange={setPaymentMethod} className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    
+                    {/* ← ADDED: QRPh Bank Transfer option */}
+                    <div>
+                        <RadioGroupItem value="qrph" id="qrph" className="peer sr-only" />
+                        <Label
+                            htmlFor="qrph"
+                            className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-green-600 peer-data-[state=checked]:text-green-600 cursor-pointer"
+                        >
+                            <Building2 className="mb-3 h-6 w-6" />
+                            Bank Transfer
+                        </Label>
+                    </div>
+
+                    {/* ← UNCHANGED: Card option */}
+>>>>>>> 67f615c2cdf5c72026d88ebd749c69770b8ebb82
                     <div>
                         <RadioGroupItem value="card" id="card" className="peer sr-only" />
                         <Label htmlFor="card" className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-red-600 peer-data-[state=checked]:text-red-600 cursor-pointer">
                             <CreditCard className="mb-3 h-6 w-6" /> Card
                         </Label>
                     </div>
+
+                    {/* ← UNCHANGED: PayPal option */}
                     <div>
                         <RadioGroupItem value="paypal" id="paypal" className="peer sr-only" />
                         <Label htmlFor="paypal" className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-blue-600 peer-data-[state=checked]:text-blue-600 cursor-pointer">
@@ -763,6 +842,7 @@ export default function PaymentPage() {
                     </div>
                 </RadioGroup>
 
+<<<<<<< HEAD
                 {paymentMethod === "qrph" && (
                   <div className="pt-4 border-t bg-green-50 rounded-lg p-4">
                     <p className="text-sm text-green-800 font-medium">🏦 Bank Transfer via QRPh</p>
@@ -772,6 +852,17 @@ export default function PaymentPage() {
                   </div>
                 )}
 
+=======
+                {/* ← ADDED: QRPh info box */}
+                {paymentMethod === "qrph" && (
+                    <div className="pt-4 border-t bg-green-50 rounded-lg p-4">
+                        <p className="text-sm text-green-800 font-medium">🏦 Bank Transfer via QRPh</p>
+                        <p className="text-sm text-green-700 mt-1">You'll be redirected to scan a QR code using your banking app (BDO, BPI, UnionBank, etc.) after clicking Pay.</p>
+                    </div>
+                )}
+
+                {/* ← UNCHANGED: Card fields */}
+>>>>>>> 67f615c2cdf5c72026d88ebd749c69770b8ebb82
                 {paymentMethod === "card" && (
                     <div className="space-y-4 pt-4 border-t">
                         <div className="space-y-2">
@@ -821,6 +912,7 @@ export default function PaymentPage() {
                     </div>
                 )}
 
+<<<<<<< HEAD
                 {/* ── Payment Currency Selector (from file 3) ─────────────── */}
                 <div className="space-y-4 pt-4 border-t">
                   <Label className="flex items-center gap-2">
@@ -855,6 +947,13 @@ export default function PaymentPage() {
                     <span className="text-red-500 mt-0.5">⚠️</span>
                     <p className="text-sm text-red-600">{error}</p>
                   </div>
+=======
+                {/* ← ADDED: Error message */}
+                {error && (
+                    <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                        <p className="text-sm text-red-600">{error}</p>
+                    </div>
+>>>>>>> 67f615c2cdf5c72026d88ebd749c69770b8ebb82
                 )}
               </CardContent>
               <CardFooter className="bg-gray-50 px-6 py-4 rounded-b-xl flex items-center justify-center text-sm text-gray-500 gap-2">
@@ -863,14 +962,18 @@ export default function PaymentPage() {
             </Card>
           </div>
 
-          {/* RIGHT COLUMN: ORDER SUMMARY */}
+          {/* RIGHT COLUMN: ORDER SUMMARY — UNCHANGED */}
           <div className="lg:col-span-1">
             <Card className="sticky top-8 shadow-lg border-t-4 border-t-red-600 flex flex-col overflow-hidden">
                 <CardHeader>
+<<<<<<< HEAD
                     <CardTitle className="flex justify-between items-center text-lg">
                         Order Summary
                         {displayData.isCustom && <Layers className="w-4 h-4 text-gray-400" />}
                     </CardTitle>
+=======
+                    <CardTitle>Order Summary</CardTitle>
+>>>>>>> 67f615c2cdf5c72026d88ebd749c69770b8ebb82
                 </CardHeader>
                 <CardContent className="space-y-6 flex-1 overflow-y-auto max-h-[calc(100vh-250px)] pb-4">
                     <div className="space-y-2 pb-4 border-b text-sm">
@@ -898,6 +1001,7 @@ export default function PaymentPage() {
                         </div>
                     </div>
 
+<<<<<<< HEAD
                     {/* === CHOSEN TRIPS / ITINERARY === */}
                     {displayData.isCustom && displayData.details.length > 0 && (
                         <div>
@@ -989,6 +1093,11 @@ export default function PaymentPage() {
                             <span>Total Due Now:</span>
                             <span>{convertAmount(amountToPay)}</span>
                         </div>
+=======
+                    <div className="flex justify-between items-center text-xl font-bold text-gray-900">
+                        <span>Total:</span>
+                        <span>¥{parseInt(price).toLocaleString()}</span>
+>>>>>>> 67f615c2cdf5c72026d88ebd749c69770b8ebb82
                     </div>
 
                     <Button 
@@ -1016,6 +1125,7 @@ export default function PaymentPage() {
           </div>
         </div>
       </div>
+<<<<<<< HEAD
 
       {/* --- WAIVER MODAL --- */}
       <Dialog open={showWaiver} onOpenChange={setShowWaiver}>
@@ -1087,6 +1197,8 @@ export default function PaymentPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+=======
+>>>>>>> 67f615c2cdf5c72026d88ebd749c69770b8ebb82
     </div>
   );
 }
