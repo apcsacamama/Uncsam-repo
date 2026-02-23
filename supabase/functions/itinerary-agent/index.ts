@@ -73,17 +73,18 @@ Deno.serve(async (req) => {
 
     // SMART ITINERARY AGENT
     if (action === "generate-itinerary" || action === "chat-revision") {
-      // Notice we are pulling tourNames now!
-      const { tourNames, days, userPrompt, currentItinerary, startDate } = payload;
+      // FIX: Added 'destinations' back into the payload extraction!
+      const { destinations, tourNames, days, userPrompt, currentItinerary, startDate } = payload;
       
       const prompt = `
         You are the expert consultant for Unclesam Tours.
         CONTEXT:
+        - Target Cities/Destinations: ${destinations?.join(", ") || "Japan"}
         - Trip Details: ${days} days starting on ${startDate || "2026-02-18"}.
         - Booked Tours: ${tourNames?.join(" | ")}
-        - STRICT DAY COUNT RULE: You MUST generate EXACTLY ${days} separate day objects in the array. Map one booked tour to each day. DO NOT put all activities on Day 1.
+        - STRICT DAY COUNT RULE: You MUST generate EXACTLY ${days} separate day objects in the "itinerary" array. Map one booked tour to each day chronologically.
         - STRICT TRANSPORT RULE: Unclesam Tours provides PRIVATE DRIVERS. NEVER suggest trains, subways, or buses. ALWAYS "Private Driver transfer".
-        - LOCATION RULE: You MUST suggest REAL, verified, and accurate places, restaurants, and attractions in Japan.
+        - LOCATION RULE: You MUST suggest REAL, verified, and accurate places, restaurants, and attractions SPECIFICALLY in the Target Cities (${destinations?.join(", ")}).
         - Current Plan: ${JSON.stringify(currentItinerary)}
         - User Input: "${userPrompt}"
 
@@ -97,8 +98,11 @@ Deno.serve(async (req) => {
         { "type": "update", "message": "Brief confirmation.", "itinerary": [ ...Full Array of Day Objects... ] }
 
         ITINERARY FORMAT RULE:
-        "itinerary" must be an array of EXACTLY ${days} objects formatted like this:
-        { "day": 1, "tourName": "Name of the Specific Tour", "date": "...", "items": [{ "time": "09:00", "activity": "...", "location": "..." }] }
+        "itinerary" MUST be an array of EXACTLY ${days} day objects formatted like this exact example:
+        [
+          { "day": 1, "tourName": "First Tour Listed", "date": "2026-02-18", "items": [{ "time": "09:00", "activity": "...", "location": "..." }] },
+          { "day": 2, "tourName": "Second Tour Listed", "date": "2026-02-19", "items": [{ "time": "09:00", "activity": "...", "location": "..." }] }
+        ]
         NO MARKDOWN. RAW JSON ONLY.
       `;
 

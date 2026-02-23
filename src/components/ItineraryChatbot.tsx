@@ -61,15 +61,26 @@ export default function ItineraryChatbot({ selectedDestinations, customItinerary
     const previousPlan = JSON.parse(JSON.stringify(currentItinerary));
 
     try {
-        // Extract the actual names of the tours booked
+        // FIX: Extract both the Tour Names AND the Destinations so the AI knows where to look!
         const tourNamesList = customItinerary && customItinerary.length > 0 
             ? customItinerary.map((d: any) => d.title || d.name || d.location || "Custom Tour") 
+            : selectedDestinations;
+            
+        const destinationsList = customItinerary && customItinerary.length > 0 
+            ? customItinerary.map((d: any) => d.location || "Japan") 
             : selectedDestinations;
 
         const { data: rawAiData, error } = await supabase.functions.invoke('itinerary-agent', {
             body: { 
                 action: isRevision ? 'chat-revision' : 'generate-itinerary',
-                payload: { tourNames: tourNamesList, days: totalDays, userPrompt: customInstruction, currentItinerary: isRevision ? currentItinerary : null, startDate: travelDate }
+                payload: { 
+                    destinations: destinationsList, // Wired back in!
+                    tourNames: tourNamesList, 
+                    days: totalDays, 
+                    userPrompt: customInstruction, 
+                    currentItinerary: isRevision ? currentItinerary : null, 
+                    startDate: travelDate 
+                }
             }
         });
 
