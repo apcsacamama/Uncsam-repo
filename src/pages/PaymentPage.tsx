@@ -10,6 +10,13 @@ import {
   CardDescription,
   CardFooter
 } from "../components/ui/card";
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogHeader, 
+  DialogTitle, 
+  DialogFooter 
+} from "../components/ui/dialog"; 
 import { RadioGroup, RadioGroupItem } from "../components/ui/radio-group";
 import { 
   CreditCard, 
@@ -23,7 +30,6 @@ import {
   Lock, 
   ArrowRight,
   Loader2,
-<<<<<<< HEAD
   Layers,
   Plane,
   Banknote,
@@ -32,9 +38,6 @@ import {
   Building2,
   Wallet,
   X
-=======
-  Building2  // ← ADDED for Bank Transfer icon
->>>>>>> 67f615c2cdf5c72026d88ebd749c69770b8ebb82
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -55,7 +58,6 @@ const CURRENCIES = [
   { value: "USD", label: "USD – US Dollar", symbol: "$" },
 ];
 
-// Get currency symbol for display
 function getCurrencySymbol(currency: string) {
   return CURRENCIES.find(c => c.value === currency)?.symbol ?? "₱";
 }
@@ -80,8 +82,7 @@ export default function PaymentPage() {
   const [allDestinations, setAllDestinations] = useState<any[]>(DEFAULT_DESTINATIONS);
   const [dbDate, setDbDate] = useState<string | null>(null);
   const [paymentOption, setPaymentOption] = useState<'full' | 'downpayment'>('full');
-  
-<<<<<<< HEAD
+
   // Waiver State
   const [showWaiver, setShowWaiver] = useState(false);
   const [waiverAgreed, setWaiverAgreed] = useState(false);
@@ -105,16 +106,6 @@ export default function PaymentPage() {
   });
   const [pricesLoaded, setPricesLoaded] = useState(false);
 
-=======
-  // ← ADDED: booking details for PayMongo
-  const bookingId = searchParams.get("bookingId") || crypto.randomUUID();
-  const tourName = searchParams.get("tourName") || location;
-
-  // State for form
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState("card"); // ← kept your original default
-  const [error, setError] = useState(""); // ← ADDED for PayMongo error handling
->>>>>>> 67f615c2cdf5c72026d88ebd749c69770b8ebb82
   const [formData, setFormData] = useState({
     firstName: "", lastName: "", email: "", phone: "",
     cardName: "", cardNumber: "", expiry: "", cvc: ""
@@ -123,23 +114,23 @@ export default function PaymentPage() {
   const [displayData, setDisplayData] = useState({
     title: "Tour Package",
     date: "",
-    travelersLabel: "1", 
+    travelersLabel: "1",
     price: 0,
     location: "",
-    details: [] as any[], 
+    details: [] as any[],
     isCustom: false
   });
 
   // --- 3. FETCH DESTINATIONS ---
   useEffect(() => {
     const fetchDestinations = async () => {
-        const { data } = await supabase.from('tour_destinations').select('*');
-        if (data && data.length > 0) {
-            setAllDestinations(prev => {
-              const newDests = data.filter(d => !prev.some(p => p.id === d.id));
-              return [...prev, ...newDests];
-            });
-        }
+      const { data } = await supabase.from('tour_destinations').select('*');
+      if (data && data.length > 0) {
+        setAllDestinations(prev => {
+          const newDests = data.filter(d => !prev.some(p => p.id === d.id));
+          return [...prev, ...newDests];
+        });
+      }
     };
     fetchDestinations();
   }, []);
@@ -182,13 +173,8 @@ export default function PaymentPage() {
         const phpRate = phpBase / jpyBase;
         console.log("💱 [Currency] Rates derived — USD/JPY:", usdRate.toFixed(6), "PHP/JPY:", phpRate.toFixed(6));
         setRates({ usd: usdRate, php: phpRate });
-
-        // Also populate prices for PayMongo
-        setPrices({
-          JPY: jpyBase,
-          USD: usdBase,
-          PHP: phpBase,
-        });
+        // ✅ Do NOT overwrite prices here — rates are only used for conversion.
+        // prices.PHP/USD are computed dynamically from the actual JPY total × rate.
         setPricesLoaded(true);
       }
     };
@@ -201,36 +187,31 @@ export default function PaymentPage() {
       try {
         const cart = JSON.parse(decodeURIComponent(cartDataRaw));
         const total = parseInt(totalPriceParam || "0");
-        
+
         let travelersDisplay = "1";
         if (cart.length > 0) {
-            const counts = cart.map((item: any) => item.travelers);
-            const min = Math.min(...counts);
-            const max = Math.max(...counts);
-            travelersDisplay = min === max ? min.toString() : `${min} - ${max}`;
+          const counts = cart.map((item: any) => item.travelers);
+          const min = Math.min(...counts);
+          const max = Math.max(...counts);
+          travelersDisplay = min === max ? min.toString() : `${min} - ${max}`;
         }
-        
+
         let dateStr = "Multiple Dates";
-        let validStartDate = new Date().toISOString(); 
+        let validStartDate = new Date().toISOString();
 
         if (cart.length > 0) {
-            const uniqueDates = Array.from(new Set(cart.map((i: any) => format(new Date(i.date), "MMM dd, yyyy"))));
-            dateStr = uniqueDates.join(" | ");
-
-            const sortedDates = cart
-              .map((item: any) => new Date(item.date))
-              .sort((a: Date, b: Date) => a.getTime() - b.getTime());
-            
-            if (sortedDates.length > 0) {
-                validStartDate = sortedDates[0].toISOString();
-            }
+          const uniqueDates = Array.from(new Set(cart.map((i: any) => format(new Date(i.date), "MMM dd, yyyy"))));
+          dateStr = uniqueDates.join(" | ");
+          const sortedDates = cart
+            .map((item: any) => new Date(item.date))
+            .sort((a: Date, b: Date) => a.getTime() - b.getTime());
+          if (sortedDates.length > 0) {
+            validStartDate = sortedDates[0].toISOString();
+          }
         }
-        
+
         setDbDate(validStartDate);
-
-        // Sync prices state with cart total for PayMongo
         setPrices(prev => ({ ...prev, JPY: total }));
-
         setDisplayData({
           title: `Custom Itinerary (${cart.length} Days)`,
           date: dateStr,
@@ -265,25 +246,24 @@ export default function PaymentPage() {
     let formattedValue = value;
 
     if (name === "cardNumber") {
-        const raw = value.replace(/\D/g, "");
-        const truncated = raw.slice(0, 16);
-        formattedValue = truncated.replace(/(\d{4})(?=\d)/g, "$1 ");
+      const raw = value.replace(/\D/g, "");
+      const truncated = raw.slice(0, 16);
+      formattedValue = truncated.replace(/(\d{4})(?=\d)/g, "$1 ");
     } else if (name === "expiry") {
-        const raw = value.replace(/\D/g, "");
-        const truncated = raw.slice(0, 4);
-        if (truncated.length >= 3) {
-            formattedValue = `${truncated.slice(0, 2)}/${truncated.slice(2)}`;
-        } else {
-            formattedValue = truncated;
-        }
+      const raw = value.replace(/\D/g, "");
+      const truncated = raw.slice(0, 4);
+      if (truncated.length >= 3) {
+        formattedValue = `${truncated.slice(0, 2)}/${truncated.slice(2)}`;
+      } else {
+        formattedValue = truncated;
+      }
     } else if (name === "cvc") {
-        formattedValue = value.replace(/\D/g, "").slice(0, 4);
+      formattedValue = value.replace(/\D/g, "").slice(0, 4);
     }
 
     setFormData(prev => ({ ...prev, [name]: formattedValue }));
   };
 
-<<<<<<< HEAD
   // --- CALCULATE TOTALS ---
   const tripCount = displayData.isCustom && displayData.details.length > 0 ? displayData.details.length : 1;
   const totalDownPayment = tripCount * DOWN_PAYMENT_AMOUNT_JPY;
@@ -302,29 +282,25 @@ export default function PaymentPage() {
     return `¥${amountJPY.toLocaleString()}`;
   };
 
-  // ── Helper to get the actual PayMongo charge amount + currency ────────────
+  // --- PAYMONGO CHARGE HELPER ---
+  // Always derive PHP/USD from the actual JPY total × exchange rate
   const getPaymongoCharge = (): { amount: number; currency: string } => {
     const targetCurrency = currency === "JPY" ? "PHP" : currency;
-    const baseAmount = targetCurrency === "USD" ? prices.USD : prices.PHP;
-    const finalAmount = paymentOption === 'downpayment' ? baseAmount / 2 : baseAmount;
-    return { amount: finalAmount, currency: targetCurrency };
+    const jpyAmount = paymentOption === 'downpayment' ? totalDownPayment : totalAmount;
+    let convertedAmount: number;
+    if (targetCurrency === "USD" && rates?.usd) {
+      convertedAmount = Math.round(jpyAmount * rates.usd * 100) / 100;
+    } else {
+      convertedAmount = rates?.php ? Math.round(jpyAmount * rates.php * 100) / 100 : jpyAmount;
+    }
+    console.log(`💳 [Charge] ¥${jpyAmount} → ${targetCurrency} ${convertedAmount}`);
+    return { amount: convertedAmount, currency: targetCurrency };
   };
 
-  // ── PayMongo QRPh handler ─────────────────────────────────────────────────
+  // --- PAYMONGO QRPh HANDLER ---
   const handleQRPh = async () => {
     setIsProcessing(true);
     setError("");
-=======
-  // ← ADDED: PayMongo bank transfer handler
- const handlePayMongoBankTransfer = async () => {
-    setIsProcessing(true);
-    setError("");
-    
-    console.log("1. Starting PayMongo payment...");
-    console.log("2. Payment method selected:", paymentMethod);
-    console.log("3. Amount:", parseInt(price));
-    console.log("4. Supabase URL:", import.meta.env.VITE_SUPABASE_URL);
->>>>>>> 67f615c2cdf5c72026d88ebd749c69770b8ebb82
 
     try {
       const response = await fetch(
@@ -336,8 +312,7 @@ export default function PaymentPage() {
             "Authorization": `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
           },
           body: JSON.stringify({
-<<<<<<< HEAD
-            amount: paymentOption === "downpayment" ? prices.PHP / 2 : prices.PHP,
+            amount: Math.round((paymentOption === "downpayment" ? totalDownPayment : totalAmount) * (rates?.php ?? 1) * 100) / 100,
             currency: "PHP",
             paymentType: "qrph",
             customerName: `${formData.firstName} ${formData.lastName}`,
@@ -346,26 +321,15 @@ export default function PaymentPage() {
             bookingId,
             tourName,
             travelDate: dbDate || dateParam,
-=======
-            amount: parseInt(price),
-            customerName: `${formData.firstName} ${formData.lastName}`,
-            customerEmail: formData.email,
-            customerPhone: formData.phone,
-            bookingId: bookingId,
-            tourName: tourName,
-            travelDate: date,
->>>>>>> 67f615c2cdf5c72026d88ebd749c69770b8ebb82
             withTransfer: false
           })
         }
       );
 
-<<<<<<< HEAD
       const data = await response.json();
       console.log("PayMongo QRPh response:", data);
 
       if (!response.ok) {
-        console.error("PayMongo API error response:", data);
         setError(
           data?.error?.errors?.[0]?.detail ??
           data?.error?.message ??
@@ -375,11 +339,7 @@ export default function PaymentPage() {
         return;
       }
 
-      console.log("Full PayMongo response:", JSON.stringify(data, null, 2));
-      console.log("QR Code from response:", data.qr_code);
-
       if (data.qr_code) {
-        console.log("Setting QR code URL with:", data.qr_code);
         setQrCodeUrl(
           `https://api.qrserver.com/v1/create-qr-code/?size=224x224&data=${encodeURIComponent(data.qr_code)}`
         );
@@ -388,7 +348,6 @@ export default function PaymentPage() {
       }
 
       if (data.status === "awaiting_next_action" && data.payment_intent_id) {
-        console.log("Fallback: Using payment_intent_id for QR code");
         setQrCodeUrl(
           `https://api.qrserver.com/v1/create-qr-code/?size=224x224&data=${encodeURIComponent(
             `PAYMONGO_TEST:${data.payment_intent_id}`
@@ -398,22 +357,17 @@ export default function PaymentPage() {
         return;
       }
 
-      console.error("No QR code returned. Response data:", data);
       setError("No QR code returned. Please try again.");
       setIsProcessing(false);
 
     } catch (err) {
       console.error("QRPh error:", err);
-      console.error("Error details:", {
-        message: err instanceof Error ? err.message : String(err),
-        type: err instanceof Error ? err.name : typeof err
-      });
       setError("Something went wrong. Please check your connection and try again.");
       setIsProcessing(false);
     }
   };
 
-  // ── PayMongo Card handler ─────────────────────────────────────────────────
+  // --- PAYMONGO CARD HANDLER ---
   const handleCard = async () => {
     setIsProcessing(true);
     setError("");
@@ -515,7 +469,7 @@ export default function PaymentPage() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setWaiverAgreed(false);
-    setShowWaiver(true); 
+    setShowWaiver(true);
   };
 
   const handleFinalConfirmAndPay = async () => {
@@ -528,34 +482,6 @@ export default function PaymentPage() {
 
     if (paymentMethod === "card") {
       await handleCard();
-=======
-      console.log("5. Response status:", response.status);
-      const data = await response.json();
-      console.log("6. Response data:", data);
-
-      const checkoutUrl = data?.data?.attributes?.redirect?.checkout_url;
-      console.log("7. Checkout URL:", checkoutUrl);
-      
-      if (checkoutUrl) {
-        window.location.href = checkoutUrl;
-      } else {
-        setError("Failed to generate payment QR. Please try again.");
-        setIsProcessing(false);
-      }
-    } catch (err) {
-      console.log("8. Error caught:", err);
-      setError("Something went wrong. Please try again.");
-      setIsProcessing(false);
-    }
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    // ← ADDED: route to PayMongo if bank transfer selected
-    if (paymentMethod === "qrph") {
-      await handlePayMongoBankTransfer();
->>>>>>> 67f615c2cdf5c72026d88ebd749c69770b8ebb82
       return;
     }
 
@@ -563,7 +489,7 @@ export default function PaymentPage() {
 
     try {
       const { data: { user }, error: authError } = await supabase.auth.getUser();
-      
+
       if (authError || !user) {
         alert("Session expired. Please sign in again.");
         navigate("/signin");
@@ -571,14 +497,14 @@ export default function PaymentPage() {
       }
 
       const bookingPayload = {
-          user_id: user.id,
-          itinerary_id: isCustom ? null : (searchParams.get("packageId") || null), 
-          pax_count: parseInt(displayData.travelersLabel) || 1,
-          total_price: displayData.price, 
-          status: "Paid", 
-          travel_date: dbDate,
-          created_by: formData.email,
-          updated_by: formData.email
+        user_id: user.id,
+        itinerary_id: isCustom ? null : (searchParams.get("packageId") || null),
+        pax_count: parseInt(displayData.travelersLabel) || 1,
+        total_price: displayData.price,
+        status: "Paid",
+        travel_date: dbDate,
+        created_by: formData.email,
+        updated_by: formData.email
       };
 
       const { data, error } = await supabase
@@ -591,7 +517,7 @@ export default function PaymentPage() {
       const queryParams = new URLSearchParams({
         bookingId: data[0].booking_id,
         price: displayData.price.toString(),
-        date: displayData.date, 
+        date: displayData.date,
         travelers: displayData.travelersLabel,
         location: displayData.location,
         custom: isCustom ? "true" : "false",
@@ -616,8 +542,8 @@ export default function PaymentPage() {
   };
 
   const getDestName = (id: string) => {
-      const found = allDestinations.find(d => d.id === id);
-      return found ? found.name : id; 
+    const found = allDestinations.find(d => d.id === id);
+    return found ? found.name : id;
   };
 
   return (
@@ -658,7 +584,7 @@ export default function PaymentPage() {
             </div>
 
             <p className="text-lg font-bold text-gray-900 mt-4">
-              ₱{(paymentOption === "downpayment" ? prices.PHP / 2 : prices.PHP).toLocaleString()}
+              ₱{(Math.round((paymentOption === "downpayment" ? totalDownPayment : totalAmount) * (rates?.php ?? 1) * 100) / 100).toLocaleString()}
             </p>
             <p className="text-xs text-gray-400">For: {tourName} · {displayData.date}</p>
 
@@ -689,108 +615,107 @@ export default function PaymentPage() {
       <div className="max-w-6xl mx-auto px-4 py-12">
         {/* Breadcrumbs */}
         <div className="flex items-center gap-2 mb-8 text-sm text-gray-500">
-            <span>Select Tour</span>
-            <span>→</span>
-            <span className="font-semibold text-red-600">Details & Payment</span>
-            <span>→</span>
-            <span>Confirmation</span>
+          <span>Select Tour</span>
+          <span>→</span>
+          <span className="font-semibold text-red-600">Details & Payment</span>
+          <span>→</span>
+          <span>Confirmation</span>
         </div>
 
         <h1 className="text-3xl font-bold text-gray-900 mb-8">Secure Checkout</h1>
 
         <div className="grid lg:grid-cols-3 gap-8">
-          
+
           {/* LEFT COLUMN: FORMS */}
           <div className="lg:col-span-2 space-y-8">
-            
+
             {/* 1. CONTACT INFORMATION */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                    <User className="w-5 h-5 text-blue-600" /> Contact Information
+                  <User className="w-5 h-5 text-blue-600" /> Contact Information
                 </CardTitle>
                 <CardDescription>We'll use this to send your tickets and updates.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                        <Label htmlFor="firstName">First Name</Label>
-                        <Input id="firstName" name="firstName" placeholder="e.g. Taro" required value={formData.firstName} onChange={handleInputChange} />
-                    </div>
-                    <div className="space-y-2">
-                        <Label htmlFor="lastName">Last Name</Label>
-                        <Input id="lastName" name="lastName" placeholder="e.g. Yamada" required value={formData.lastName} onChange={handleInputChange} />
-                    </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="firstName">First Name</Label>
+                    <Input id="firstName" name="firstName" placeholder="e.g. Taro" required value={formData.firstName} onChange={handleInputChange} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="lastName">Last Name</Label>
+                    <Input id="lastName" name="lastName" placeholder="e.g. Yamada" required value={formData.lastName} onChange={handleInputChange} />
+                  </div>
                 </div>
                 <div className="grid md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                        <Label htmlFor="email">Email Address</Label>
-                        <div className="relative">
-                            <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                            <Input id="email" name="email" type="email" placeholder="name@example.com" className="pl-9" required value={formData.email} onChange={handleInputChange} />
-                        </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="email">Email Address</Label>
+                    <div className="relative">
+                      <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                      <Input id="email" name="email" type="email" placeholder="name@example.com" className="pl-9" required value={formData.email} onChange={handleInputChange} />
                     </div>
-                    <div className="space-y-2">
-                        <Label htmlFor="phone">Phone Number</Label>
-                        <div className="relative">
-                            <Phone className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                            <Input id="phone" name="phone" type="tel" placeholder="+81 90 1234 5678" className="pl-9" required value={formData.phone} onChange={handleInputChange} />
-                        </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="phone">Phone Number</Label>
+                    <div className="relative">
+                      <Phone className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                      <Input id="phone" name="phone" type="tel" placeholder="+81 90 1234 5678" className="pl-9" required value={formData.phone} onChange={handleInputChange} />
                     </div>
+                  </div>
                 </div>
               </CardContent>
             </Card>
 
             {/* 2. PAYMENT OPTIONS */}
             <Card className="border-l-4 border-l-blue-600">
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                        <Banknote className="w-5 h-5 text-blue-600" /> Payment Options
-                    </CardTitle>
-                    <CardDescription>Choose how you would like to pay today.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <RadioGroup defaultValue="full" onValueChange={(v) => setPaymentOption(v as 'full' | 'downpayment')} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <RadioGroupItem value="full" id="opt-full" className="peer sr-only" />
-                            <Label htmlFor="opt-full" className="flex flex-col justify-between h-full rounded-md border-2 border-muted bg-white p-4 hover:bg-gray-50 peer-data-[state=checked]:border-blue-600 peer-data-[state=checked]:bg-blue-50 cursor-pointer">
-                                <div className="font-bold text-gray-900 mb-1">Full Payment</div>
-                                <div className="text-sm text-gray-500 mb-2">Pay the entire amount now.</div>
-                                <div className="text-lg font-bold text-blue-700">¥{totalAmount.toLocaleString()}</div>
-                            </Label>
-                        </div>
-                        <div>
-                            <RadioGroupItem value="downpayment" id="opt-down" className="peer sr-only" />
-                            <Label htmlFor="opt-down" className="flex flex-col justify-between h-full rounded-md border-2 border-muted bg-white p-4 hover:bg-gray-50 peer-data-[state=checked]:border-blue-600 peer-data-[state=checked]:bg-blue-50 cursor-pointer">
-                                <div className="flex justify-between">
-                                    <div className="font-bold text-gray-900 mb-1">Down Payment</div>
-                                    <div className="bg-green-100 text-green-700 text-[10px] font-bold px-2 py-0.5 rounded h-fit">INSTALLMENT</div>
-                                </div>
-                                <div className="text-sm text-gray-500 mb-2">Reserve now, pay the rest later.</div>
-                                <div className="flex items-baseline gap-2">
-                                    <div className="text-lg font-bold text-blue-700">¥{totalDownPayment.toLocaleString()}</div>
-                                    {tripCount > 1 && (
-                                        <div className="text-xs text-gray-400 font-medium">
-                                            (¥{DOWN_PAYMENT_AMOUNT_JPY.toLocaleString()} × {tripCount} trips)
-                                        </div>
-                                    )}
-                                </div>
-                            </Label>
-                        </div>
-                    </RadioGroup>
-                </CardContent>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Banknote className="w-5 h-5 text-blue-600" /> Payment Options
+                </CardTitle>
+                <CardDescription>Choose how you would like to pay today.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <RadioGroup defaultValue="full" onValueChange={(v) => setPaymentOption(v as 'full' | 'downpayment')} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <RadioGroupItem value="full" id="opt-full" className="peer sr-only" />
+                    <Label htmlFor="opt-full" className="flex flex-col justify-between h-full rounded-md border-2 border-muted bg-white p-4 hover:bg-gray-50 peer-data-[state=checked]:border-blue-600 peer-data-[state=checked]:bg-blue-50 cursor-pointer">
+                      <div className="font-bold text-gray-900 mb-1">Full Payment</div>
+                      <div className="text-sm text-gray-500 mb-2">Pay the entire amount now.</div>
+                      <div className="text-lg font-bold text-blue-700">¥{totalAmount.toLocaleString()}</div>
+                    </Label>
+                  </div>
+                  <div>
+                    <RadioGroupItem value="downpayment" id="opt-down" className="peer sr-only" />
+                    <Label htmlFor="opt-down" className="flex flex-col justify-between h-full rounded-md border-2 border-muted bg-white p-4 hover:bg-gray-50 peer-data-[state=checked]:border-blue-600 peer-data-[state=checked]:bg-blue-50 cursor-pointer">
+                      <div className="flex justify-between">
+                        <div className="font-bold text-gray-900 mb-1">Down Payment</div>
+                        <div className="bg-green-100 text-green-700 text-[10px] font-bold px-2 py-0.5 rounded h-fit">INSTALLMENT</div>
+                      </div>
+                      <div className="text-sm text-gray-500 mb-2">Reserve now, pay the rest later.</div>
+                      <div className="flex items-baseline gap-2">
+                        <div className="text-lg font-bold text-blue-700">¥{totalDownPayment.toLocaleString()}</div>
+                        {tripCount > 1 && (
+                          <div className="text-xs text-gray-400 font-medium">
+                            (¥{DOWN_PAYMENT_AMOUNT_JPY.toLocaleString()} × {tripCount} trips)
+                          </div>
+                        )}
+                      </div>
+                    </Label>
+                  </div>
+                </RadioGroup>
+              </CardContent>
             </Card>
 
-            {/* 3. PAYMENT METHOD CARD */}
+            {/* 3. PAYMENT METHOD */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                    <CreditCard className="w-5 h-5 text-blue-600" /> Payment Method
+                  <CreditCard className="w-5 h-5 text-blue-600" /> Payment Method
                 </CardTitle>
                 <CardDescription>All transactions are secure and encrypted.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
-<<<<<<< HEAD
                 <RadioGroup
                   defaultValue="card"
                   onValueChange={(val) => {
@@ -799,50 +724,30 @@ export default function PaymentPage() {
                   }}
                   className="grid grid-cols-1 md:grid-cols-3 gap-4"
                 >
-                    <div>
-                        <RadioGroupItem value="qrph" id="qrph" className="peer sr-only" />
-                        <Label
-                          htmlFor="qrph"
-                          className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-green-600 peer-data-[state=checked]:text-green-600 cursor-pointer"
-                        >
-                          <Building2 className="mb-3 h-6 w-6" />
-                          Bank Transfer
-                        </Label>
-                    </div>
-=======
-                <RadioGroup defaultValue="card" onValueChange={setPaymentMethod} className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    
-                    {/* ← ADDED: QRPh Bank Transfer option */}
-                    <div>
-                        <RadioGroupItem value="qrph" id="qrph" className="peer sr-only" />
-                        <Label
-                            htmlFor="qrph"
-                            className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-green-600 peer-data-[state=checked]:text-green-600 cursor-pointer"
-                        >
-                            <Building2 className="mb-3 h-6 w-6" />
-                            Bank Transfer
-                        </Label>
-                    </div>
-
-                    {/* ← UNCHANGED: Card option */}
->>>>>>> 67f615c2cdf5c72026d88ebd749c69770b8ebb82
-                    <div>
-                        <RadioGroupItem value="card" id="card" className="peer sr-only" />
-                        <Label htmlFor="card" className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-red-600 peer-data-[state=checked]:text-red-600 cursor-pointer">
-                            <CreditCard className="mb-3 h-6 w-6" /> Card
-                        </Label>
-                    </div>
-
-                    {/* ← UNCHANGED: PayPal option */}
-                    <div>
-                        <RadioGroupItem value="paypal" id="paypal" className="peer sr-only" />
-                        <Label htmlFor="paypal" className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-blue-600 peer-data-[state=checked]:text-blue-600 cursor-pointer">
-                            <span className="mb-3 text-xl font-bold italic">PP</span> PayPal
-                        </Label>
-                    </div>
+                  <div>
+                    <RadioGroupItem value="qrph" id="qrph" className="peer sr-only" />
+                    <Label
+                      htmlFor="qrph"
+                      className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-green-600 peer-data-[state=checked]:text-green-600 cursor-pointer"
+                    >
+                      <Building2 className="mb-3 h-6 w-6" />
+                      Bank Transfer
+                    </Label>
+                  </div>
+                  <div>
+                    <RadioGroupItem value="card" id="card" className="peer sr-only" />
+                    <Label htmlFor="card" className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-red-600 peer-data-[state=checked]:text-red-600 cursor-pointer">
+                      <CreditCard className="mb-3 h-6 w-6" /> Card
+                    </Label>
+                  </div>
+                  <div>
+                    <RadioGroupItem value="paypal" id="paypal" className="peer sr-only" />
+                    <Label htmlFor="paypal" className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-blue-600 peer-data-[state=checked]:text-blue-600 cursor-pointer">
+                      <span className="mb-3 text-xl font-bold italic">PP</span> PayPal
+                    </Label>
+                  </div>
                 </RadioGroup>
 
-<<<<<<< HEAD
                 {paymentMethod === "qrph" && (
                   <div className="pt-4 border-t bg-green-50 rounded-lg p-4">
                     <p className="text-sm text-green-800 font-medium">🏦 Bank Transfer via QRPh</p>
@@ -852,68 +757,56 @@ export default function PaymentPage() {
                   </div>
                 )}
 
-=======
-                {/* ← ADDED: QRPh info box */}
-                {paymentMethod === "qrph" && (
-                    <div className="pt-4 border-t bg-green-50 rounded-lg p-4">
-                        <p className="text-sm text-green-800 font-medium">🏦 Bank Transfer via QRPh</p>
-                        <p className="text-sm text-green-700 mt-1">You'll be redirected to scan a QR code using your banking app (BDO, BPI, UnionBank, etc.) after clicking Pay.</p>
-                    </div>
-                )}
-
-                {/* ← UNCHANGED: Card fields */}
->>>>>>> 67f615c2cdf5c72026d88ebd749c69770b8ebb82
                 {paymentMethod === "card" && (
-                    <div className="space-y-4 pt-4 border-t">
-                        <div className="space-y-2">
-                            <Label>Name on Card</Label>
-                            <Input name="cardName" placeholder="Name as it appears on card" value={formData.cardName} onChange={handleInputChange} />
-                        </div>
-                        <div className="space-y-2">
-                            <Label>Card Number</Label>
-                            <Input 
-                                name="cardNumber" 
-                                placeholder="0000 0000 0000 0000" 
-                                value={formData.cardNumber} 
-                                onChange={handleInputChange} 
-                                maxLength={19} 
-                                inputMode="numeric"
-                            />
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                                <Label>Expiry Date</Label>
-                                <Input 
-                                    name="expiry" 
-                                    placeholder="MM/YY" 
-                                    value={formData.expiry} 
-                                    onChange={handleInputChange}
-                                    maxLength={5}
-                                    inputMode="numeric"
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <Label>CVC</Label>
-                                <Input 
-                                    name="cvc" 
-                                    placeholder="123" 
-                                    maxLength={4} 
-                                    value={formData.cvc} 
-                                    onChange={handleInputChange} 
-                                    inputMode="numeric"
-                                />
-                            </div>
-                        </div>
-                        <div className="bg-blue-50 border border-blue-100 rounded-lg p-3">
-                          <p className="text-xs text-blue-700">
-                            🔒 Your card may require 3D Secure verification. If so, you'll be redirected to your bank's page to confirm the payment, then brought back here automatically.
-                          </p>
-                        </div>
+                  <div className="space-y-4 pt-4 border-t">
+                    <div className="space-y-2">
+                      <Label>Name on Card</Label>
+                      <Input name="cardName" placeholder="Name as it appears on card" value={formData.cardName} onChange={handleInputChange} />
                     </div>
+                    <div className="space-y-2">
+                      <Label>Card Number</Label>
+                      <Input
+                        name="cardNumber"
+                        placeholder="0000 0000 0000 0000"
+                        value={formData.cardNumber}
+                        onChange={handleInputChange}
+                        maxLength={19}
+                        inputMode="numeric"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>Expiry Date</Label>
+                        <Input
+                          name="expiry"
+                          placeholder="MM/YY"
+                          value={formData.expiry}
+                          onChange={handleInputChange}
+                          maxLength={5}
+                          inputMode="numeric"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>CVC</Label>
+                        <Input
+                          name="cvc"
+                          placeholder="123"
+                          maxLength={4}
+                          value={formData.cvc}
+                          onChange={handleInputChange}
+                          inputMode="numeric"
+                        />
+                      </div>
+                    </div>
+                    <div className="bg-blue-50 border border-blue-100 rounded-lg p-3">
+                      <p className="text-xs text-blue-700">
+                        🔒 Your card may require 3D Secure verification. If so, you'll be redirected to your bank's page to confirm the payment, then brought back here automatically.
+                      </p>
+                    </div>
+                  </div>
                 )}
 
-<<<<<<< HEAD
-                {/* ── Payment Currency Selector (from file 3) ─────────────── */}
+                {/* Payment Currency Selector */}
                 <div className="space-y-4 pt-4 border-t">
                   <Label className="flex items-center gap-2">
                     <Wallet className="w-4 h-4 text-gray-500" />
@@ -937,7 +830,7 @@ export default function PaymentPage() {
                   </div>
                   {currency === "JPY" && (
                     <p className="text-xs text-blue-600 bg-blue-50 rounded-lg px-3 py-2 mt-1">
-                      💡 JPY cards are accepted. You will be charged ₱{(paymentOption === "downpayment" ? prices.PHP / 2 : prices.PHP).toLocaleString()} — your issuing bank will convert and show the amount in Japanese Yen on your statement.
+                      💡 JPY cards are accepted. You will be charged ₱{(Math.round((paymentOption === "downpayment" ? totalDownPayment : totalAmount) * (rates?.php ?? 1) * 100) / 100).toLocaleString()} — your issuing bank will convert and show the amount in Japanese Yen on your statement.
                     </p>
                   )}
                 </div>
@@ -947,13 +840,6 @@ export default function PaymentPage() {
                     <span className="text-red-500 mt-0.5">⚠️</span>
                     <p className="text-sm text-red-600">{error}</p>
                   </div>
-=======
-                {/* ← ADDED: Error message */}
-                {error && (
-                    <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-                        <p className="text-sm text-red-600">{error}</p>
-                    </div>
->>>>>>> 67f615c2cdf5c72026d88ebd749c69770b8ebb82
                 )}
               </CardContent>
               <CardFooter className="bg-gray-50 px-6 py-4 rounded-b-xl flex items-center justify-center text-sm text-gray-500 gap-2">
@@ -962,170 +848,155 @@ export default function PaymentPage() {
             </Card>
           </div>
 
-          {/* RIGHT COLUMN: ORDER SUMMARY — UNCHANGED */}
+          {/* RIGHT COLUMN: ORDER SUMMARY */}
           <div className="lg:col-span-1">
             <Card className="sticky top-8 shadow-lg border-t-4 border-t-red-600 flex flex-col overflow-hidden">
-                <CardHeader>
-<<<<<<< HEAD
-                    <CardTitle className="flex justify-between items-center text-lg">
-                        Order Summary
-                        {displayData.isCustom && <Layers className="w-4 h-4 text-gray-400" />}
-                    </CardTitle>
-=======
-                    <CardTitle>Order Summary</CardTitle>
->>>>>>> 67f615c2cdf5c72026d88ebd749c69770b8ebb82
-                </CardHeader>
-                <CardContent className="space-y-6 flex-1 overflow-y-auto max-h-[calc(100vh-250px)] pb-4">
-                    <div className="space-y-2 pb-4 border-b text-sm">
-                        <div className="flex items-start justify-between">
-                            <span className="text-gray-600 flex items-center gap-2">
-                                <MapPin className="w-4 h-4" /> Location
-                            </span>
-                            <span className="font-bold text-right capitalize truncate max-w-[150px]">
-                                {displayData.location}
-                            </span>
-                        </div>
-                        <div className="flex items-start justify-between">
-                            <span className="text-gray-600 flex items-center gap-2">
-                                <CalendarIcon className="w-4 h-4" /> Date
-                            </span>
-                            <span className="font-bold text-right text-xs max-w-[150px] leading-tight">
-                                {displayData.date}
-                            </span>
-                        </div>
-                        <div className="flex items-start justify-between">
-                            <span className="text-gray-600 flex items-center gap-2">
-                                <Users className="w-4 h-4" /> Travelers
-                            </span>
-                            <span className="font-bold text-right">{displayData.travelersLabel}</span>
-                        </div>
+              <CardHeader>
+                <CardTitle className="flex justify-between items-center text-lg">
+                  Order Summary
+                  {displayData.isCustom && <Layers className="w-4 h-4 text-gray-400" />}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6 flex-1 overflow-y-auto max-h-[calc(100vh-250px)] pb-4">
+                <div className="space-y-2 pb-4 border-b text-sm">
+                  <div className="flex items-start justify-between">
+                    <span className="text-gray-600 flex items-center gap-2">
+                      <MapPin className="w-4 h-4" /> Location
+                    </span>
+                    <span className="font-bold text-right capitalize truncate max-w-[150px]">
+                      {displayData.location}
+                    </span>
+                  </div>
+                  <div className="flex items-start justify-between">
+                    <span className="text-gray-600 flex items-center gap-2">
+                      <CalendarIcon className="w-4 h-4" /> Date
+                    </span>
+                    <span className="font-bold text-right text-xs max-w-[150px] leading-tight">
+                      {displayData.date}
+                    </span>
+                  </div>
+                  <div className="flex items-start justify-between">
+                    <span className="text-gray-600 flex items-center gap-2">
+                      <Users className="w-4 h-4" /> Travelers
+                    </span>
+                    <span className="font-bold text-right">{displayData.travelersLabel}</span>
+                  </div>
+                </div>
+
+                {/* CHOSEN TRIPS / ITINERARY */}
+                {displayData.isCustom && displayData.details.length > 0 && (
+                  <div>
+                    <h3 className="font-bold text-gray-900 mb-3 flex items-center gap-2 text-sm">
+                      <Layers className="w-4 h-4 text-red-600" /> Chosen Trips
+                    </h3>
+                    <div className="space-y-4 max-h-[300px] overflow-y-auto pr-1">
+                      {displayData.details.map((day, idx) => {
+                        const hasTransfer = day.transportation && day.transportation.includes("airport-transfer");
+                        const AIRPORT_TRANSFER_PRICE = 8000;
+                        const listingPrice = day.price - (hasTransfer ? AIRPORT_TRANSFER_PRICE : 0);
+
+                        return (
+                          <div key={idx} className="bg-gray-50 p-3 rounded-lg border border-gray-100 relative">
+                            <div className="flex justify-between items-start mb-2">
+                              <div>
+                                <span className="text-[10px] font-bold text-white bg-gray-800 px-2 py-0.5 rounded-full uppercase">Day {idx + 1}</span>
+                                <div className="font-bold text-gray-800 mt-1">{day.location.toUpperCase()}</div>
+                                <div className="flex items-center gap-2 mt-1">
+                                  <span className="text-xs text-gray-500">{format(new Date(day.date), "MMM dd")}</span>
+                                  <span className="text-gray-300">•</span>
+                                  <span className="text-xs text-gray-500 flex items-center">
+                                    <Users className="w-3 h-3 mr-1" />
+                                    {day.travelers}
+                                  </span>
+                                </div>
+                              </div>
+                              <div className="font-bold text-red-600 text-sm">¥{listingPrice.toLocaleString()}</div>
+                            </div>
+                            <div className="text-xs text-gray-600 border-t border-gray-200 pt-2 mt-2">
+                              <p className="font-semibold mb-1">Destinations:</p>
+                              <ul className="list-disc pl-4 space-y-0.5">
+                                {day.destinations.map((destId: string) => (
+                                  <li key={destId}>{getDestName(destId)}</li>
+                                ))}
+                                {hasTransfer && (
+                                  <li className="text-blue-600 font-medium flex items-center -ml-1 mt-1">
+                                    <Plane className="w-3 h-3 mr-1" /> Airport Transfer (+¥{AIRPORT_TRANSFER_PRICE.toLocaleString()})
+                                  </li>
+                                )}
+                              </ul>
+                              <div className="flex justify-between items-end border-t border-dashed pt-2 mt-2">
+                                <span className="text-gray-400">Day Total</span>
+                                <span className="font-bold text-gray-900">¥{day.price.toLocaleString()}</span>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
+                  </div>
+                )}
 
-<<<<<<< HEAD
-                    {/* === CHOSEN TRIPS / ITINERARY === */}
-                    {displayData.isCustom && displayData.details.length > 0 && (
-                        <div>
-                            <h3 className="font-bold text-gray-900 mb-3 flex items-center gap-2 text-sm">
-                                <Layers className="w-4 h-4 text-red-600"/> Chosen Trips
-                            </h3>
-                            <div className="space-y-4 max-h-[300px] overflow-y-auto pr-1">
-                                {displayData.details.map((day, idx) => {
-                                    const hasTransfer = day.transportation && day.transportation.includes("airport-transfer");
-                                    const AIRPORT_TRANSFER_PRICE = 8000;
-                                    const listingPrice = day.price - (hasTransfer ? AIRPORT_TRANSFER_PRICE : 0);
-
-                                    return (
-                                        <div key={idx} className="bg-gray-50 p-3 rounded-lg border border-gray-100 relative">
-                                            <div className="flex justify-between items-start mb-2">
-                                                <div>
-                                                    <span className="text-[10px] font-bold text-white bg-gray-800 px-2 py-0.5 rounded-full uppercase">Day {idx + 1}</span>
-                                                    <div className="font-bold text-gray-800 mt-1">{day.location.toUpperCase()}</div>
-                                                    
-                                                    <div className="flex items-center gap-2 mt-1">
-                                                        <span className="text-xs text-gray-500">{format(new Date(day.date), "MMM dd")}</span>
-                                                        <span className="text-gray-300">•</span>
-                                                        <span className="text-xs text-gray-500 flex items-center">
-                                                            <Users className="w-3 h-3 mr-1" />
-                                                            {day.travelers}
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                                <div className="font-bold text-red-600 text-sm">¥{listingPrice.toLocaleString()}</div>
-                                            </div>
-                                            
-                                            <div className="text-xs text-gray-600 border-t border-gray-200 pt-2 mt-2">
-                                                <p className="font-semibold mb-1">Destinations:</p>
-                                                <ul className="list-disc pl-4 space-y-0.5">
-                                                    {day.destinations.map((destId: string) => (
-                                                        <li key={destId}>{getDestName(destId)}</li>
-                                                    ))}
-                                                    {hasTransfer && (
-                                                        <li className="text-blue-600 font-medium flex items-center -ml-1 mt-1">
-                                                            <Plane className="w-3 h-3 mr-1" /> Airport Transfer (+¥{AIRPORT_TRANSFER_PRICE.toLocaleString()})
-                                                        </li>
-                                                    )}
-                                                </ul>
-                                                <div className="flex justify-between items-end border-t border-dashed pt-2 mt-2">
-                                                    <span className="text-gray-400">Day Total</span>
-                                                    <span className="font-bold text-gray-900">¥{day.price.toLocaleString()}</span>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        </div>
-                    )}
-
-                    {/* TRAVEL INCLUSION NOTICE */}
-                    <div className="bg-orange-50 border border-orange-100 rounded-lg p-3 relative z-10">
-                        <div className="flex items-center gap-2 text-orange-800 font-semibold text-xs mb-2">
-                            <Info className="w-3.5 h-3.5" /> Inclusion Notice
-                        </div>
-                        <p className="text-[11px] text-gray-700 leading-tight mb-2">
-                            Package covers <strong>private transportation and guide only</strong>.
-                        </p>
-                        <div className="space-y-1">
-                            <div className="flex items-center text-[10px] text-red-600 gap-1.5 font-medium">
-                                <XCircle className="w-3 h-3" /> No Roundtrip Airfare
-                            </div>
-                            <div className="flex items-center text-[10px] text-red-600 gap-1.5 font-medium">
-                                <XCircle className="w-3 h-3" /> No Hotel Accommodations
-                            </div>
-                        </div>
+                {/* TRAVEL INCLUSION NOTICE */}
+                <div className="bg-orange-50 border border-orange-100 rounded-lg p-3 relative z-10">
+                  <div className="flex items-center gap-2 text-orange-800 font-semibold text-xs mb-2">
+                    <Info className="w-3.5 h-3.5" /> Inclusion Notice
+                  </div>
+                  <p className="text-[11px] text-gray-700 leading-tight mb-2">
+                    Package covers <strong>private transportation and guide only</strong>.
+                  </p>
+                  <div className="space-y-1">
+                    <div className="flex items-center text-[10px] text-red-600 gap-1.5 font-medium">
+                      <XCircle className="w-3 h-3" /> No Roundtrip Airfare
                     </div>
-
-                    {/* --- TOTALS SECTION --- */}
-                    <div className="flex flex-col gap-2 pt-4 border-t">
-                        <div className="flex justify-between items-center text-sm text-gray-600">
-                            <span>Package Total:</span>
-                            <span>¥{totalAmount.toLocaleString()}</span>
-                        </div>
-                        
-                        {paymentOption === 'downpayment' && (
-                            <div className="flex justify-between items-center text-sm text-gray-600">
-                                <span>Remaining Balance:</span>
-                                <span className="font-bold text-orange-600">¥{balanceAmount.toLocaleString()}</span>
-                            </div>
-                        )}
-
-                        <div className="flex justify-between items-center text-xl font-bold text-gray-900 pt-2 border-t mt-2">
-                            <span>Total Due Now:</span>
-                            <span>{convertAmount(amountToPay)}</span>
-                        </div>
-=======
-                    <div className="flex justify-between items-center text-xl font-bold text-gray-900">
-                        <span>Total:</span>
-                        <span>¥{parseInt(price).toLocaleString()}</span>
->>>>>>> 67f615c2cdf5c72026d88ebd749c69770b8ebb82
+                    <div className="flex items-center text-[10px] text-red-600 gap-1.5 font-medium">
+                      <XCircle className="w-3 h-3" /> No Hotel Accommodations
                     </div>
+                  </div>
+                </div>
 
-                    <Button 
-                        onClick={handleSubmit} 
-                        disabled={isProcessing || !formData.firstName || !formData.email}
-                        className="w-full bg-red-600 hover:bg-red-700 text-white py-6 text-lg mt-4"
-                    >
-                        {isProcessing ? (
-                            <>
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                Processing...
-                            </>
-                        ) : (
-                            <>
-                                Pay & Confirm
-                                <ArrowRight className="ml-2 w-4 h-4" />
-                            </>
-                        )}
-                    </Button>
-                    <p className="text-xs text-center text-gray-500 mt-2 pb-2">
-                        By clicking pay, you agree to our Terms & Conditions.
-                    </p>
-                </CardContent>
+                {/* TOTALS SECTION */}
+                <div className="flex flex-col gap-2 pt-4 border-t">
+                  <div className="flex justify-between items-center text-sm text-gray-600">
+                    <span>Package Total:</span>
+                    <span>¥{totalAmount.toLocaleString()}</span>
+                  </div>
+                  {paymentOption === 'downpayment' && (
+                    <div className="flex justify-between items-center text-sm text-gray-600">
+                      <span>Remaining Balance:</span>
+                      <span className="font-bold text-orange-600">¥{balanceAmount.toLocaleString()}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between items-center text-xl font-bold text-gray-900 pt-2 border-t mt-2">
+                    <span>Total Due Now:</span>
+                    <span>{convertAmount(amountToPay)}</span>
+                  </div>
+                </div>
+
+                <Button
+                  onClick={handleSubmit}
+                  disabled={isProcessing || !formData.firstName || !formData.email}
+                  className="w-full bg-red-600 hover:bg-red-700 text-white py-6 text-lg mt-4"
+                >
+                  {isProcessing ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Processing...
+                    </>
+                  ) : (
+                    <>
+                      Pay & Confirm
+                      <ArrowRight className="ml-2 w-4 h-4" />
+                    </>
+                  )}
+                </Button>
+                <p className="text-xs text-center text-gray-500 mt-2 pb-2">
+                  By clicking pay, you agree to our Terms & Conditions.
+                </p>
+              </CardContent>
             </Card>
           </div>
         </div>
       </div>
-<<<<<<< HEAD
 
       {/* --- WAIVER MODAL --- */}
       <Dialog open={showWaiver} onOpenChange={setShowWaiver}>
@@ -1140,28 +1011,28 @@ export default function PaymentPage() {
             <p className="font-semibold italic">Please read carefully before proceeding:</p>
 
             <p>
-              I hereby assume all risks of participating in any and all activities associated with this tour event. 
+              I hereby assume all risks of participating in any and all activities associated with this tour event.
               I certify that I am physically fit and have sufficiently prepared for participation in this activity.
             </p>
 
             <div className="bg-red-50 p-4 rounded-md border border-red-100">
               <p className="text-red-900 font-medium">
-                <strong>Liability Limitation:</strong> I acknowledge and agree that the liability of 
-                <span className="font-bold"> Uncle Sam (UncleSam Japan Tour)</span> is strictly limited to 
-                occurrences and activities within the scheduled tours. Uncle Sam shall not be held liable 
+                <strong>Liability Limitation:</strong> I acknowledge and agree that the liability of
+                <span className="font-bold"> Uncle Sam (UncleSam Japan Tour)</span> is strictly limited to
+                occurrences and activities within the scheduled tours. Uncle Sam shall not be held liable
                 for any incidents, injuries, or losses occurring outside of the official tour itinerary.
               </p>
             </div>
 
             <p>
-              (A) I WAIVE, RELEASE, AND DISCHARGE from any and all liability, including but not 
-              limited to, liability arising from the negligence or fault of the entities or persons released, 
+              (A) I WAIVE, RELEASE, AND DISCHARGE from any and all liability, including but not
+              limited to, liability arising from the negligence or fault of the entities or persons released,
               for my death, disability, personal injury, property damage, or actions of any kind.
             </p>
 
             <p>
-              (B) I INDEMNIFY AND HOLD HARMLESS the entities or persons mentioned in this 
-              paragraph from any and all liabilities or claims made as a result of participation in this 
+              (B) I INDEMNIFY AND HOLD HARMLESS the entities or persons mentioned in this
+              paragraph from any and all liabilities or claims made as a result of participation in this
               activity, whether caused by negligence or otherwise.
             </p>
 
@@ -1197,8 +1068,6 @@ export default function PaymentPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-=======
->>>>>>> 67f615c2cdf5c72026d88ebd749c69770b8ebb82
     </div>
   );
 }

@@ -17,11 +17,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabaseClient"; 
 import { useIsAdmin } from "../hooks/useIsAdmin"; 
-<<<<<<< HEAD
 import { format, isBefore, startOfToday, isSameDay, addDays } from "date-fns";
-=======
-import { format, isBefore, startOfToday, isSameDay } from "date-fns";
->>>>>>> 67f615c2cdf5c72026d88ebd749c69770b8ebb82
 import { cn } from "../lib/utils";
 
 // --- CONFIGURATION ---
@@ -37,10 +33,7 @@ const PRICING_CONFIG: Record<string, { tier1: number; tier2: number }> = {
 const MAX_TRAVELERS = 9;
 const MIN_DESTINATIONS = 1; 
 const MAX_DESTINATIONS = 5;
-<<<<<<< HEAD
 const ADVANCE_BOOKING_DAYS = 5; // Minimum days in advance required to book
-=======
->>>>>>> 67f615c2cdf5c72026d88ebd749c69770b8ebb82
 const FULLY_BOOKED_DATES = [new Date(2025, 12, 25), new Date(2025, 12, 31)];
 const DEFAULT_DESTINATIONS = [
   { id: "hasedera", name: "Hasedera Temple", description: "Temple with a massive wooden statue", location: "nara" },
@@ -82,14 +75,11 @@ export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) 
   const [isFavorite, setIsFavorite] = useState(false);
   const [showFeedback, setShowFeedback] = useState(false);
 
-<<<<<<< HEAD
   // Calculate the earliest selectable date (today + 5 days)
   const earliestBookingDate = addDays(startOfToday(), ADVANCE_BOOKING_DAYS);
   // Format for the HTML date input's min attribute (YYYY-MM-DD)
   const earliestBookingDateStr = earliestBookingDate.toISOString().split("T")[0];
 
-=======
->>>>>>> 67f615c2cdf5c72026d88ebd749c69770b8ebb82
   // ==========================================
   // 1. OFFER MODE LOGIC
   // ==========================================
@@ -263,12 +253,8 @@ export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) 
   };
 
   const isDateDisabled = (date: Date) => {
-<<<<<<< HEAD
     // Block any date before the earliest allowed booking date (today + 5 days)
     if (isBefore(date, earliestBookingDate)) return true;
-=======
-    if (isBefore(date, startOfToday())) return true; 
->>>>>>> 67f615c2cdf5c72026d88ebd749c69770b8ebb82
     const inCart = cart.some(item => isSameDay(item.date, date));
     if (inCart) return true;
     return FULLY_BOOKED_DATES.some(blockedDate => isSameDay(date, blockedDate));
@@ -327,17 +313,10 @@ export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) 
         price: currentFormPrice
     };
 
-    if (isMultiDay) {
-        setCart([...cart, newItem]);
-        setCustomDate(undefined);
-        setSelectedDestinations([]);
-        setSelectedTransportation(["private-van"]);
-    } else {
-        setCart([...cart, newItem]);
-        setCustomDate(undefined);
-        setSelectedDestinations([]);
-        setSelectedTransportation(["private-van"]);
-    }
+    setCart([...cart, newItem]);
+    setCustomDate(undefined);
+    setSelectedDestinations([]);
+    setSelectedTransportation(["private-van"]);
   };
 
   const removeFromCart = (id: string) => {
@@ -492,14 +471,15 @@ export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) 
                            <label className="text-sm font-medium text-gray-700 mb-1 block">Travel Date</label>
                            <div className="relative">
                               <CalendarIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-<<<<<<< HEAD
-                              <input type="date" className="w-full pl-10 pr-4 py-2 border rounded-md text-sm bg-white" min={earliestBookingDateStr} value={offerDate} onChange={(e) => setOfferDate(e.target.value)} />
+                              <input
+                                type="date"
+                                className="w-full pl-10 pr-4 py-2 border rounded-md text-sm bg-white"
+                                min={earliestBookingDateStr}
+                                value={offerDate}
+                                onChange={(e) => setOfferDate(e.target.value)}
+                              />
                            </div>
                            <p className="text-sm text-gray-500 mt-1 italic">Bookings must be made at least {ADVANCE_BOOKING_DAYS} days in advance.</p>
-=======
-                              <input type="date" className="w-full pl-10 pr-4 py-2 border rounded-md text-sm bg-white" min={new Date().toISOString().split("T")[0]} value={offerDate} onChange={(e) => setOfferDate(e.target.value)} />
-                           </div>
->>>>>>> 67f615c2cdf5c72026d88ebd749c69770b8ebb82
                         </div>
                         <div>
                            <label className="text-sm font-medium text-gray-700 mb-1 block">Travelers</label>
@@ -521,7 +501,6 @@ export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) 
                           <Button variant="outline" className="w-full border-gray-300 text-gray-700 hover:bg-gray-50 hover:text-red-600" onClick={handleBookMultiple}>
                               <Layers className="w-4 h-4 mr-2" />Book multiple tours or dates
                           </Button>
-
                           <Button className="w-full bg-red-600 hover:bg-red-700 text-white" onClick={handleOfferProceed} disabled={!offerDate}>
                               {isTransferOffer ? (
                                   <><CreditCard className="w-4 h-4 mr-2" /> Proceed to Payment</>
@@ -590,14 +569,10 @@ export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) 
                                                     <CalendarIcon className="mr-2 h-4 w-4" />{customDate ? format(customDate, "PPP") : "Pick a date"}
                                                 </Button>
                                             </PopoverTrigger>
-<<<<<<< HEAD
                                             <PopoverContent className="w-auto p-0">
                                               <Calendar mode="single" selected={customDate} onSelect={setCustomDate} disabled={isDateDisabled} initialFocus />
                                               <p className="text-xs text-gray-400 text-center pb-2">Earliest available: {format(earliestBookingDate, "MMM dd, yyyy")}</p>
                                             </PopoverContent>
-=======
-                                            <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={customDate} onSelect={setCustomDate} disabled={isDateDisabled} initialFocus /></PopoverContent>
->>>>>>> 67f615c2cdf5c72026d88ebd749c69770b8ebb82
                                         </Popover>
                                         <div className="flex items-center border rounded-md px-2 bg-white">
                                              <Users className="w-4 h-4 text-gray-400 mr-2"/>
@@ -606,10 +581,7 @@ export default function OfferModal({ isOpen, onClose, offer }: OfferModalProps) 
                                              </select>
                                         </div>
                                     </div>
-<<<<<<< HEAD
                                     <p className="text-sm text-gray-500 italic">Bookings must be at least {ADVANCE_BOOKING_DAYS} days in advance.</p>
-=======
->>>>>>> 67f615c2cdf5c72026d88ebd749c69770b8ebb82
                                 </div>
                             </CardContent>
                         </Card>
