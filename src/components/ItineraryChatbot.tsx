@@ -19,30 +19,27 @@ export default function ItineraryChatbot({ selectedDestinations, customItinerary
   const [currentItinerary, setCurrentItinerary] = useState<any[]>([]);
   const [history, setHistory] = useState<any[][]>([]); 
   
-  const totalDays = customItinerary && customItinerary.length > 0 ? customItinerary.length : 1;
+  // Enforce correct day count based on how many tours are in the cart
+  const totalDays = customItinerary && customItinerary.length > 0 ? customItinerary.length : selectedDestinations?.length || 1;
   const MAX_AI_REVISIONS = 5; 
   const [revisionCount, setRevisionCount] = useState(0);
 
-  // Edit State
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
 
-  // Manual Add State
   const [addingDayIdx, setAddingDayIdx] = useState<number | null>(null);
   const [newItem, setNewItem] = useState({ time: "12:00", activity: "", location: "" });
 
   const [chatMessages, setChatMessages] = useState<any[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // Auto-Start
   useEffect(() => {
     if (isVisible && currentItinerary.length === 0) {
-      setChatMessages([{ role: 'ai', text: `Hello! I'm connecting to Gemini 2.5 Flash to build your private tour...`, timestamp: new Date() }]);
+      setChatMessages([{ role: 'ai', text: `Hello! I'm mapping out your ${totalDays}-day private tour...`, timestamp: new Date() }]);
       generateItinerary(false); 
     }
   }, [isVisible]);
 
-  // Scroll Chat
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [chatMessages]);
@@ -64,14 +61,15 @@ export default function ItineraryChatbot({ selectedDestinations, customItinerary
     const previousPlan = JSON.parse(JSON.stringify(currentItinerary));
 
     try {
-        const destinationsList = customItinerary && customItinerary.length > 0 
-            ? customItinerary.map((d: any) => d.location) 
+        // Extract the actual names of the tours booked
+        const tourNamesList = customItinerary && customItinerary.length > 0 
+            ? customItinerary.map((d: any) => d.title || d.name || d.location || "Custom Tour") 
             : selectedDestinations;
 
         const { data: rawAiData, error } = await supabase.functions.invoke('itinerary-agent', {
             body: { 
                 action: isRevision ? 'chat-revision' : 'generate-itinerary',
-                payload: { destinations: destinationsList, days: totalDays, userPrompt: customInstruction, currentItinerary: isRevision ? currentItinerary : null, startDate: travelDate }
+                payload: { tourNames: tourNamesList, days: totalDays, userPrompt: customInstruction, currentItinerary: isRevision ? currentItinerary : null, startDate: travelDate }
             }
         });
 
@@ -93,10 +91,9 @@ export default function ItineraryChatbot({ selectedDestinations, customItinerary
 
             let safeArray = Array.isArray(response.itinerary) ? response.itinerary : [response.itinerary];
             if (safeArray.length > 0 && !safeArray[0].items && safeArray[0].activity) {
-                safeArray = [{ day: 1, date: travelDate || "2026-02-18", items: safeArray }];
+                safeArray = [{ day: 1, tourName: tourNamesList[0], date: travelDate || "2026-02-18", items: safeArray }];
             }
 
-            // Assign unique IDs to AI generated items to fix the edit/delete bugs
             const instantView = safeArray.map((day: any) => ({
                 ...day,
                 items: day.items?.map((i: any, idx: number) => ({ ...i, id: i.id || `ai-item-${Date.now()}-${idx}` })),
@@ -132,8 +129,6 @@ export default function ItineraryChatbot({ selectedDestinations, customItinerary
       }
   };
 
-  // --- MANUAL EDITS & ADDS ---
-  
   const handleManualEditSave = (dayIndex: number) => {
       if (!editingItemId) return;
       const newItinerary = JSON.parse(JSON.stringify(currentItinerary));
@@ -170,7 +165,6 @@ export default function ItineraryChatbot({ selectedDestinations, customItinerary
           location: newItem.location
       });
       
-      // Sort the day's activities by time chronologically
       newItinerary[dayIndex].items.sort((a: any, b: any) => a.time.localeCompare(b.time));
       
       setCurrentItinerary(newItinerary);
@@ -180,7 +174,70 @@ export default function ItineraryChatbot({ selectedDestinations, customItinerary
   };
 
   const handleUndo = () => { if (history.length > 0) { setCurrentItinerary(history[history.length - 1]); setHistory(prev => prev.slice(0, -1)); } };
-  const generatePDF = () => { const doc = new jsPDF(); doc.text("Itinerary", 10, 10); doc.save("plan.pdf"); };
+  
+  // ==========================================
+  // PROFESSIONAL PDF GENERATION
+  // ==========================================
+  const generatePDF = () => { 
+    if (!currentItinerary || currentItinerary.length === 0) {
+        alert("Please wait for the itinerary to generate before downloading.");
+        return;
+    }
+
+    const doc = new jsPDF(); 
+    
+    doc.setFontSize(22);
+    doc.setTextColor(29, 78, 216); 
+    doc.text("Unclesam Tours", 14, 20);
+    
+    doc.setFontSize(14);
+    doc.setTextColor(100, 100, 100);
+    doc.text("Your Custom Private Itinerary", 14, 28);
+    
+    if (travelDate) {
+        doc.setFontSize(10);
+        doc.text(`Starting Date: ${travelDate}`, 14, 34);
+    }
+
+    const tableData: any[] = [];
+    
+    currentItinerary.forEach((day: any) => {
+        // PDF Output format: "Tokyo Highlights (Day 1)"
+        const dayHeader = day.tourName ? `${day.tourName} (Day ${day.day})` : `Day ${day.day}`;
+        const dayWeather = day.weather?.temp ? ` - ${day.weather.temp}, ${day.weather.summary}` : '';
+        
+        tableData.push([
+            { 
+                content: `${dayHeader}${dayWeather}`, 
+                colSpan: 3, 
+                styles: { fillColor: [240, 245, 255], fontStyle: 'bold', textColor: [29, 78, 216] } 
+            }
+        ]);
+        
+        if (day.items && day.items.length > 0) {
+            day.items.forEach((item: any) => {
+                if (item.activity && item.activity.length > 2) {
+                    tableData.push([ item.time, item.activity, item.location ]);
+                }
+            });
+        } else {
+            tableData.push(["", "Free time or no activities scheduled.", ""]);
+        }
+    });
+
+    autoTable(doc, {
+        startY: 40,
+        head: [['Time', 'Activity', 'Location']],
+        body: tableData,
+        theme: 'striped',
+        headStyles: { fillColor: [37, 99, 235] }, 
+        styles: { fontSize: 10, cellPadding: 4 },
+        columnStyles: { 0: { cellWidth: 25 }, 1: { cellWidth: 90 }, 2: { cellWidth: 'auto' } }
+    });
+
+    doc.save("Unclesam_Tours_Itinerary.pdf"); 
+  };
+
   const getWeatherIcon = (c: string) => c?.includes("Rain") ? <CloudRain className="w-5 h-5 text-blue-300"/> : <Sun className="w-5 h-5 text-yellow-400"/>;
 
   if (!isVisible) return null;
@@ -216,7 +273,14 @@ export default function ItineraryChatbot({ selectedDestinations, customItinerary
               {currentItinerary.map((day, idx) => (
                   <div key={idx} className="space-y-4">
                       <div className="bg-gradient-to-r from-blue-500 to-cyan-500 rounded-lg p-4 text-white flex justify-between items-center shadow-md">
-                          <div><h3 className="font-bold flex gap-2">{getWeatherIcon(day.weather?.condition)} Day {day.day}</h3><p className="text-xs">{day.weather?.summary}</p></div>
+                          <div>
+                              {/* UI Display Format: "Tokyo Highlights (Day 1)" */}
+                              <h3 className="font-bold flex items-center gap-2">
+                                  {getWeatherIcon(day.weather?.condition)} 
+                                  {day.tourName ? `${day.tourName} (Day ${day.day})` : `Day ${day.day}`}
+                              </h3>
+                              <p className="text-xs">{day.weather?.summary}</p>
+                          </div>
                           <span className="text-2xl font-bold">{day.weather?.temp}</span>
                       </div>
                       
@@ -243,7 +307,6 @@ export default function ItineraryChatbot({ selectedDestinations, customItinerary
                                       )}
                                   </div>
                                   
-                                  {/* Only show icons if NOT currently editing this item */}
                                   {editingItemId !== item.id && (
                                       <div className="absolute right-0 top-3 opacity-0 group-hover:opacity-100 flex gap-1 bg-white pl-2">
                                           <Button variant="ghost" size="icon" onClick={() => { setEditingItemId(item.id); setEditValue(item.activity); }}><Pencil className="w-4 h-4 text-blue-600"/></Button>
@@ -253,7 +316,6 @@ export default function ItineraryChatbot({ selectedDestinations, customItinerary
                               </div>
                           ))}
 
-                          {/* MANUAL ADD FORM / BUTTON */}
                           {addingDayIdx === idx ? (
                               <div className="mt-4 p-4 border rounded-lg bg-blue-50/50 space-y-3">
                                   <h4 className="text-sm font-semibold text-blue-800 mb-2">Add Manual Activity</h4>
