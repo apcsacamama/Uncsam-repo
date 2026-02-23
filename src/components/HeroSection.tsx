@@ -10,13 +10,13 @@ const heroImages = [
     subtitle: "Discover Ancient Beauty",
   },
   {
-    url: "https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?w=1920&h=1080&fit=crop",
-    title: "TOKYO",
-    subtitle: "Modern Metropolis",
+    url: "https://images.unsplash.com/photo-1550303435-1703d8811aaa?q=80&w=1470&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
+    title: "NARA",
+    subtitle: "Shrine And Scenery",
   },
   {
-    url: "https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?w=1920&h=1080&fit=crop",
-    title: "KYOTO",
+    url: "https://images.unsplash.com/photo-1568901002433-5a8ceafe4647?q=80&w=1470&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
+    title: "HAKONE",
     subtitle: "Traditional Culture",
   },
 ];
