@@ -21,7 +21,8 @@ import {
   Users, 
   Lock, 
   ArrowRight,
-  Loader2
+  Loader2,
+  Building2  // ← ADDED for Bank Transfer icon
 } from "lucide-react";
 import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -36,9 +37,14 @@ export default function PaymentPage() {
   const travelers = searchParams.get("travelers") || "1";
   const price = searchParams.get("price") || "0";
   
+  // ← ADDED: booking details for PayMongo
+  const bookingId = searchParams.get("bookingId") || crypto.randomUUID();
+  const tourName = searchParams.get("tourName") || location;
+
   // State for form
   const [isProcessing, setIsProcessing] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState("card");
+  const [paymentMethod, setPaymentMethod] = useState("card"); // ← kept your original default
+  const [error, setError] = useState(""); // ← ADDED for PayMongo error handling
   const [formData, setFormData] = useState({
     firstName: "",
     lastName: "",
@@ -55,8 +61,67 @@ export default function PaymentPage() {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
+  // ← ADDED: PayMongo bank transfer handler
+ const handlePayMongoBankTransfer = async () => {
+    setIsProcessing(true);
+    setError("");
+    
+    console.log("1. Starting PayMongo payment...");
+    console.log("2. Payment method selected:", paymentMethod);
+    console.log("3. Amount:", parseInt(price));
+    console.log("4. Supabase URL:", import.meta.env.VITE_SUPABASE_URL);
+
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-paymongo-source`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
+          },
+          body: JSON.stringify({
+            amount: parseInt(price),
+            customerName: `${formData.firstName} ${formData.lastName}`,
+            customerEmail: formData.email,
+            customerPhone: formData.phone,
+            bookingId: bookingId,
+            tourName: tourName,
+            travelDate: date,
+            withTransfer: false
+          })
+        }
+      );
+
+      console.log("5. Response status:", response.status);
+      const data = await response.json();
+      console.log("6. Response data:", data);
+
+      const checkoutUrl = data?.data?.attributes?.redirect?.checkout_url;
+      console.log("7. Checkout URL:", checkoutUrl);
+      
+      if (checkoutUrl) {
+        window.location.href = checkoutUrl;
+      } else {
+        setError("Failed to generate payment QR. Please try again.");
+        setIsProcessing(false);
+      }
+    } catch (err) {
+      console.log("8. Error caught:", err);
+      setError("Something went wrong. Please try again.");
+      setIsProcessing(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // ← ADDED: route to PayMongo if bank transfer selected
+    if (paymentMethod === "qrph") {
+      await handlePayMongoBankTransfer();
+      return;
+    }
+
     setIsProcessing(true);
 
     // Simulate API Payment Processing
@@ -182,6 +247,20 @@ export default function PaymentPage() {
               </CardHeader>
               <CardContent className="space-y-6">
                 <RadioGroup defaultValue="card" onValueChange={setPaymentMethod} className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    
+                    {/* ← ADDED: QRPh Bank Transfer option */}
+                    <div>
+                        <RadioGroupItem value="qrph" id="qrph" className="peer sr-only" />
+                        <Label
+                            htmlFor="qrph"
+                            className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-green-600 peer-data-[state=checked]:text-green-600 cursor-pointer"
+                        >
+                            <Building2 className="mb-3 h-6 w-6" />
+                            Bank Transfer
+                        </Label>
+                    </div>
+
+                    {/* ← UNCHANGED: Card option */}
                     <div>
                         <RadioGroupItem value="card" id="card" className="peer sr-only" />
                         <Label
@@ -192,6 +271,8 @@ export default function PaymentPage() {
                             Card
                         </Label>
                     </div>
+
+                    {/* ← UNCHANGED: PayPal option */}
                     <div>
                         <RadioGroupItem value="paypal" id="paypal" className="peer sr-only" />
                         <Label
@@ -204,6 +285,15 @@ export default function PaymentPage() {
                     </div>
                 </RadioGroup>
 
+                {/* ← ADDED: QRPh info box */}
+                {paymentMethod === "qrph" && (
+                    <div className="pt-4 border-t bg-green-50 rounded-lg p-4">
+                        <p className="text-sm text-green-800 font-medium">🏦 Bank Transfer via QRPh</p>
+                        <p className="text-sm text-green-700 mt-1">You'll be redirected to scan a QR code using your banking app (BDO, BPI, UnionBank, etc.) after clicking Pay.</p>
+                    </div>
+                )}
+
+                {/* ← UNCHANGED: Card fields */}
                 {paymentMethod === "card" && (
                     <div className="space-y-4 pt-4 border-t">
                         <div className="space-y-2">
@@ -247,6 +337,13 @@ export default function PaymentPage() {
                         </div>
                     </div>
                 )}
+
+                {/* ← ADDED: Error message */}
+                {error && (
+                    <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                        <p className="text-sm text-red-600">{error}</p>
+                    </div>
+                )}
               </CardContent>
               <CardFooter className="bg-gray-50 px-6 py-4 rounded-b-xl flex items-center justify-center text-sm text-gray-500 gap-2">
                 <Lock className="w-4 h-4" /> SSL Encrypted Payment
@@ -254,7 +351,7 @@ export default function PaymentPage() {
             </Card>
           </div>
 
-          {/* RIGHT COLUMN: ORDER SUMMARY */}
+          {/* RIGHT COLUMN: ORDER SUMMARY — UNCHANGED */}
           <div className="lg:col-span-1">
             <Card className="sticky top-8 shadow-lg border-t-4 border-t-red-600">
                 <CardHeader>
