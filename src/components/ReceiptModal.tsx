@@ -14,6 +14,9 @@ interface InvoiceModalProps {
     totalPrice: number;
     travelers: number;
     hasAirportTransfer: boolean;
+    paymentType?: 'full' | 'downpayment';
+    amountPaid?: number;
+    balance?: number;
   };
 }
 
@@ -59,38 +62,52 @@ export default function InvoiceModal({
 
   if (!isOpen) return null;
 
-  // --- CALCULATE LINE ITEMS ---
+  // --- SMART DATA EXTRACTION ---
   const airportTransferPrice = 8000;
-  // Calculate base price (Total - Addons)
-  const basePriceTotal = paymentDetails.totalPrice - (paymentDetails.hasAirportTransfer ? airportTransferPrice : 0);
   
-  // Prepare Invoice Items
-  const invoiceItems = [];
+  // 1. Determine Listing Name & Transfer Status directly from details if available
+  let listingName = packageDetails?.title || "Standard Tour Package";
+  let hasTransfer = paymentDetails.hasAirportTransfer;
 
-  // 1. Tour Package / Itinerary Item
+  // If we have detailed cart info (Custom Tour), verify the data
   if (bookingDetails.details && bookingDetails.details.length > 0) {
-      // If it's a custom tour with multiple days, we can list them or bundle them
-      // For a cleaner invoice, we often bundle "Custom Tour Package (X Days)"
-      invoiceItems.push({
-          description: `Custom Tour Package (${bookingDetails.details.length} Days) - ${paymentDetails.travelers} Travelers`,
-          qty: 1,
-          unitPrice: basePriceTotal,
-          amount: basePriceTotal
-      });
-  } else {
-      // Standard Package
-      invoiceItems.push({
-          description: `${packageDetails?.title || "Tour Package"} - ${paymentDetails.travelers} Travelers`,
-          qty: 1, // We treat the whole group package as 1 unit usually, or you can split by person
-          unitPrice: basePriceTotal,
-          amount: basePriceTotal
-      });
+      const firstItem = bookingDetails.details[0];
+      
+      // Fix Name: Use the specific location (e.g. "NAGOYA")
+      if (firstItem.location) {
+          listingName = firstItem.location.toUpperCase();
+      }
+
+      // Fix Transfer Check: Look inside the transportation array
+      if (firstItem.transportation && firstItem.transportation.includes("airport-transfer")) {
+          hasTransfer = true;
+      }
   }
 
-  // 2. Add-ons
-  if (paymentDetails.hasAirportTransfer) {
+  // 2. Calculate Base Price (Total - Addon)
+  // This ensures 93k becomes 85k base + 8k add-on
+  const basePriceTotal = paymentDetails.totalPrice - (hasTransfer ? airportTransferPrice : 0);
+  
+  // 3. Payment Status Logic
+  const isDownPayment = paymentDetails.paymentType === 'downpayment';
+  const amountPaid = paymentDetails.amountPaid || paymentDetails.totalPrice;
+  const balanceDue = paymentDetails.balance || 0;
+
+  // 4. Prepare Invoice Items Array
+  const invoiceItems = [];
+
+  // Item 1: The Main Listing (e.g. NAGOYA)
+  invoiceItems.push({
+      description: listingName,
+      qty: 1, 
+      unitPrice: basePriceTotal,
+      amount: basePriceTotal
+  });
+
+  // Item 2: The Add-on
+  if (hasTransfer) {
       invoiceItems.push({
-          description: "Optional Add-on: Private Airport Transfer",
+          description: "Add-on: Airport Transfer",
           qty: 1,
           unitPrice: airportTransferPrice,
           amount: airportTransferPrice
@@ -103,7 +120,7 @@ export default function InvoiceModal({
         
         {/* HEADER ACTIONS */}
         <div className="bg-white p-4 border-b flex justify-between items-center shrink-0">
-            <h3 className="font-semibold text-gray-700">Invoice Preview</h3>
+            <h3 className="font-semibold text-gray-700">Document Preview</h3>
             <div className="flex gap-2">
                 <Button variant="outline" size="sm" onClick={handlePrint} className="hidden sm:flex">
                     <Printer className="w-4 h-4 mr-2" /> Print
@@ -155,9 +172,18 @@ export default function InvoiceModal({
                             <span className="text-gray-500 font-medium">Date:</span>
                             <span className="text-gray-900">{new Date().toLocaleDateString()}</span>
                         </div>
-                        <div className="flex justify-end gap-4">
-                            <span className="text-gray-500 font-medium">Status:</span>
-                            <span className="text-green-600 font-bold bg-green-50 px-2 rounded">PAID</span>
+                        
+                        <div className="flex justify-end gap-4 mt-2">
+                            <span className="text-gray-500 font-medium self-center">Status:</span>
+                            {isDownPayment ? (
+                                <span className="text-orange-700 bg-orange-100 px-2 py-0.5 rounded text-xs font-bold border border-orange-200 uppercase">
+                                    PARTIAL PAYMENT
+                                </span>
+                            ) : (
+                                <span className="text-green-700 bg-green-100 px-2 py-0.5 rounded text-xs font-bold border border-green-200 uppercase">
+                                    PAID IN FULL
+                                </span>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -206,17 +232,34 @@ export default function InvoiceModal({
             <div className="flex justify-end mb-16">
                 <div className="w-5/12 space-y-3">
                     <div className="flex justify-between text-sm text-gray-600">
-                        <span>Subtotal</span>
+                        <span>Total Amount</span>
                         <span>¥{paymentDetails.totalPrice.toLocaleString()}</span>
                     </div>
                     <div className="flex justify-between text-sm text-gray-600">
                         <span>Tax (Included)</span>
                         <span>¥0</span>
                     </div>
-                    <div className="border-t border-gray-200 pt-3 flex justify-between items-center">
-                        <span className="font-bold text-lg text-gray-900">Total Paid</span>
-                        <span className="font-bold text-2xl text-red-600">¥{paymentDetails.totalPrice.toLocaleString()}</span>
+
+                    <div className="border-t border-gray-200 my-2"></div>
+
+                    <div className="flex justify-between text-sm font-bold text-gray-800">
+                        <span>Amount Paid</span>
+                        <span className="text-green-600">- ¥{amountPaid.toLocaleString()}</span>
                     </div>
+
+                    {isDownPayment && (
+                        <div className="flex justify-between text-lg font-bold text-red-600 bg-red-50 p-2 rounded border border-red-100 mt-2">
+                            <span>Balance Due</span>
+                            <span>¥{balanceDue.toLocaleString()}</span>
+                        </div>
+                    )}
+                    
+                    {!isDownPayment && (
+                         <div className="flex justify-between text-lg font-bold text-gray-900 mt-2">
+                            <span>Balance Due</span>
+                            <span>¥0</span>
+                        </div>
+                    )}
                 </div>
             </div>
 
@@ -224,7 +267,8 @@ export default function InvoiceModal({
             <div className="mt-auto border-t border-gray-100 pt-8 text-center">
                 <p className="font-bold text-gray-900 mb-2">Thank you for choosing Uncle Sam Tours!</p>
                 <p className="text-xs text-gray-500 max-w-md mx-auto leading-relaxed">
-                    This document serves as your official proof of payment. For any questions regarding this invoice, please contact support@unclesam-travel.com quoting your invoice number.
+                    This document serves as your official invoice. 
+                    {isDownPayment && " Please ensure the remaining balance is settled 3 days prior to your trip date."}
                 </p>
                 <p className="text-xs text-gray-400 mt-4">Registered Travel Agency No. 123456 • Tokyo, Japan</p>
             </div>
