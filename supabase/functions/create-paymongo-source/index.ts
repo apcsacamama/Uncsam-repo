@@ -1,3 +1,4 @@
+// @ts-ignore - Deno global
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 
 const corsHeaders = {
@@ -5,7 +6,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-serve(async (req) => {
+serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
@@ -29,7 +30,9 @@ serve(async (req) => {
       withTransfer
     } = await req.json()
 
+    // @ts-ignore - Deno global
     const PAYMONGO_SECRET_KEY = Deno.env.get('PAYMONGO_SECRET_KEY')
+    // @ts-ignore - Deno global
     const BASE_URL = Deno.env.get('BASE_URL')
 
     if (!PAYMONGO_SECRET_KEY || !BASE_URL) {
@@ -194,8 +197,9 @@ serve(async (req) => {
     )
 
   } catch (error) {
-    console.error('Edge function error:', error.message)
-    return new Response(JSON.stringify({ error: error.message }), {
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    console.error('Edge function error:', errorMessage)
+    return new Response(JSON.stringify({ error: errorMessage }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
