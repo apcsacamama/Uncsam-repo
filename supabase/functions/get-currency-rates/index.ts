@@ -1,7 +1,10 @@
+// @ts-ignore - Deno global
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+// @ts-ignore - External ESM import
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
-serve(async (req) => {
+serve(async (req: Request) => {
+  // @ts-ignore - Deno global
   const apiKey = Deno.env.get('FXRATES_API_KEY')?.trim();
 
   try {
@@ -36,10 +39,11 @@ serve(async (req) => {
     console.log(`Your Buffered JPY-USD: ${usdRateSafe.toFixed(6)} (This is higher than Google)`);
 
     // 2. Connect to Supabase
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
+    // @ts-ignore - Deno global
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+    // @ts-ignore - Deno global
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+    const supabase = createClient(supabaseUrl, supabaseKey);
 
     // 3. Fetch all tour packages
     const { data: packages, error: fetchError } = await supabase
@@ -50,7 +54,7 @@ serve(async (req) => {
     if (fetchError) throw fetchError;
 
     // 4. Prepare Batch Update
-    const updates = packages.map(pkg => ({
+    const updates = packages.map((pkg: any) => ({
       id: pkg.id,
       // Result: Higher than Google market rate to cover PayMongo/Bank fees
       price_usd: parseFloat((pkg.price * usdRateSafe).toFixed(2)),
@@ -75,7 +79,8 @@ serve(async (req) => {
     });
 
   } catch (err) {
-    console.error("Function error:", err.message);
-    return new Response(JSON.stringify({ error: err.message }), { status: 500 });
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    console.error("Function error:", errorMessage);
+    return new Response(JSON.stringify({ error: errorMessage }), { status: 500 });
   }
 })

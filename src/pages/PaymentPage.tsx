@@ -334,6 +334,7 @@ export default function PaymentPage() {
       console.log("PayMongo QRPh response:", data);
 
       if (!response.ok) {
+        console.error("PayMongo API error response:", data);
         setError(
           data?.error?.errors?.[0]?.detail ??
           data?.error?.message ??
@@ -343,7 +344,11 @@ export default function PaymentPage() {
         return;
       }
 
+      console.log("Full PayMongo response:", JSON.stringify(data, null, 2));
+      console.log("QR Code from response:", data.qr_code);
+
       if (data.qr_code) {
+        console.log("Setting QR code URL with:", data.qr_code);
         setQrCodeUrl(
           `https://api.qrserver.com/v1/create-qr-code/?size=224x224&data=${encodeURIComponent(data.qr_code)}`
         );
@@ -352,6 +357,7 @@ export default function PaymentPage() {
       }
 
       if (data.status === "awaiting_next_action" && data.payment_intent_id) {
+        console.log("Fallback: Using payment_intent_id for QR code");
         setQrCodeUrl(
           `https://api.qrserver.com/v1/create-qr-code/?size=224x224&data=${encodeURIComponent(
             `PAYMONGO_TEST:${data.payment_intent_id}`
@@ -361,11 +367,16 @@ export default function PaymentPage() {
         return;
       }
 
+      console.error("No QR code returned. Response data:", data);
       setError("No QR code returned. Please try again.");
       setIsProcessing(false);
 
     } catch (err) {
       console.error("QRPh error:", err);
+      console.error("Error details:", {
+        message: err instanceof Error ? err.message : String(err),
+        type: err instanceof Error ? err.name : typeof err
+      });
       setError("Something went wrong. Please check your connection and try again.");
       setIsProcessing(false);
     }

@@ -178,16 +178,21 @@ serve(async (req: Request) => {
 
     console.log('Attach status:', status)
     console.log('Next action:', JSON.stringify(nextAction))
+    console.log('Full attach response:', JSON.stringify(attachData.data.attributes))
 
     // ── Card: may need 3DS redirect ──────────────────────────────────────────
     // ── QRPh: returns consume_qr action with QR code string ─────────────────
+    const qrCode = paymentType === 'qrph' 
+      ? nextAction?.code ?? attachData.data.attributes.actions?.[0]?.code ?? null
+      : null
+    
     return new Response(
       JSON.stringify({
         status,
         payment_intent_id: paymentIntentId,
         payment_type: paymentType,
         // QRPh fields
-        qr_code: nextAction?.code ?? null,
+        qr_code: qrCode,
         // Card 3DS redirect (if required by issuing bank)
         redirect_url: nextAction?.redirect?.url ?? null,
       }),
