@@ -1,13 +1,8 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { createClient } from "jsr:@supabase/supabase-js@2"; // <-- INJECTED: Supabase Client for database access
+import { createClient } from "jsr:@supabase/supabase-js@2"; // Added ONLY the import
 
 const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
 const OPENWEATHER_API_KEY = Deno.env.get("OPENWEATHER_API_KEY");
-
-// <-- INJECTED: Setup Supabase admin client to save vectors
-const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
-const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
-const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -21,41 +16,50 @@ Deno.serve(async (req) => {
     const { action, payload } = await req.json();
 
     // =========================================================================
-    // NEW: KNOWLEDGE INJECTOR (RAG PHASE 2)
+    // ISOLATED TRAINING BLOCK (Will NOT crash the rest of the app)
     // =========================================================================
     if (action === "add-document") {
-      const { content } = payload;
-      
-      if (!content) throw new Error("Content is required.");
+      try {
+        const { content } = payload;
+        
+        // 1. Get Google Math (Vector)
+        const embedRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key=${GEMINI_API_KEY}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            model: "models/text-embedding-004",
+            content: { parts: [{ text: content }] }
+          }),
+        });
+        
+        const embedData = await embedRes.json();
+        
+        // Give us the EXACT Google error if it fails
+        if (embedData.error) {
+          return new Response(JSON.stringify({ error: `Google Error: ${embedData.error.message}` }), { status: 500, headers: corsHeaders });
+        }
+        
+        const embedding = embedData.embedding?.values;
+        if (!embedding) throw new Error("Google returned no math.");
 
-      // 1. Ask Gemini to turn the text into an AI Vector (Math)
-      const embedRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key=${GEMINI_API_KEY}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: "models/text-embedding-004",
-          content: { parts: [{ text: content }] }
-        }),
-      });
+        // 2. Connect to Database ONLY when training is triggered
+        const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
+        // Fallback to ANON_KEY if SERVICE_ROLE is hidden by the environment
+        const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || Deno.env.get("SUPABASE_ANON_KEY") || "";
+        const supabase = createClient(supabaseUrl, supabaseKey);
 
-      const embedData = await embedRes.json();
-      const embedding = embedData.embedding?.values;
+        const { error: dbError } = await supabase.from('company_documents').insert({ content, embedding });
+        
+        if (dbError) throw new Error(`Database Error: ${dbError.message}`);
 
-      if (!embedding) throw new Error("Failed to generate AI embedding.");
-
-      // 2. Save the text AND the math into your Supabase database
-      const { error: dbError } = await supabase
-        .from('company_documents')
-        .insert({ content, embedding });
-
-      if (dbError) throw new Error(`Database error: ${dbError.message}`);
-
-      return new Response(JSON.stringify({ success: true, message: "Knowledge successfully injected into Unclesam Tours Brain!" }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        return new Response(JSON.stringify({ success: true, message: "Successfully injected into AI Brain!" }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      } catch (err: any) {
+        return new Response(JSON.stringify({ error: `Training Failed: ${err.message}` }), { status: 500, headers: corsHeaders });
+      }
     }
     // =========================================================================
 
-
-    // WEATHER SERVICE (Keep as is)
+    // WEATHER SERVICE (Untouched)
     if (action === "fetch-weather") {
       const { location } = payload;
       try {
@@ -71,7 +75,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    // SMART ITINERARY AGENT
+    // SMART ITINERARY AGENT (Untouched)
     if (action === "generate-itinerary" || action === "chat-revision") {
       const { destinations, days, userPrompt, currentItinerary, startDate } = payload;
       
@@ -120,7 +124,7 @@ Deno.serve(async (req) => {
 
       return new Response(aiContent, { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
-  } catch (error) {
+  } catch (error: any) {
     return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: corsHeaders });
   }
 });
