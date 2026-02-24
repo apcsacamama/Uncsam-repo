@@ -4,42 +4,44 @@ import { Card, CardContent } from "./ui/card";
 import { Input } from "./ui/input";
 import { Badge } from "./ui/badge";
 import { format } from "date-fns";
-import { supabase } from "../lib/supabaseClient"; 
+import { supabase } from "../lib/supabaseClient";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import {
-  MapPin, X, Bot, CloudRain, Sun, Cloud, Send, User, Pencil, Trash2, 
-  Loader2, RotateCcw, Sparkles, Download, Plus 
+  MapPin, X, Bot, CloudRain, Sun, Cloud, Send, User, Pencil, Trash2,
+  Loader2, RotateCcw, Sparkles, Download, Plus
 } from "lucide-react";
 
 export default function ItineraryChatbot({ selectedDestinations, customItinerary, isVisible, onClose, travelDate }: any) {
-  
+
   const [isGenerating, setIsGenerating] = useState(false);
   const [prompt, setPrompt] = useState("");
   const [currentItinerary, setCurrentItinerary] = useState<any[]>([]);
-  const [history, setHistory] = useState<any[][]>([]); 
-  
-  // Enforce correct day count based on how many tours are in the cart
-  const totalDays = customItinerary && customItinerary.length > 0 ? customItinerary.length : selectedDestinations?.length || 1;
-  const MAX_AI_REVISIONS = 5; 
+  const [history, setHistory] = useState<any[][]>([]);
+
+  const totalDays = customItinerary && customItinerary.length > 0 ? customItinerary.length : 1;
+  const MAX_AI_REVISIONS = 5;
   const [revisionCount, setRevisionCount] = useState(0);
 
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
 
+  // Manual Add State
   const [addingDayIdx, setAddingDayIdx] = useState<number | null>(null);
   const [newItem, setNewItem] = useState({ time: "12:00", activity: "", location: "" });
 
   const [chatMessages, setChatMessages] = useState<any[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  // Auto-Start
   useEffect(() => {
     if (isVisible && currentItinerary.length === 0) {
-      setChatMessages([{ role: 'ai', text: `Hello! I'm mapping out your ${totalDays}-day private tour...`, timestamp: new Date() }]);
-      generateItinerary(false); 
+      setChatMessages([{ role: 'ai', text: `Hello! I'm connecting to Gemini 2.5 Flash to build your private tour...`, timestamp: new Date() }]);
+      generateItinerary(false);
     }
   }, [isVisible]);
 
+  // Scroll Chat
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [chatMessages]);
@@ -53,7 +55,7 @@ export default function ItineraryChatbot({ selectedDestinations, customItinerary
 
   const generateItinerary = async (isRevision: boolean = false, customInstruction: string = "") => {
     setIsGenerating(true);
-    
+
     if (isRevision && customInstruction) {
         setChatMessages(prev => [...prev, { role: 'user', text: customInstruction, timestamp: new Date() }]);
     }
@@ -61,36 +63,26 @@ export default function ItineraryChatbot({ selectedDestinations, customItinerary
     const previousPlan = JSON.parse(JSON.stringify(currentItinerary));
 
     try {
-        // FIX: Extract both the Tour Names AND the Destinations so the AI knows where to look!
-        const tourNamesList = customItinerary && customItinerary.length > 0 
-            ? customItinerary.map((d: any) => d.title || d.name || d.location || "Custom Tour") 
-            : selectedDestinations;
-            
-        const destinationsList = customItinerary && customItinerary.length > 0 
-            ? customItinerary.map((d: any) => d.location || "Japan") 
+        const destinationsList = customItinerary && customItinerary.length > 0
+            ? customItinerary.map((d: any) => d.location)
             : selectedDestinations;
 
         const { data: rawAiData, error } = await supabase.functions.invoke('itinerary-agent', {
-            body: { 
+            body: {
                 action: isRevision ? 'chat-revision' : 'generate-itinerary',
-                payload: { 
-                    destinations: destinationsList, // Wired back in!
-                    tourNames: tourNamesList, 
-                    days: totalDays, 
-                    userPrompt: customInstruction, 
-                    currentItinerary: isRevision ? currentItinerary : null, 
-                    startDate: travelDate 
-                }
+                payload: { destinations: destinationsList, days: totalDays, userPrompt: customInstruction, currentItinerary: isRevision ? currentItinerary : null, startDate: travelDate }
             }
         });
 
         if (error) throw new Error("Connection Failed");
 
+        // Parse Response
         let response = typeof rawAiData === 'string' ? JSON.parse(rawAiData.replace(/```json/gi, "").replace(/```/gi, "").trim()) : rawAiData;
 
+        // --- LOGIC SPLIT: INQUIRY vs UPDATE ---
         if (response.type === 'inquiry') {
             setChatMessages(prev => [...prev, { role: 'ai', text: response.message, timestamp: new Date() }]);
-        } 
+        }
         else {
             if (isRevision && revisionCount >= MAX_AI_REVISIONS) {
                  setChatMessages(prev => [...prev, { role: 'ai', text: "Limit reached. I cannot update the plan further, but I can still answer questions!", timestamp: new Date() }]);
@@ -100,11 +92,13 @@ export default function ItineraryChatbot({ selectedDestinations, customItinerary
 
             if (previousPlan.length > 0) setHistory(prev => [...prev, previousPlan]);
 
+            // Fix "Flat List" Bug
             let safeArray = Array.isArray(response.itinerary) ? response.itinerary : [response.itinerary];
             if (safeArray.length > 0 && !safeArray[0].items && safeArray[0].activity) {
-                safeArray = [{ day: 1, tourName: tourNamesList[0], date: travelDate || "2026-02-18", items: safeArray }];
+                safeArray = [{ day: 1, date: travelDate || "2026-02-18", items: safeArray }];
             }
 
+            // Generate unique IDs for AI items so editing works flawlessly
             const instantView = safeArray.map((day: any) => ({
                 ...day,
                 items: day.items?.map((i: any, idx: number) => ({ ...i, id: i.id || `ai-item-${Date.now()}-${idx}` })),
@@ -112,6 +106,7 @@ export default function ItineraryChatbot({ selectedDestinations, customItinerary
             }));
             setCurrentItinerary(instantView);
 
+            // Fetch Weather
             const finalView = await Promise.all(instantView.map(async (day: any) => {
                 const city = day.items?.[0]?.location || "Tokyo";
                 const weather = await fetchRealWeather(city, day.date);
@@ -120,7 +115,7 @@ export default function ItineraryChatbot({ selectedDestinations, customItinerary
             setCurrentItinerary(finalView);
 
             if (isRevision) setRevisionCount(prev => prev + 1);
-            
+
             const msg = response.message || (isRevision ? "Plan updated!" : "Here is your custom plan.");
             setChatMessages(prev => [...prev, { role: 'ai', text: msg, timestamp: new Date() }]);
         }
@@ -132,8 +127,8 @@ export default function ItineraryChatbot({ selectedDestinations, customItinerary
     }
   };
 
-  const handleSubmitPrompt = (e: React.FormEvent) => { 
-      e.preventDefault(); 
+  const handleSubmitPrompt = (e: React.FormEvent) => {
+      e.preventDefault();
       if (prompt.trim()) {
           generateItinerary(true, prompt);
           setPrompt(""); 
@@ -149,18 +144,18 @@ export default function ItineraryChatbot({ selectedDestinations, customItinerary
           if (itemIndex > -1) { 
               day.items[itemIndex].activity = editValue; 
               setCurrentItinerary(newItinerary); 
-              setChatMessages(prev => [...prev, { role: 'ai', text: "Changes saved.", timestamp: new Date() }]); 
+              setChatMessages(prev => [...prev, { role: 'ai', text: "Saved.", timestamp: new Date() }]); 
           }
       }
       setEditingItemId(null);
   };
 
   const handleManualDelete = (dayIndex: number, itemId: string) => {
-      if(!confirm("Are you sure you want to remove this activity?")) return;
+      if(!confirm("Delete?")) return;
       const newItinerary = JSON.parse(JSON.stringify(currentItinerary));
       newItinerary[dayIndex].items = newItinerary[dayIndex].items.filter((i: any) => i.id !== itemId);
       setCurrentItinerary(newItinerary);
-      setChatMessages(prev => [...prev, { role: 'ai', text: "Activity removed.", timestamp: new Date() }]);
+      setChatMessages(prev => [...prev, { role: 'ai', text: "Deleted.", timestamp: new Date() }]);
   };
 
   const handleManualAddSave = (dayIndex: number) => {
@@ -176,6 +171,7 @@ export default function ItineraryChatbot({ selectedDestinations, customItinerary
           location: newItem.location
       });
       
+      // Sort chronologically by time
       newItinerary[dayIndex].items.sort((a: any, b: any) => a.time.localeCompare(b.time));
       
       setCurrentItinerary(newItinerary);
@@ -186,10 +182,8 @@ export default function ItineraryChatbot({ selectedDestinations, customItinerary
 
   const handleUndo = () => { if (history.length > 0) { setCurrentItinerary(history[history.length - 1]); setHistory(prev => prev.slice(0, -1)); } };
   
-  // ==========================================
   // PROFESSIONAL PDF GENERATION
-  // ==========================================
-  const generatePDF = () => { 
+  const generatePDF = () => {
     if (!currentItinerary || currentItinerary.length === 0) {
         alert("Please wait for the itinerary to generate before downloading.");
         return;
@@ -213,7 +207,6 @@ export default function ItineraryChatbot({ selectedDestinations, customItinerary
     const tableData: any[] = [];
     
     currentItinerary.forEach((day: any) => {
-        // PDF Output format: "Tokyo Highlights (Day 1)"
         const dayHeader = day.tourName ? `${day.tourName} (Day ${day.day})` : `Day ${day.day}`;
         const dayWeather = day.weather?.temp ? ` - ${day.weather.temp}, ${day.weather.summary}` : '';
         
@@ -280,24 +273,13 @@ export default function ItineraryChatbot({ selectedDestinations, customItinerary
                       <p>Building your private tour...</p>
                   </div>
               )}
-              
               {currentItinerary.map((day, idx) => (
                   <div key={idx} className="space-y-4">
                       <div className="bg-gradient-to-r from-blue-500 to-cyan-500 rounded-lg p-4 text-white flex justify-between items-center shadow-md">
-                          <div>
-                              {/* UI Display Format: "Tokyo Highlights (Day 1)" */}
-                              <h3 className="font-bold flex items-center gap-2">
-                                  {getWeatherIcon(day.weather?.condition)} 
-                                  {day.tourName ? `${day.tourName} (Day ${day.day})` : `Day ${day.day}`}
-                              </h3>
-                              <p className="text-xs">{day.weather?.summary}</p>
-                          </div>
+                          <div><h3 className="font-bold flex gap-2">{getWeatherIcon(day.weather?.condition)} Day {day.day}</h3><p className="text-xs">{day.weather?.summary}</p></div>
                           <span className="text-2xl font-bold">{day.weather?.temp}</span>
                       </div>
-                      
-                      <Card className="border-none shadow-sm"><CardContent className="p-0">
-                          <div className="p-4">
-                          
+                      <Card className="border-none shadow-sm"><CardContent className="p-0"><div className="p-4">
                           {day.items?.filter((i:any) => i.activity && i.activity.length > 2).map((item:any, i:number) => (
                               <div key={i} className="flex gap-4 py-3 border-b last:border-0 group relative items-start">
                                   <div className="text-xs text-gray-400 w-12 pt-1">{item.time}</div>
@@ -317,7 +299,7 @@ export default function ItineraryChatbot({ selectedDestinations, customItinerary
                                           </div>
                                       )}
                                   </div>
-                                  
+                                  {/* Overlap bug fixed: Only show Pencil/Trash if NOT currently editing */}
                                   {editingItemId !== item.id && (
                                       <div className="absolute right-0 top-3 opacity-0 group-hover:opacity-100 flex gap-1 bg-white pl-2">
                                           <Button variant="ghost" size="icon" onClick={() => { setEditingItemId(item.id); setEditValue(item.activity); }}><Pencil className="w-4 h-4 text-blue-600"/></Button>
@@ -327,6 +309,7 @@ export default function ItineraryChatbot({ selectedDestinations, customItinerary
                               </div>
                           ))}
 
+                          {/* MANUAL ADD FORM */}
                           {addingDayIdx === idx ? (
                               <div className="mt-4 p-4 border rounded-lg bg-blue-50/50 space-y-3">
                                   <h4 className="text-sm font-semibold text-blue-800 mb-2">Add Manual Activity</h4>
@@ -354,14 +337,12 @@ export default function ItineraryChatbot({ selectedDestinations, customItinerary
                                   <Plus className="w-4 h-4 mr-2" /> Add Activity Manually
                               </Button>
                           )}
-                          
-                          </div>
-                      </CardContent></Card>
+
+                      </div></CardContent></Card>
                   </div>
               ))}
           </div>
-          
-          <div className="md:w-[35%] bg-white flex flex-col shadow-xl border-l">
+          <div className="md:w-[35%] bg-white flex flex-col shadow-xl">
               <div className="flex-1 overflow-y-auto p-4 space-y-4" ref={scrollRef}>
                   {chatMessages.map((msg, i) => (
                       <div key={i} className={`flex gap-3 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
@@ -370,10 +351,10 @@ export default function ItineraryChatbot({ selectedDestinations, customItinerary
                   ))}
                   {isGenerating && <div className="text-xs text-gray-400 animate-pulse px-4">Thinking...</div>}
               </div>
-              <div className="p-4 border-t bg-gray-50">
+              <div className="p-4 border-t">
                   <form onSubmit={handleSubmitPrompt} className="relative">
-                      <Input value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder="Ask a question or modify plan..." className="pr-12 rounded-full border-gray-300 focus-visible:ring-blue-500" disabled={isGenerating}/>
-                      <Button type="submit" size="icon" className="absolute right-1 top-1 rounded-full bg-blue-600 hover:bg-blue-700" disabled={isGenerating}><Send className="w-4 h-4"/></Button>
+                      <Input value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder="Ask a question or modify plan..." className="pr-12 rounded-full" disabled={isGenerating}/>
+                      <Button type="submit" size="icon" className="absolute right-1 top-1 rounded-full bg-blue-600" disabled={isGenerating}><Send className="w-4 h-4"/></Button>
                   </form>
               </div>
           </div>
