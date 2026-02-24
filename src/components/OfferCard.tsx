@@ -50,7 +50,7 @@ export default function OfferCard({ offer, onBookNow }: OfferCardProps) {
           </div>
           <div className="flex items-center">
             <MapPin className="w-4 h-4 mr-2 text-red-500" />
-            {offer.destinations.length} Stops
+            {offer.destinations.length} Destinations
           </div>
           <div className="flex items-center col-span-2">
             <Users className="w-4 h-4 mr-2 text-red-500" />

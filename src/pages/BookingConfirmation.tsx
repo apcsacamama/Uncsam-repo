@@ -71,12 +71,12 @@ export default function BookingConfirmation() {
   const dbBookingId = searchParams.get("bookingId");
   const bookingId = dbBookingId || `BK-TEMP-${Math.floor(Date.now() / 1000)}`;
 
-  // Payment Details (New!)
+  // Payment Details
   const amountPaidParam = searchParams.get("amountPaid");
   const balanceParam = searchParams.get("balance");
   const paymentType = searchParams.get("paymentType") || "full";
 
-  const hasAirportTransfer = addonsParam && addonsParam.includes("airport-transfer");
+  const hasAirportTransfer = addonsParam?.includes("airport-transfer");
   const customerName = searchParams.get("name") || "Valued Customer";
   const customerEmail = searchParams.get("email") || "email@example.com";
   const customerPhone = searchParams.get("phone") || "N/A";
@@ -84,7 +84,6 @@ export default function BookingConfirmation() {
   // --- STATE ---
   const [showItineraryChatbot, setShowItineraryChatbot] = useState(false);
   const [showInvoice, setShowInvoice] = useState(false);
-
   const [selectedPackage, setSelectedPackage] = useState<any>(null);
   const [allDestinations, setAllDestinations] = useState<any[]>(DEFAULT_DESTINATIONS);
   const [customItinerary, setCustomItinerary] = useState<any[]>([]);
@@ -145,7 +144,6 @@ export default function BookingConfirmation() {
     }
   }, [isCustom, cartDataRaw]);
 
-  // Helper to get destination name from ID
   const getDestName = (id: string) => {
       const found = allDestinations.find(d => d.id === id);
       return found ? found.name : id;
@@ -155,7 +153,6 @@ export default function BookingConfirmation() {
     ? selectedPackage.inclusions || STANDARD_INCLUSIONS 
     : STANDARD_INCLUSIONS;
 
-  // Driver Details (Mock)
   const driverDetails = {
     name: "Takeshi Yamamoto",
     phone: "+81 80-5331-1738",
@@ -175,7 +172,6 @@ export default function BookingConfirmation() {
   return (
     <div className="min-h-screen bg-gray-50 pb-12">
       
-      {/* Success Header */}
       <div className="bg-gradient-to-r from-green-600 to-green-700 text-white py-12">
         <div className="max-w-4xl mx-auto px-4 text-center">
           <div className="flex justify-center mb-4">
@@ -193,10 +189,7 @@ export default function BookingConfirmation() {
       <div className="max-w-4xl mx-auto px-4 -mt-8">
         <div className="grid lg:grid-cols-3 gap-8">
             
-            {/* LEFT COLUMN: BOOKING DETAILS */}
             <div className="lg:col-span-2 space-y-6">
-                
-                {/* 1. SUMMARY CARD */}
                 <Card className="shadow-lg border-t-4 border-t-[#2eb85c]">
                     <CardHeader className="border-b bg-gray-50/50 pb-4">
                         <CardTitle className="flex items-center gap-2 text-xl">
@@ -205,7 +198,6 @@ export default function BookingConfirmation() {
                     </CardHeader>
                     <CardContent className="space-y-6 pt-6">
                         
-                        {/* ID & Status */}
                         <div className="flex justify-between items-center">
                             <div>
                                 <p className="text-xs text-gray-500 uppercase font-bold tracking-wider">Booking ID</p>
@@ -216,13 +208,12 @@ export default function BookingConfirmation() {
                             </Badge>
                         </div>
 
-                        {/* Core Details Grid */}
                         <div className="grid md:grid-cols-2 gap-6 bg-gray-50 p-4 rounded-lg border border-gray-100">
                             <div>
                                 <p className="text-xs text-gray-500 uppercase font-bold mb-1">Package</p>
                                 <p className="font-semibold text-gray-900">
                                     {isCustom 
-                                        ? `Custom Tour (${locationParam ? locationParam.toUpperCase() : "Japan"})` 
+                                        ? `Custom Tour (${locationParam?.toUpperCase() || "Japan"})` 
                                         : selectedPackage?.title || "Standard Package"}
                                 </p>
                             </div>
@@ -242,7 +233,6 @@ export default function BookingConfirmation() {
                             </div>
                         </div>
 
-                        {/* ITINERARY BREAKDOWN */}
                         <div>
                             <h4 className="font-bold text-gray-900 mb-3 flex items-center gap-2">
                                 {isCustom ? <Layers className="w-4 h-4 text-red-600"/> : <MapPin className="w-4 h-4 text-red-600"/>}
@@ -256,10 +246,10 @@ export default function BookingConfirmation() {
                                             <div className="flex justify-between items-start mb-3 border-b border-gray-100 pb-2">
                                                 <div className="flex items-center gap-2">
                                                     <span className="bg-gray-800 text-white text-xs font-bold px-2 py-1 rounded">Day {idx + 1}</span>
-                                                    <span className="font-bold text-gray-800 text-sm">{day.location.toUpperCase()}</span>
+                                                    <span className="font-bold text-gray-800 text-sm">{day.location?.toUpperCase()}</span>
                                                 </div>
                                                 <div className="text-xs text-gray-500 flex items-center gap-3">
-                                                    <span className="flex items-center"><Calendar className="w-3 h-3 mr-1"/>{format(new Date(day.date), "MMM dd")}</span>
+                                                    <span className="flex items-center"><Calendar className="w-3 h-3 mr-1"/>{day.date ? format(new Date(day.date), "MMM dd") : ""}</span>
                                                     <span className="flex items-center"><Users className="w-3 h-3 mr-1"/>{day.travelers}</span>
                                                 </div>
                                             </div>
@@ -270,7 +260,7 @@ export default function BookingConfirmation() {
                                                         {getDestName(destId)}
                                                     </div>
                                                 ))}
-                                                {day.transportation && day.transportation.includes("airport-transfer") && (
+                                                {day.transportation?.includes("airport-transfer") && (
                                                     <div className="flex items-center text-sm text-blue-600 font-medium sm:col-span-2 mt-1 bg-blue-50 p-2 rounded border border-blue-100">
                                                         <Plane className="w-4 h-4 mr-2" />
                                                         Airport Transfer Included
@@ -294,7 +284,6 @@ export default function BookingConfirmation() {
                             )}
                         </div>
 
-                        {/* INCLUSIONS */}
                         <div className="bg-green-50 p-4 rounded-lg">
                             <h4 className="font-bold text-green-900 mb-2 text-sm">Included Services</h4>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
@@ -306,11 +295,9 @@ export default function BookingConfirmation() {
                                 ))}
                             </div>
                         </div>
-
                     </CardContent>
                 </Card>
 
-                {/* 2. DRIVER & CUSTOMER INFO */}
                 <div className="grid md:grid-cols-2 gap-6">
                     <Card>
                         <CardHeader className="pb-2">
@@ -336,7 +323,7 @@ export default function BookingConfirmation() {
                     <Card>
                         <CardHeader className="pb-2">
                             <CardTitle className="text-base flex items-center gap-2">
-                                <Users className="w-4 h-4 text-purple-600" /> Customer
+                                <Mail className="w-4 h-4 text-purple-600" /> Customer Info
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="text-sm space-y-2">
@@ -354,7 +341,6 @@ export default function BookingConfirmation() {
                 </div>
             </div>
 
-            {/* RIGHT COLUMN: ACTIONS & SUMMARY */}
             <div className="lg:col-span-1 space-y-6">
                 <Card className="sticky top-8 shadow-md">
                     <CardHeader>
@@ -377,13 +363,11 @@ export default function BookingConfirmation() {
                                 </div>
                             )}
                             
-                            {/* NEW: Total Paid Section */}
                             <div className="border-t pt-3 flex justify-between items-center font-bold text-lg text-green-700">
                                 <span>Total Paid Now</span>
                                 <span>¥{amountPaid.toLocaleString()}</span>
                             </div>
 
-                            {/* NEW: Balance Section */}
                             {balance > 0 && (
                                 <div className="mt-2 bg-orange-50 border border-orange-100 p-3 rounded-lg">
                                     <div className="flex justify-between items-center text-orange-800 text-sm font-bold">
@@ -398,8 +382,7 @@ export default function BookingConfirmation() {
                         </div>
 
                         <div className="bg-gray-50 p-3 rounded text-xs text-gray-500">
-                            <p className="mb-1">Payment Method: Credit Card (****1234)</p>
-                            {/* Display real numeric booking ID if available */}
+                            <p className="mb-1">Payment Method: Credit Card (**********434345)</p>
                             <p>Transaction ID: TXN{bookingId.toString().replace(/[^0-9]/g, "")}</p>
                         </div>
                     </CardContent>
@@ -426,11 +409,9 @@ export default function BookingConfirmation() {
                     </CardContent>
                 </Card>
             </div>
-
         </div>
       </div>
       
-      {/* INVOICE MODAL */}
       <InvoiceModal 
         isOpen={showInvoice}
         onClose={() => setShowInvoice(false)}
@@ -440,17 +421,15 @@ export default function BookingConfirmation() {
             email: customerEmail,
             phone: customerPhone,
             travelDate: displayDate,
-            // Status depends on balance
             status: balance > 0 ? "partial" : "confirmed",
-            details: customItinerary, // Pass details for custom listing
+            details: customItinerary,
             createdAt: new Date().toISOString().split("T")[0]
         }}
         packageDetails={selectedPackage || { title: isCustom ? "Custom Tour Package" : "Standard Package", price: totalPrice }}
         paymentDetails={{
             totalPrice: totalPrice,
             travelers: parseInt(travelersParam), 
-            hasAirportTransfer: hasAirportTransfer,
-            // Pass split payment info to Invoice
+            hasAirportTransfer: !!hasAirportTransfer,
             amountPaid: amountPaid,
             balance: balance,
             paymentType: paymentType as 'full' | 'downpayment'

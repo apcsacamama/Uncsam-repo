@@ -54,6 +54,8 @@ export default function Dashboard() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [startMonth, setStartMonth] = useState<string>("January");
   const [endMonth, setEndMonth] = useState<string>("December");
+  // --- TIMEFRAME STATE FROM 2ND CODE ---
+  const [timeframe, setTimeframe] = useState<"monthly" | "quarterly" | "annually">("monthly");
 
   // --- DB STATE ---
   const [bookings, setBookings] = useState<any[]>([]);
@@ -63,7 +65,6 @@ export default function Dashboard() {
   useEffect(() => {
     fetchInitialData();
 
-    // REALTIME: Listen for ALL changes (Insert, Update, Delete) to keep dashboard in sync
     const channel = supabase
       .channel('dashboard-sync')
       .on('postgres_changes', 
@@ -76,33 +77,28 @@ export default function Dashboard() {
   }, []);
 
   const fetchInitialData = async () => {
-  setIsLoading(true);
-  try {
-    // 1. Attempt to fetch raw bookings first (easiest to succeed)
-    console.log("Fetching bookings...");
-    
-    const { data, error } = await supabase
-      .from('bookings')
-      .select(`
-        *,
-        user:user_id (full_name) 
-      `) 
-      .order('created_at', { ascending: false });
+    setIsLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('bookings')
+        .select(`
+          *,
+          user:user_id (full_name) 
+        `) 
+        .order('created_at', { ascending: false });
 
-    if (error) {
-      console.error("Dashboard Fetch Error:", error.message);
-      alert("Error loading data: " + error.message);
-      return;
+      if (error) {
+        console.error("Dashboard Fetch Error:", error.message);
+        alert("Error loading data: " + error.message);
+        return;
+      }
+      setBookings(data || []);
+    } catch (err: any) {
+      console.error("Unexpected Error:", err.message);
+    } finally {
+      setIsLoading(false);
     }
-
-    console.log("Bookings loaded:", data);
-    setBookings(data || []);
-  } catch (err: any) {
-    console.error("Unexpected Error:", err.message);
-  } finally {
-    setIsLoading(false);
-  }
-};
+  };
 
   const updateBookingStatus = async (bookingId: number, newStatus: string) => {
     try {
@@ -113,11 +109,9 @@ export default function Dashboard() {
   
       if (error) throw error;
   
-      // Update local state so the list updates immediately
       const updatedBookings = bookings.map((b) => (b.booking_id === bookingId ? { ...b, status: newStatus } : b));
       setBookings(updatedBookings);
       
-      // Update the modal view instantly if it's open
       if (selectedBooking && selectedBooking.booking_id === bookingId) {
         setSelectedBooking({ ...selectedBooking, status: newStatus });
       }
@@ -129,7 +123,7 @@ export default function Dashboard() {
     }
   };
 
-  // --- CALCULATIONS ---
+  // --- MERGED REVENUE LOGIC (Supporting Timeframes + Decimals) ---
   const currentRevenue = useMemo(() => {
     const startIndex = months.indexOf(startMonth);
     const endIndex = months.indexOf(endMonth);
@@ -149,6 +143,7 @@ export default function Dashboard() {
     return filteredByRange.reduce((acc, curr) => acc + (Number(curr.total_price) || 0), 0);
   }, [startMonth, endMonth, bookings]);
 
+  // --- TRAFFIC DATA ---
   const touristTrafficData = useMemo(() => {
     const data = months.map(m => ({ name: m.substring(0, 3), travelers: 0 }));
     bookings.forEach(booking => {
@@ -160,6 +155,7 @@ export default function Dashboard() {
     return data;
   }, [bookings]);
 
+  // --- FILTERED LIST ---
   const filteredBookings = bookings.filter((booking) => {
     const name = booking.user?.full_name?.toLowerCase() || booking.created_by?.toLowerCase() || "";
     const matchesSearch = name.includes(searchTerm.toLowerCase());
@@ -171,17 +167,15 @@ export default function Dashboard() {
     const s = status?.toLowerCase();
     if (s === "completed") return "bg-emerald-100 text-emerald-800 border-emerald-200"; 
     if (s === "confirmed") return "bg-green-100 text-green-800 border-green-200";
-    if (s === "pending") return "bg-orange-100 text-orange-800 border-orange-200"; // Queue color
-    if (s === "paid") return "bg-blue-100 text-blue-800 border-blue-200"; // New Initial color
+    if (s === "pending") return "bg-orange-100 text-orange-800 border-orange-200";
+    if (s === "paid") return "bg-blue-100 text-blue-800 border-blue-200";
     if (s === "cancelled") return "bg-red-100 text-red-800 border-red-200";
     return "bg-gray-100 text-gray-800";
   };
 
   const destinationData = [
-    { name: "Nagoya", value: 45 },
-    { name: "Tokyo", value: 32 },
-    { name: "Hiroshima", value: 28 },
-    { name: "Kyoto", value: 15 },
+    { name: "Nagoya", value: 45 }, { name: "Tokyo", value: 32 },
+    { name: "Hiroshima", value: 28 }, { name: "Kyoto", value: 15 },
   ];
   const PIE_COLORS = ["#DC2626", "#2563EB", "#16A34A", "#9333EA"];
 
@@ -206,13 +200,25 @@ export default function Dashboard() {
             </Button>
         </div>
 
-        {/* --- REVENUE & POPULAR --- */}
+        {/* --- REVENUE & POPULAR (Merged with Monthly/Quarterly/Annually) --- */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <Card className="lg:col-span-2 bg-white shadow-sm border-l-4 border-l-green-600">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <div>
                 <CardTitle className="text-lg font-medium text-gray-700">Total Revenue</CardTitle>
-                <CardDescription>Filtering by tour month</CardDescription>
+                <div className="flex gap-2 mt-2">
+                  {(['monthly', 'quarterly', 'annually'] as const).map((t) => (
+                    <button
+                      key={t}
+                      onClick={() => setTimeframe(t)}
+                      className={`text-xs px-3 py-1 rounded-full transition-colors ${
+                        timeframe === t ? "bg-green-600 text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                      }`}
+                    >
+                      {t.charAt(0).toUpperCase() + t.slice(1)}
+                    </button>
+                  ))}
+                </div>
               </div>
               <div className="bg-green-100 p-3 rounded-full">
                 <JapaneseYen className="w-6 h-6 text-green-600" />
@@ -246,7 +252,7 @@ export default function Dashboard() {
               </div>
               <div className="flex items-baseline gap-2">
                 <span className="text-5xl font-black text-gray-900 tracking-tighter">
-                    ¥{currentRevenue.toLocaleString()}
+                    ¥{currentRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
                 <Badge variant="outline" className="text-green-600 bg-green-50 border-green-200">
                     <TrendingUp className="w-3 h-3 mr-1" /> LIVE
@@ -266,10 +272,8 @@ export default function Dashboard() {
                             <Pie 
                                 data={destinationData} 
                                 cx="50%" cy="50%" 
-                                innerRadius={50} 
-                                outerRadius={70} 
-                                paddingAngle={8} 
-                                dataKey="value"
+                                innerRadius={50} outerRadius={70} 
+                                paddingAngle={8} dataKey="value"
                             >
                                 {destinationData.map((entry, index) => (
                                     <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} strokeWidth={0} />
@@ -375,9 +379,7 @@ export default function Dashboard() {
                         </div>
                         <div className="space-y-1">
                             <span className="text-gray-400 block uppercase text-[10px] font-bold">Travel Date</span>
-                            <span className="font-semibold text-blue-600">
-                            {booking.travel_date || "Not set"}
-                            </span>
+                            <span className="font-semibold text-blue-600">{booking.travel_date || "Not set"}</span>
                         </div>
                         <div className="space-y-1">
                             <span className="text-gray-400 block uppercase text-[10px] font-bold">Group Size</span>
@@ -385,7 +387,7 @@ export default function Dashboard() {
                         </div>
                         <div className="space-y-1">
                             <span className="text-gray-400 block uppercase text-[10px] font-bold">Total Paid</span>
-                            <span className="font-bold text-green-700 text-lg">¥{Number(booking.total_price).toLocaleString()}</span>
+                            <span className="font-bold text-green-700 text-lg">¥{Number(booking.total_price).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                         </div>
                         </div>
                         
@@ -393,9 +395,7 @@ export default function Dashboard() {
                             <Dialog>
                                 <DialogTrigger asChild>
                                 <Button 
-                                    size="sm" 
-                                    variant="ghost" 
-                                    className="text-blue-600 hover:bg-blue-50"
+                                    size="sm" variant="ghost" className="text-blue-600 hover:bg-blue-50"
                                     onClick={() => setSelectedBooking(booking)}
                                 >
                                     <Eye className="w-4 h-4 mr-2" /> View Details
@@ -406,32 +406,25 @@ export default function Dashboard() {
                                     <DialogTitle className="text-2xl font-bold flex items-center gap-2">
                                         <Info className="w-6 h-6 text-blue-600" /> Booking Management
                                     </DialogTitle>
-                                    <DialogDescription>
-                                    Manage workflow for Booking ID: #{booking.booking_id}
-                                    </DialogDescription>
+                                    <DialogDescription>Manage workflow for Booking ID: #{booking.booking_id}</DialogDescription>
                                 </DialogHeader>
 
                                 <div className="space-y-6 py-4">
-                                    {/* INFO GRID */}
                                     <div className="grid grid-cols-2 gap-4">
                                         <div className="bg-gray-50 p-4 rounded-xl border border-gray-100">
                                             <h5 className="text-xs font-bold text-gray-400 uppercase mb-2">Customer Info</h5>
                                             <p className="font-bold text-gray-900">{booking.user?.full_name || "Guest"}</p>
-                                            <p className="text-sm text-gray-600 flex items-center gap-2 mt-1">
-                                                <Mail className="w-3 h-3" /> {booking.created_by}
-                                            </p>
+                                            <p className="text-sm text-gray-600 flex items-center gap-2 mt-1"><Mail className="w-3 h-3" /> {booking.created_by}</p>
                                         </div>
                                         <div className="bg-green-50 p-4 rounded-xl border border-green-100">
                                             <h5 className="text-xs font-bold text-green-600 uppercase mb-2">Revenue</h5>
-                                            <p className="text-2xl font-black text-green-700">¥{Number(booking.total_price).toLocaleString()}</p>
+                                            <p className="text-2xl font-black text-green-700">¥{Number(booking.total_price).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                                             <p className="text-xs text-green-600 italic">Confirmed Transaction</p>
                                         </div>
                                     </div>
 
                                     <div className="space-y-3">
-                                        <h5 className="font-bold text-gray-900 flex items-center gap-2">
-                                            <MapPin className="w-4 h-4 text-red-500" /> Logistics Status
-                                        </h5>
+                                        <h5 className="font-bold text-gray-900 flex items-center gap-2"><MapPin className="w-4 h-4 text-red-500" /> Logistics Status</h5>
                                         <div className="grid grid-cols-2 gap-y-4 text-sm border rounded-xl p-4">
                                             <div>
                                                 <p className="text-gray-400 uppercase text-[10px] font-bold">Package Name</p>
@@ -448,48 +441,26 @@ export default function Dashboard() {
                                         </div>
                                     </div>
 
-                                    {/* WORKFLOW ACTION BUTTONS */}
                                     <div className="flex flex-col gap-3 pt-4 border-t">
-                                        {/* STEP 1: PAID -> PENDING (QUEUE) */}
                                         {booking.status === "Paid" && (
-                                            <Button 
-                                                className="w-full bg-orange-500 hover:bg-orange-600 text-white"
-                                                onClick={() => updateBookingStatus(booking.booking_id, "Pending")}
-                                            >
+                                            <Button className="w-full bg-orange-500 hover:bg-orange-600 text-white" onClick={() => updateBookingStatus(booking.booking_id, "Pending")}>
                                                 <Clock className="w-4 h-4 mr-2" /> Move to Queue (Pending)
                                             </Button>
                                         )}
-
-                                        {/* STEP 2: PENDING -> CONFIRMED */}
                                         {booking.status === "Pending" && (
-                                            <Button 
-                                                className="w-full bg-blue-600 hover:bg-blue-700 text-white"
-                                                onClick={() => updateBookingStatus(booking.booking_id, "Confirmed")}
-                                            >
+                                            <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white" onClick={() => updateBookingStatus(booking.booking_id, "Confirmed")}>
                                                 <ArrowRightCircle className="w-4 h-4 mr-2" /> Confirm Final Logistics
                                             </Button>
                                         )}
-
-                                        {/* STEP 3: CONFIRMED -> COMPLETED */}
                                         {booking.status === "Confirmed" && (
-                                            <Button 
-                                                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white"
-                                                onClick={() => updateBookingStatus(booking.booking_id, "Completed")}
-                                            >
+                                            <Button className="w-full bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => updateBookingStatus(booking.booking_id, "Completed")}>
                                                 <CheckCircle className="w-4 h-4 mr-2" /> Mark as Completed
                                             </Button>
                                         )}
-
                                         <div className="flex gap-3 mt-2">
-                                            <Button variant="outline" className="flex-1 border-gray-300">
-                                                Contact Customer
-                                            </Button>
+                                            <Button variant="outline" className="flex-1 border-gray-300">Contact Customer</Button>
                                             {booking.status !== "Completed" && booking.status !== "Cancelled" && (
-                                                <Button 
-                                                    variant="outline" 
-                                                    className="flex-1 text-red-600 border-red-200 hover:bg-red-50"
-                                                    onClick={() => updateBookingStatus(booking.booking_id, "Cancelled")}
-                                                >
+                                                <Button variant="outline" className="flex-1 text-red-600 border-red-200 hover:bg-red-50" onClick={() => updateBookingStatus(booking.booking_id, "Cancelled")}>
                                                     Cancel Booking
                                                 </Button>
                                             )}
