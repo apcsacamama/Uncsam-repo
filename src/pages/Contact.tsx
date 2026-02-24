@@ -390,7 +390,7 @@ export default function Contact() {
                     <Label htmlFor="phone">Phone Number</Label>
                     <div className="flex gap-2">
                         <Select value={countryCode} onValueChange={setCountryCode}>
-                            <SelectTrigger className="w-[140px] bg-white">
+                            <SelectTrigger className="w-[120px] bg-white">
                                 <SelectValue placeholder="Code" />
                             </SelectTrigger>
                             <SelectContent>
@@ -423,7 +423,7 @@ export default function Contact() {
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
                     >
                       <option value="general">General Inquiry</option>
-                      <option value="nagoya">Nagoya Tour Package</option>
+                      <option value="nagoya">Tour Package Query</option>
                       <option value="tokyo">Tokyo Disney Tour</option>
                       <option value="custom">Custom Tour</option>
                       <option value="group">Group Booking</option>
